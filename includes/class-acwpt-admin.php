@@ -94,7 +94,10 @@ class ACWPT_Admin {
 		$show_sugg   = isset( $settings['show_suggestion'] ) ? (bool) $settings['show_suggestion'] : true;
 		$api_key     = isset( $settings['api_key'] ) ? $settings['api_key'] : '';
 		$model       = isset( $settings['model'] ) ? $settings['model'] : 'gpt-4o-mini';
-		$cache_stats = ACWPT_Cache::stats();
+		$cache_stats   = ACWPT_Cache::stats();
+		$current_usage = ACWPT_Translator::get_current_month_usage();
+		$total_usage   = ACWPT_Translator::get_total_usage();
+		$usage_history = ACWPT_Translator::get_usage();
 		?>
 		<div class="wrap acwpt-settings">
 			<h1>AC WP Translator</h1>
@@ -228,6 +231,101 @@ class ACWPT_Admin {
 					<span id="acwpt-flush-status"></span>
 				</p>
 				<p class="description">Translations are automatically re-cached when a page is updated or when the cache is cleared.</p>
+			</div>
+
+			<!-- API Usage & Cost -->
+			<div class="acwpt-card">
+				<h2>API Usage & Cost</h2>
+
+				<?php if ( $current_usage ) : ?>
+					<div class="acwpt-usage-current">
+						<h3>Current Month (<?php echo esc_html( gmdate( 'F Y' ) ); ?>)</h3>
+						<table class="acwpt-usage-table">
+							<tr>
+								<td><strong>API Requests</strong></td>
+								<td><?php echo esc_html( number_format( $current_usage['requests'] ) ); ?></td>
+							</tr>
+							<tr>
+								<td><strong>Page Translations</strong></td>
+								<td><?php echo esc_html( number_format( $current_usage['content_translations'] ) ); ?></td>
+							</tr>
+							<tr>
+								<td><strong>String Batches</strong></td>
+								<td><?php echo esc_html( number_format( $current_usage['string_translations'] ) ); ?></td>
+							</tr>
+							<tr>
+								<td><strong>Input Tokens</strong></td>
+								<td><?php echo esc_html( number_format( $current_usage['prompt_tokens'] ) ); ?></td>
+							</tr>
+							<tr>
+								<td><strong>Output Tokens</strong></td>
+								<td><?php echo esc_html( number_format( $current_usage['completion_tokens'] ) ); ?></td>
+							</tr>
+							<tr>
+								<td><strong>Total Tokens</strong></td>
+								<td><?php echo esc_html( number_format( $current_usage['total_tokens'] ) ); ?></td>
+							</tr>
+							<tr class="acwpt-usage-cost-row">
+								<td><strong>Estimated Cost</strong></td>
+								<td><strong>$<?php echo esc_html( number_format( $current_usage['estimated_cost'], 4 ) ); ?></strong></td>
+							</tr>
+						</table>
+					</div>
+				<?php else : ?>
+					<p>No API usage recorded this month yet.</p>
+				<?php endif; ?>
+
+				<?php if ( $total_usage['months'] > 0 ) : ?>
+					<div class="acwpt-usage-totals">
+						<h3>All-Time Totals</h3>
+						<p>
+							<strong><?php echo esc_html( number_format( $total_usage['requests'] ) ); ?></strong> API requests
+							&middot; <strong><?php echo esc_html( number_format( $total_usage['total_tokens'] ) ); ?></strong> tokens
+							&middot; <strong>$<?php echo esc_html( number_format( $total_usage['estimated_cost'], 4 ) ); ?></strong> estimated cost
+							&middot; across <strong><?php echo esc_html( $total_usage['months'] ); ?></strong> month(s)
+						</p>
+					</div>
+
+					<?php if ( count( $usage_history ) > 1 || ( count( $usage_history ) === 1 && ! $current_usage ) ) : ?>
+						<div class="acwpt-usage-history">
+							<h3>Monthly History</h3>
+							<table class="widefat striped acwpt-history-table">
+								<thead>
+									<tr>
+										<th>Month</th>
+										<th>Requests</th>
+										<th>Pages</th>
+										<th>Strings</th>
+										<th>Tokens</th>
+										<th>Cost</th>
+									</tr>
+								</thead>
+								<tbody>
+									<?php foreach ( $usage_history as $month => $mdata ) : ?>
+										<?php
+										$date_obj   = DateTime::createFromFormat( 'Y-m', $month );
+										$month_label = $date_obj ? $date_obj->format( 'M Y' ) : $month;
+										$is_current  = ( $month === gmdate( 'Y-m' ) );
+										?>
+										<tr<?php echo $is_current ? ' class="acwpt-current-month"' : ''; ?>>
+											<td><?php echo esc_html( $month_label ); ?><?php echo $is_current ? ' <em>(current)</em>' : ''; ?></td>
+											<td><?php echo esc_html( number_format( $mdata['requests'] ) ); ?></td>
+											<td><?php echo esc_html( number_format( $mdata['content_translations'] ) ); ?></td>
+											<td><?php echo esc_html( number_format( $mdata['string_translations'] ) ); ?></td>
+											<td><?php echo esc_html( number_format( $mdata['total_tokens'] ) ); ?></td>
+											<td>$<?php echo esc_html( number_format( $mdata['estimated_cost'], 4 ) ); ?></td>
+										</tr>
+									<?php endforeach; ?>
+								</tbody>
+							</table>
+						</div>
+					<?php endif; ?>
+				<?php endif; ?>
+
+				<p class="description" style="margin-top: 12px;">
+					Cost estimates based on OpenAI published pricing: GPT-4o Mini ($0.15/$0.60 per 1M tokens in/out), GPT-4o ($2.50/$10.00 per 1M tokens in/out).
+					Actual charges may vary slightly. Check your <a href="https://platform.openai.com/usage" target="_blank">OpenAI dashboard</a> for exact billing.
+				</p>
 			</div>
 		</div>
 		<?php

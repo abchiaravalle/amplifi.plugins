@@ -45,3 +45,54 @@
 	font-weight: 500;
 	color: #00a32a;
 }
+
+/* Usage & Cost */
+.acwpt-usage-current h3,
+.acwpt-usage-totals h3,
+.acwpt-usage-history h3 {
+	margin-top: 16px;
+	margin-bottom: 8px;
+	font-size: 14px;
+}
+
+.acwpt-usage-table {
+	border-collapse: collapse;
+	margin-bottom: 16px;
+}
+
+.acwpt-usage-table td {
+	padding: 4px 16px 4px 0;
+	vertical-align: top;
+}
+
+.acwpt-usage-cost-row td {
+	padding-top: 8px;
+	border-top: 1px solid #eee;
+	font-size: 15px;
+}
+
+.acwpt-usage-totals {
+	background: #f6f7f7;
+	border-radius: 4px;
+	padding: 12px 16px;
+	margin: 12px 0;
+}
+
+.acwpt-usage-totals p {
+	margin: 0;
+}
+
+.acwpt-history-table {
+	margin-top: 8px;
+}
+
+.acwpt-history-table th,
+.acwpt-history-table td {
+	text-align: left;
+	padding: 6px 12px;
+}
+
+tr.acwpt-current-month {
+	background: #f0f6fc !important;
+	font-weight: 500;
+}
