@@ -1,0 +1,16 @@
+# Docker volumes
+db_data/
+wp_data/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env

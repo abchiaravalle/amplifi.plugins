@@ -1,0 +1,85 @@
+/* Language Switcher Dropdown */
+.acwpt-switcher-wrap {
+	display: inline-block;
+	position: relative;
+}
+
+.acwpt-switcher {
+	padding: 6px 28px 6px 10px;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	background: #fff;
+	font-size: 14px;
+	cursor: pointer;
+	appearance: auto;
+	min-width: 140px;
+}
+
+.acwpt-switcher:hover {
+	border-color: #999;
+}
+
+.acwpt-switcher:focus {
+	outline: 2px solid #2271b1;
+	outline-offset: 1px;
+}
+
+/* Language Suggestion Banner */
+.acwpt-suggestion-banner {
+	position: fixed;
+	bottom: 20px;
+	right: 20px;
+	background: #fff;
+	border: 1px solid #ddd;
+	border-radius: 8px;
+	padding: 14px 18px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	z-index: 99999;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	font-size: 14px;
+	max-width: 400px;
+	animation: acwpt-slide-in 0.3s ease-out;
+}
+
+@keyframes acwpt-slide-in {
+	from {
+		transform: translateY(20px);
+		opacity: 0;
+	}
+	to {
+		transform: translateY(0);
+		opacity: 1;
+	}
+}
+
+.acwpt-suggestion-banner .acwpt-switch-link {
+	display: inline-block;
+	background: #2271b1;
+	color: #fff;
+	text-decoration: none;
+	padding: 6px 14px;
+	border-radius: 4px;
+	font-weight: 500;
+	white-space: nowrap;
+}
+
+.acwpt-suggestion-banner .acwpt-switch-link:hover {
+	background: #135e96;
+}
+
+.acwpt-suggestion-banner .acwpt-dismiss {
+	background: none;
+	border: none;
+	font-size: 20px;
+	cursor: pointer;
+	color: #999;
+	padding: 0 4px;
+	line-height: 1;
+}
+
+.acwpt-suggestion-banner .acwpt-dismiss:hover {
+	color: #333;
+}

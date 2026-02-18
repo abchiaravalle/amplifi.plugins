@@ -1,0 +1,47 @@
+.acwpt-settings .acwpt-card {
+	background: #fff;
+	border: 1px solid #ccd0d4;
+	border-radius: 4px;
+	padding: 20px 24px;
+	margin-bottom: 20px;
+	max-width: 800px;
+}
+
+.acwpt-settings .acwpt-card h2 {
+	margin-top: 0;
+	padding-top: 0;
+	border-bottom: 1px solid #eee;
+	padding-bottom: 10px;
+}
+
+.acwpt-lang-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+	gap: 6px 16px;
+}
+
+.acwpt-lang-grid label {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 0;
+}
+
+#acwpt-key-status {
+	margin-left: 8px;
+	font-weight: 500;
+}
+
+#acwpt-key-status.success {
+	color: #00a32a;
+}
+
+#acwpt-key-status.error {
+	color: #d63638;
+}
+
+#acwpt-flush-status {
+	margin-left: 8px;
+	font-weight: 500;
+	color: #00a32a;
+}
