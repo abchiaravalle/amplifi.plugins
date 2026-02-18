@@ -79,6 +79,9 @@ class ACWPT_Admin {
 			update_option( 'acwpt_flush_rules', true );
 		}
 
+		// Clear string translation caches when settings change.
+		ACWPT_Frontend::instance()->clear_all_string_caches();
+
 		return $clean;
 	}
 
