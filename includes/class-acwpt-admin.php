@@ -20,6 +20,10 @@ class ACWPT_Admin {
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_action( 'wp_ajax_acwpt_test_api_key', array( $this, 'ajax_test_api_key' ) );
 		add_action( 'wp_ajax_acwpt_flush_cache', array( $this, 'ajax_flush_cache' ) );
+
+		// Nav menu meta box for adding Language Switcher to menus.
+		add_action( 'admin_head-nav-menus.php', array( $this, 'add_nav_menu_meta_box' ) );
+		add_filter( 'wp_setup_nav_menu_item', array( $this, 'label_nav_menu_item' ) );
 	}
 
 	public function add_menu() {
@@ -193,13 +197,22 @@ class ACWPT_Admin {
 					</table>
 				</div>
 
-				<!-- Shortcode Info -->
+				<!-- Language Switcher -->
 				<div class="acwpt-card">
-					<h2>Language Switcher Shortcode</h2>
-					<p>Add the language switcher anywhere using:</p>
+					<h2>Language Switcher</h2>
+
+					<h3 style="margin-top:0;">Nav Menu Item</h3>
+					<p>
+						Go to <strong>Appearance &gt; Menus</strong>, find the <strong>AC Language Switcher</strong> panel on the left, and click <em>Add to Menu</em>.
+						The top-level item shows the current language; sub-items list all available languages.
+					</p>
+					<p class="description">Works with any classic WordPress menu. In block themes, use the <em>Classic Menu</em> block in the Site Editor.</p>
+
+					<h3>Shortcode (Dropdown)</h3>
+					<p>Add a <code>&lt;select&gt;</code> dropdown anywhere using:</p>
 					<code>[acwpt_switcher]</code>
 					<p class="description" style="margin-top: 8px;">
-						You can also use it as a widget in theme widget areas, or add it directly in your theme template:
+						You can also use it in theme templates:
 						<code>&lt;?php echo do_shortcode('[acwpt_switcher]'); ?&gt;</code>
 					</p>
 				</div>
@@ -366,5 +379,77 @@ class ACWPT_Admin {
 
 		ACWPT_Cache::flush_all();
 		wp_send_json_success( 'Cache cleared.' );
+	}
+
+	// =========================================================================
+	// Nav Menu Meta Box
+	// =========================================================================
+
+	/**
+	 * Register meta box on the Appearance > Menus screen.
+	 */
+	public function add_nav_menu_meta_box() {
+		add_meta_box(
+			'acwpt-language-switcher-box',
+			'AC Language Switcher',
+			array( $this, 'render_nav_menu_meta_box' ),
+			'nav-menus',
+			'side',
+			'default'
+		);
+	}
+
+	/**
+	 * Render the Language Switcher meta box content.
+	 */
+	public function render_nav_menu_meta_box() {
+		global $_nav_menu_placeholder;
+		$_nav_menu_placeholder = ( isset( $_nav_menu_placeholder ) && $_nav_menu_placeholder < -1 )
+			? $_nav_menu_placeholder - 1
+			: -1;
+		?>
+		<div id="acwpt-lang-switcher-div" class="posttypediv">
+			<div id="tabs-panel-acwpt-switcher" class="tabs-panel tabs-panel-active">
+				<ul id="acwpt-switcher-checklist" class="categorychecklist form-no-clear">
+					<li>
+						<label class="menu-item-title">
+							<input type="checkbox" class="menu-item-checkbox"
+								name="menu-item[<?php echo (int) $_nav_menu_placeholder; ?>][menu-item-object-id]"
+								value="-1" />
+							Language Switcher
+						</label>
+						<input type="hidden" class="menu-item-type"
+							name="menu-item[<?php echo (int) $_nav_menu_placeholder; ?>][menu-item-type]"
+							value="custom" />
+						<input type="hidden" class="menu-item-title"
+							name="menu-item[<?php echo (int) $_nav_menu_placeholder; ?>][menu-item-title]"
+							value="Language Switcher" />
+						<input type="hidden" class="menu-item-url"
+							name="menu-item[<?php echo (int) $_nav_menu_placeholder; ?>][menu-item-url]"
+							value="#acwpt-language-switcher" />
+					</li>
+				</ul>
+			</div>
+			<p class="button-controls wp-clearfix">
+				<span class="add-to-menu">
+					<input type="submit" class="button submit-add-to-menu right"
+						value="<?php esc_attr_e( 'Add to Menu' ); ?>"
+						name="add-post-type-menu-item"
+						id="submit-acwpt-lang-switcher-div" />
+					<span class="spinner"></span>
+				</span>
+			</p>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Customise the type label for the Language Switcher menu item in admin.
+	 */
+	public function label_nav_menu_item( $item ) {
+		if ( is_object( $item ) && isset( $item->url ) && $item->url === '#acwpt-language-switcher' ) {
+			$item->type_label = 'AC Language Switcher';
+		}
+		return $item;
 	}
 }

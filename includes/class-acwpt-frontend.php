@@ -59,6 +59,10 @@ class ACWPT_Frontend {
 		// Language switcher shortcode.
 		add_shortcode( 'acwpt_switcher', array( $this, 'render_switcher' ) );
 
+		// Language switcher as nav menu item.
+		add_filter( 'wp_nav_menu_objects', array( $this, 'expand_language_menu_items' ), 10, 2 );
+		add_filter( 'nav_menu_link_attributes', array( $this, 'add_lang_link_attributes' ), 10, 4 );
+
 		// Enqueue frontend assets.
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 
@@ -433,6 +437,18 @@ class ACWPT_Frontend {
 			return $html;
 		}
 
+		// Protect language switcher links from being translated or re-prefixed.
+		$protected_links = array();
+		$html = preg_replace_callback(
+			'/<a\s[^>]*data-acwpt-lang[^>]*>.*?<\/a>/is',
+			function( $m ) use ( &$protected_links ) {
+				$placeholder = '<!--ACWPT_PROT_' . count( $protected_links ) . '-->';
+				$protected_links[ $placeholder ] = $m[0];
+				return $placeholder;
+			},
+			$html
+		);
+
 		// 1. Translate meta tags (description, OG, Twitter).
 		$html = $this->translate_meta_tags( $html );
 
@@ -450,6 +466,11 @@ class ACWPT_Frontend {
 
 		// 6. Fix og:url to point to translated URL.
 		$html = $this->fix_og_url( $html );
+
+		// Restore protected language switcher links.
+		foreach ( $protected_links as $placeholder => $link ) {
+			$html = str_replace( $placeholder, $link, $html );
+		}
 
 		return $html;
 	}
@@ -721,6 +742,125 @@ class ACWPT_Frontend {
 		$html .= '</div>';
 
 		return $html;
+	}
+
+	// =========================================================================
+	// Language Switcher Nav Menu Item
+	// =========================================================================
+
+	/**
+	 * Expand the Language Switcher placeholder into real language menu items.
+	 */
+	public function expand_language_menu_items( $items, $args ) {
+		$settings   = get_option( 'acwpt_settings', array() );
+		$show_flags = isset( $settings['show_flags'] ) ? (bool) $settings['show_flags'] : true;
+		$source     = ACWPT_Languages::get_source();
+		$enabled    = ACWPT_Languages::get_enabled();
+		$current    = $this->current_language ? $this->current_language : $source;
+		$path       = $this->get_current_page_path();
+
+		if ( empty( $enabled ) ) {
+			return $items;
+		}
+
+		$new_items = array();
+		$counter   = 999990;
+
+		foreach ( $items as $item ) {
+			if ( $item->url !== '#acwpt-language-switcher' ) {
+				$new_items[] = $item;
+				continue;
+			}
+
+			// Set the top-level item to show the current language.
+			$item->title = $this->menu_label( $current, $show_flags );
+			$item->url   = '#';
+			if ( ! is_array( $item->classes ) ) {
+				$item->classes = array();
+			}
+			$item->classes[] = 'acwpt-menu-switcher';
+			$item->classes[] = 'menu-item-has-children';
+			$new_items[]     = $item;
+			$parent_db_id    = $item->db_id;
+
+			// Source language sub-item (only if not currently on source).
+			if ( $current !== $source ) {
+				$new_items[] = $this->create_lang_menu_item(
+					$counter++,
+					$parent_db_id,
+					$this->menu_label( $source, $show_flags ),
+					home_url( $path )
+				);
+			}
+
+			// Enabled language sub-items (skip current).
+			foreach ( $enabled as $code => $lang ) {
+				if ( $code === $current ) {
+					continue;
+				}
+				$new_items[] = $this->create_lang_menu_item(
+					$counter++,
+					$parent_db_id,
+					$this->menu_label( $code, $show_flags ),
+					home_url( '/' . $code . $path )
+				);
+			}
+		}
+
+		return $new_items;
+	}
+
+	/**
+	 * Create a single language sub-menu item object.
+	 */
+	private function create_lang_menu_item( $id, $parent_id, $title, $url ) {
+		$item                        = new stdClass();
+		$item->ID                    = $id;
+		$item->db_id                 = $id;
+		$item->menu_item_parent      = (string) $parent_id;
+		$item->object_id             = $id;
+		$item->object                = 'custom';
+		$item->type                  = 'custom';
+		$item->type_label            = '';
+		$item->title                 = $title;
+		$item->url                   = $url;
+		$item->target                = '';
+		$item->attr_title            = '';
+		$item->description           = '';
+		$item->classes               = array( 'menu-item', 'acwpt-lang-item' );
+		$item->xfn                   = '';
+		$item->current               = false;
+		$item->current_item_ancestor = false;
+		$item->current_item_parent   = false;
+
+		return $item;
+	}
+
+	/**
+	 * Build a label for a language (with or without flag emoji).
+	 */
+	private function menu_label( $code, $show_flags ) {
+		$lang = ACWPT_Languages::get( $code );
+		if ( ! $lang ) {
+			return $code;
+		}
+		$label = '';
+		if ( $show_flags ) {
+			$label .= $lang['flag'] . ' ';
+		}
+		$label .= $lang['name'];
+		return $label;
+	}
+
+	/**
+	 * Add data-acwpt-lang attribute to language sub-item links so the output
+	 * buffer can protect them from being re-prefixed.
+	 */
+	public function add_lang_link_attributes( $atts, $item, $args, $depth ) {
+		if ( is_array( $item->classes ) && in_array( 'acwpt-lang-item', $item->classes, true ) ) {
+			$atts['data-acwpt-lang'] = '1';
+		}
+		return $atts;
 	}
 
 	// =========================================================================

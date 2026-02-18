@@ -17,6 +17,7 @@ No duplicate pages, no manual translations, no complex setup. Just add your API 
 - **URL-based language routing** - Clean URLs like `/es/page-slug/`, `/fr/page-slug/`
 - **OpenAI-powered translation** - Uses GPT-4o Mini (cheapest) or GPT-4o for high-quality, natural translations
 - **Smart caching** - Translations stored in a custom DB table; auto-invalidated when content changes
+- **Language switcher as nav menu item** - Add to any WordPress menu via Appearance > Menus; shows current language at top level with available languages as sub-items
 - **Language switcher shortcode** - `[acwpt_switcher]` renders a dropdown with all enabled languages
 - **Flag emoji toggle** - Show or hide flag emojis in the language switcher
 - **Browser language detection** - Detects visitor's browser language and suggests switching via a dismissable banner
@@ -57,7 +58,21 @@ https://yoursite.com/fr/about-us/       → French
 https://yoursite.com/zh/about-us/       → Chinese
 ```
 
-## Shortcode
+## Language Switcher
+
+### Nav Menu Item
+
+1. Go to **Appearance > Menus** (the plugin registers a menu location so this is available even in block themes)
+2. Find the **AC Language Switcher** panel on the left sidebar
+3. Click **Add to Menu**
+4. Position the item wherever you want in your menu
+5. Save the menu
+
+The top-level item dynamically shows the **current language** (e.g. "Spanish" when viewing `/es/`). Sub-items list all other available languages, each linking to the translated version of the current page. Respects the **Flag Emojis** setting.
+
+In block themes (e.g. Twenty Twenty-Five), use the **Classic Menu** block in the Site Editor and select the menu containing the Language Switcher.
+
+### Shortcode (Dropdown)
 
 ```
 [acwpt_switcher]

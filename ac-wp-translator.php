@@ -37,6 +37,15 @@ function acwpt_init() {
 	}
 }
 
+// Register a nav menu location so Appearance > Menus is available (even in block themes).
+add_action( 'after_setup_theme', 'acwpt_register_nav_menus', 20 );
+
+function acwpt_register_nav_menus() {
+	register_nav_menus( array(
+		'acwpt_languages' => 'Language Switcher (AC Translator)',
+	) );
+}
+
 // Activation.
 register_activation_hook( __FILE__, 'acwpt_activate' );
 
