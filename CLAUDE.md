@@ -12,6 +12,7 @@ WordPress plugin that translates site content in real-time using OpenAI (GPT-4o 
 - **Caching**: Custom DB table `{prefix}_acwpt_translations` keyed by `post_id + language`. Content hash (md5) detects when posts are updated
 - **Cache Invalidation**: `save_post` hook deletes all cached translations for the updated post
 - **Usage Tracking**: Token counts and estimated costs recorded per month in `wp_options` key `acwpt_usage`, displayed in admin dashboard
+- **Multilingual Sitemap**: Generated at `/acwpt-sitemap.xml` via `parse_request` hook; each post gets a `<url>` entry per language with `<xhtml:link>` hreflang alternates. Cached as transient `acwpt_sitemap_xml` (1 hour), invalidated on post save and settings change. Added to `robots.txt` via filter.
 
 ## Key Files
 - `ac-wp-translator.php` - Bootstrap, activation/deactivation hooks, nav menu location registration

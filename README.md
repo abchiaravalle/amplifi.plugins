@@ -21,7 +21,7 @@ No duplicate pages, no manual translations, no complex setup. Just add your API 
 - **Language switcher shortcode** - `[acwpt_switcher]` renders a dropdown with all enabled languages
 - **Flag emoji toggle** - Show or hide flag emojis in the language switcher
 - **Browser language detection** - Detects visitor's browser language and suggests switching via a dismissable banner
-- **SEO-friendly** - Outputs proper `<link rel="alternate" hreflang="...">` tags and sets `<html lang="...">`
+- **SEO-friendly** - Outputs `<link rel="alternate" hreflang="...">` tags, sets `<html lang="...">`, and generates a multilingual sitemap with hreflang annotations at `/acwpt-sitemap.xml`
 - **32 languages supported** - English, Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, Arabic, Russian, Hindi, Dutch, Swedish, Turkish, Polish, Vietnamese, Thai, Indonesian, Ukrainian, Czech, Danish, Finnish, Greek, Hebrew, Hungarian, Norwegian, Romanian, Slovak, Bulgarian, Malay, Tamil, Bengali
 - **Configurable source language** - Your site doesn't have to be in English
 - **Cache management** - View stats and clear cache from the admin panel
@@ -85,6 +85,14 @@ You can also use it in theme templates:
 ```php
 <?php echo do_shortcode('[acwpt_switcher]'); ?>
 ```
+
+## Multilingual Sitemap
+
+The plugin automatically generates a sitemap at `/acwpt-sitemap.xml` that follows [Google's hreflang sitemap spec](https://developers.google.com/search/docs/specialty/international/localized-versions#sitemap). Each published post/page gets a `<url>` entry for every language version, with `<xhtml:link rel="alternate" hreflang="...">` annotations cross-referencing all versions.
+
+- Automatically added to `robots.txt` for search engine discovery
+- Cached for 1 hour; auto-invalidated when posts are updated or settings change
+- Includes `x-default` pointing to the source language URL
 
 ## How Caching Works
 

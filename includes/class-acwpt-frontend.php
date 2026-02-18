@@ -79,6 +79,10 @@ class ACWPT_Frontend {
 			delete_option( 'acwpt_flush_rules' );
 		}
 
+		// Multilingual sitemap.
+		add_action( 'parse_request', array( $this, 'maybe_serve_sitemap' ) );
+		add_filter( 'robots_txt', array( $this, 'add_sitemap_to_robots' ), 10, 2 );
+
 		// Fix canonical URL for translated pages.
 		add_filter( 'get_canonical_url', array( $this, 'filter_canonical_url' ), 10, 2 );
 	}
@@ -936,5 +940,110 @@ class ACWPT_Frontend {
 
 		// Also clear string caches since page titles may have changed (used in nav).
 		$this->clear_all_string_caches();
+
+		// Invalidate the sitemap cache.
+		delete_transient( 'acwpt_sitemap_xml' );
+	}
+
+	// =========================================================================
+	// Multilingual Sitemap
+	// =========================================================================
+
+	/**
+	 * Intercept requests for /acwpt-sitemap.xml and serve the sitemap.
+	 */
+	public function maybe_serve_sitemap( $wp ) {
+		if ( ! isset( $wp->request ) || $wp->request !== 'acwpt-sitemap.xml' ) {
+			return;
+		}
+
+		$enabled = ACWPT_Languages::get_enabled_codes();
+		if ( empty( $enabled ) ) {
+			return; // Let WordPress 404 normally.
+		}
+
+		// Serve from cache if available.
+		$xml = get_transient( 'acwpt_sitemap_xml' );
+		if ( ! $xml ) {
+			$xml = $this->generate_sitemap_xml();
+			set_transient( 'acwpt_sitemap_xml', $xml, HOUR_IN_SECONDS );
+		}
+
+		status_header( 200 );
+		header( 'Content-Type: application/xml; charset=UTF-8' );
+		echo $xml;
+		exit;
+	}
+
+	/**
+	 * Add sitemap URL to robots.txt.
+	 */
+	public function add_sitemap_to_robots( $output, $public ) {
+		if ( $public ) {
+			$enabled = ACWPT_Languages::get_enabled_codes();
+			if ( ! empty( $enabled ) ) {
+				$output .= "\nSitemap: " . home_url( '/acwpt-sitemap.xml' ) . "\n";
+			}
+		}
+		return $output;
+	}
+
+	/**
+	 * Generate the multilingual sitemap XML with hreflang annotations.
+	 *
+	 * Each published post/page gets a <url> entry for every language version.
+	 * Every entry includes <xhtml:link> alternates pointing to all language
+	 * versions plus x-default (the source language URL).
+	 */
+	private function generate_sitemap_xml() {
+		$enabled = ACWPT_Languages::get_enabled_codes();
+		$source  = ACWPT_Languages::get_source();
+		$home    = home_url();
+
+		$posts = get_posts( array(
+			'post_type'      => array( 'page', 'post' ),
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'orderby'        => 'modified',
+			'order'          => 'DESC',
+		) );
+
+		$xml  = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+		$xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"' . "\n";
+		$xml .= '        xmlns:xhtml="http://www.w3.org/1999/xhtml">' . "\n";
+
+		foreach ( $posts as $post ) {
+			$permalink = get_permalink( $post );
+			$lastmod   = get_post_modified_time( 'c', true, $post );
+
+			$relative  = str_replace( $home, '', $permalink );
+			$relative  = '/' . ltrim( $relative, '/' );
+
+			// Build URLs for all language versions.
+			$lang_urls            = array();
+			$lang_urls[ $source ] = $permalink;
+			foreach ( $enabled as $code ) {
+				$lang_urls[ $code ] = home_url( '/' . $code . $relative );
+			}
+
+			// A <url> block for each language version.
+			foreach ( $lang_urls as $lang => $url ) {
+				$xml .= "  <url>\n";
+				$xml .= '    <loc>' . esc_url( $url ) . "</loc>\n";
+				if ( $lastmod ) {
+					$xml .= '    <lastmod>' . esc_html( $lastmod ) . "</lastmod>\n";
+				}
+				// Hreflang alternates (every version, including self).
+				foreach ( $lang_urls as $alt_lang => $alt_url ) {
+					$xml .= '    <xhtml:link rel="alternate" hreflang="' . esc_attr( $alt_lang ) . '" href="' . esc_url( $alt_url ) . '" />' . "\n";
+				}
+				$xml .= '    <xhtml:link rel="alternate" hreflang="x-default" href="' . esc_url( $permalink ) . '" />' . "\n";
+				$xml .= "  </url>\n";
+			}
+		}
+
+		$xml .= '</urlset>';
+
+		return $xml;
 	}
 }

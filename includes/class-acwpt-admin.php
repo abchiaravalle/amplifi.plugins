@@ -86,6 +86,9 @@ class ACWPT_Admin {
 		// Clear string translation caches when settings change.
 		ACWPT_Frontend::instance()->clear_all_string_caches();
 
+		// Invalidate sitemap cache.
+		delete_transient( 'acwpt_sitemap_xml' );
+
 		return $clean;
 	}
 
@@ -214,6 +217,18 @@ class ACWPT_Admin {
 					<p class="description" style="margin-top: 8px;">
 						You can also use it in theme templates:
 						<code>&lt;?php echo do_shortcode('[acwpt_switcher]'); ?&gt;</code>
+					</p>
+				</div>
+
+			<!-- SEO Sitemap -->
+				<div class="acwpt-card">
+					<h2>Multilingual Sitemap</h2>
+					<p>A sitemap with <code>hreflang</code> annotations is automatically generated at:</p>
+					<p><a href="<?php echo esc_url( home_url( '/acwpt-sitemap.xml' ) ); ?>" target="_blank"><code><?php echo esc_html( home_url( '/acwpt-sitemap.xml' ) ); ?></code></a></p>
+					<p class="description">
+						This sitemap is referenced in <code>robots.txt</code> and tells search engines about every language version of every page.
+						It follows <a href="https://developers.google.com/search/docs/specialty/international/localized-versions#sitemap" target="_blank">Google's hreflang sitemap spec</a>.
+						The sitemap is cached for 1 hour and automatically regenerated when posts are updated or settings change.
 					</p>
 				</div>
 
