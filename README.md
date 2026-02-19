@@ -1,6 +1,15 @@
-# AC WP Translator
+<p align="center">
+  <img src="assets/icon.svg" alt="Polyglot icon" width="96" height="96">
+</p>
 
-AI-powered real-time translation plugin for WordPress using OpenAI. Translates pages and posts on the fly with URL-based language prefixes (`/es/`, `/fr/`, `/zh/`, etc.) and smart database caching.
+<h1 align="center">Polyglot</h1>
+
+<p align="center">
+  AI-powered real-time translation for WordPress using OpenAI.<br>
+  Translates pages and posts on the fly with URL-based language prefixes and smart caching.
+</p>
+
+---
 
 ## How It Works
 
@@ -22,10 +31,37 @@ No duplicate pages, no manual translations, no complex setup. Just add your API 
 - **Flag emoji toggle** - Show or hide flag emojis in the language switcher
 - **Browser language detection** - Detects visitor's browser language and suggests switching via a dismissable banner
 - **SEO-friendly** - Outputs `<link rel="alternate" hreflang="...">` tags, sets `<html lang="...">`, and generates a multilingual sitemap with hreflang annotations at `/acwpt-sitemap.xml`
-- **32 languages supported** - English, Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, Arabic, Russian, Hindi, Dutch, Swedish, Turkish, Polish, Vietnamese, Thai, Indonesian, Ukrainian, Czech, Danish, Finnish, Greek, Hebrew, Hungarian, Norwegian, Romanian, Slovak, Bulgarian, Malay, Tamil, Bengali
+- **33 languages supported** - English, Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, Arabic, Russian, Hindi, Dutch, Swedish, Turkish, Polish, Vietnamese, Thai, Indonesian, Ukrainian, Czech, Danish, Finnish, Greek, Hebrew, Hungarian, Norwegian, Romanian, Slovak, Bulgarian, Malay, Tamil, Bengali
 - **Configurable source language** - Your site doesn't have to be in English
+- **API usage tracking** - Monitor requests, tokens, and estimated cost from the admin panel
 - **Cache management** - View stats and clear cache from the admin panel
 - **Clean uninstall** - Removes all data (DB table + options) when deleted
+
+## Screenshots
+
+### Admin Settings
+
+Configure your API key, model, source language, target languages, and display options all in one place.
+
+![Admin Settings](assets/screenshots/admin-settings.png)
+
+### English (Source)
+
+Your original content, with the language switcher dropdown showing all available translations.
+
+![English page](assets/screenshots/page-english.png)
+
+### Spanish Translation
+
+Full page translation including title, content, and navigation - all generated automatically by OpenAI.
+
+![Spanish translation](assets/screenshots/page-spanish.png)
+
+### Chinese Translation
+
+Even complex scripts are translated accurately with proper character rendering.
+
+![Chinese translation](assets/screenshots/page-chinese.png)
 
 ## Installation
 
@@ -34,7 +70,7 @@ No duplicate pages, no manual translations, no complex setup. Just add your API 
 3. Go to **Settings > AC Translator**
 4. Enter your OpenAI API key
 5. Select which languages to enable
-6. Add `[acwpt_switcher]` to your pages, header, or widget areas
+6. Add the language switcher to a nav menu or use `[acwpt_switcher]` shortcode
 
 ## Settings
 
@@ -137,18 +173,20 @@ This starts WordPress on port **8085** and MySQL on port **3310**. The plugin di
 ac-wp-translator/
 ├── ac-wp-translator.php          # Main plugin file, bootstrap
 ├── includes/
-│   ├── class-acwpt-languages.php # Language definitions (32 languages)
-│   ├── class-acwpt-cache.php     # Database table CRUD
+│   ├── class-acwpt-languages.php # Language definitions (33 languages)
+│   ├── class-acwpt-cache.php     # Database table CRUD & usage tracking
 │   ├── class-acwpt-translator.php # OpenAI API integration
-│   ├── class-acwpt-admin.php     # Settings page
-│   └── class-acwpt-frontend.php  # URL routing, content filters, shortcode, SEO
+│   ├── class-acwpt-admin.php     # Settings page & nav menu meta box
+│   └── class-acwpt-frontend.php  # URL routing, content filters, shortcode, SEO, sitemap
 ├── assets/
+│   ├── icon.svg                  # Plugin icon
 │   ├── css/
 │   │   ├── admin.css             # Admin settings styles
 │   │   └── frontend.css          # Switcher & suggestion banner styles
-│   └── js/
-│       ├── admin.js              # API key test & cache flush
-│       └── detect.js             # Browser language detection
+│   ├── js/
+│   │   ├── admin.js              # API key test & cache flush
+│   │   └── detect.js             # Browser language detection
+│   └── screenshots/              # README screenshots
 ├── uninstall.php                 # Cleanup on plugin deletion
 ├── docker-compose.yml            # Development environment
 └── README.md
