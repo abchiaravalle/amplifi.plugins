@@ -18,6 +18,7 @@
   - [amplifi.meta](#amplifimeta)
   - [amplifi.magic](#amplifimagic)
   - [amplifi.lockcache](#amplifilockcache)
+  - [amplifi.pods](#amplifipods)
 - [Installation](#installation)
 - [Auto-Updates](#auto-updates)
 - [Releases](#releases)
@@ -89,6 +90,19 @@ Static HTML cache for password-protected WordPress posts. Caches unlocked conten
 - Preload all caches, debug log viewer (newest first)
 - No-cache headers for still-locked posts
 
+### amplifi.pods
+
+Podcast carousel and floating player for WordPress. Display episodes from an Apple Podcasts RSS feed or a built-in custom post type with a Swiper-powered carousel and floating Apple Podcasts embed player.
+
+**Features:**
+- Dual mode: RSS feed parsing or custom post type episodes
+- Responsive Swiper.js carousel with breakpoints for mobile/tablet/desktop
+- Floating Apple Podcasts embed player with slide-up animation
+- Episode categories for CPT mode filtering
+- Site-agnostic: no font declarations, no Bootstrap, CSS custom properties for theme overrides
+- RSS feed caching (1 hour) for performance
+- Admin documentation page with shortcode reference and episode list
+
 ## Installation
 
 1. Download the latest plugin zip from [Releases](https://github.com/abchiaravalle/amplifi.plugins/releases/latest)
@@ -110,6 +124,7 @@ Releases are created with the included release script:
 ./scripts/release.sh 1.2.0 ac-bulk-meta       # Release specific plugin
 ./scripts/release.sh 1.2.0 ac-magic-links     # Release specific plugin
 ./scripts/release.sh 1.2.0 ac-static-cache   # Release specific plugin
+./scripts/release.sh 1.2.0 ac-pods           # Release specific plugin
 ```
 
 This will:
@@ -150,8 +165,13 @@ amplifi.plugins/
 │   │   ├── includes/              # Framework (copied at release)
 │   │   ├── uninstall.php          # Clean uninstall
 │   │   └── docker-compose.yml     # Dev environment
-│   └── ac-static-cache/           # amplifi.lockcache plugin
-│       ├── ac-static-cache.php    # Main plugin file
+│   ├── ac-static-cache/           # amplifi.lockcache plugin
+│   │   ├── ac-static-cache.php    # Main plugin file
+│   │   ├── includes/              # Framework (copied at release)
+│   │   ├── uninstall.php          # Clean uninstall
+│   │   └── docker-compose.yml     # Dev environment
+│   └── ac-pods/                   # amplifi.pods plugin
+│       ├── ac-pods.php            # Main plugin file
 │       ├── includes/              # Framework (copied at release)
 │       ├── uninstall.php          # Clean uninstall
 │       └── docker-compose.yml     # Dev environment
@@ -182,6 +202,10 @@ docker-compose up -d
 cd plugins/ac-static-cache
 docker-compose up -d
 # WordPress on :8089, MySQL on :3315
+
+cd plugins/ac-pods
+docker-compose up -d
+# WordPress on :8090, MySQL on :3316
 ```
 
 ## License

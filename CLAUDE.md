@@ -123,6 +123,48 @@ Hook suffix: `amplifi-studio_page_amplifi-ac-static-cache`
 - Debug log: `wp-content/pp-static-cache/ppsc-debug.log`
 - No `wp_options` or post meta used
 
+## Plugin: amplifi.pods (`plugins/ac-pods/`)
+Podcast carousel and floating player via Apple Podcasts RSS feed or built-in custom post type.
+
+### Architecture
+- **Single-file plugin**: All logic in `ac-pods.php` — CPT, taxonomy, meta boxes, shortcode, carousel, floating player, admin page
+- **Dual Mode**: RSS Feed mode (parses Apple Podcasts RSS) or CPT mode (queries `amplifi-podcasts` posts)
+- **Swiper Carousel**: Responsive card carousel via Swiper.js CDN, multiple instances per page
+- **Floating Player**: Fixed-position Apple Podcasts embed player with slide-up animation
+- **RSS Caching**: 1-hour transient cache keyed on `md5($feed_url)`
+- **Site-Agnostic**: No font declarations, no Bootstrap, all styling via `--acpods-*` CSS custom properties
+
+### Key Files
+- `ac-pods.php` - Everything: bootstrap, framework registration, CPT, taxonomy, meta boxes, shortcode, carousel, player, CSS, JS, admin page
+- `includes/amplifi-framework.php` - Shared framework (copied from `shared/`)
+- `uninstall.php` - Removes all `amplifi-podcasts` posts and RSS cache transients
+
+### Admin Menu
+Single page under the **amplifi.studio** menu:
+- **Pods** — registered via `amplifi_register_plugin()` → slug: `amplifi-ac-pods`
+
+Hook suffix: `amplifi-studio_page_amplifi-ac-pods`
+
+### Data Storage
+**Post meta on `amplifi-podcasts` CPT:**
+| Key | Purpose |
+|-----|---------|
+| `_acpods_show_name` | Podcast show name |
+| `_acpods_apple_show_id` | Apple show ID (for embed) |
+| `_acpods_apple_episode_id` | Apple episode ID (for embed) |
+| `_acpods_artwork_url` | Episode artwork URL |
+| `_acpods_episode_number` | Episode number |
+| `_acpods_duration` | Duration (e.g. "42 min") |
+
+**Transients:** `acpods_rss_{md5}` — cached RSS feed data (1 hour)
+
+### Shortcode
+```
+[amplifi-pods feed="https://..." count="8"]   <!-- RSS mode -->
+[amplifi-pods]                                 <!-- CPT mode, all episodes -->
+[amplifi-pods category="tech" count="6"]       <!-- CPT mode, filtered -->
+```
+
 ## Releasing
 ```bash
 ./scripts/release.sh 1.0.0                  # All plugins
@@ -130,6 +172,7 @@ Hook suffix: `amplifi-studio_page_amplifi-ac-static-cache`
 ./scripts/release.sh 1.0.0 ac-bulk-meta     # Just meta
 ./scripts/release.sh 1.0.0 ac-magic-links   # Just magic
 ./scripts/release.sh 1.0.0 ac-static-cache  # Just cache
+./scripts/release.sh 1.0.0 ac-pods          # Just pods
 ```
 The script: validates semver, copies `shared/amplifi-framework.php` + `LICENSE` into each plugin, zips them, generates changelog from git log, creates a GitHub release with assets.
 
@@ -146,6 +189,9 @@ docker-compose up -d    # WordPress on :8088, MySQL on :3314
 
 cd plugins/ac-static-cache
 docker-compose up -d    # WordPress on :8089, MySQL on :3315
+
+cd plugins/ac-pods
+docker-compose up -d    # WordPress on :8090, MySQL on :3316
 ```
 Plugin dirs are volume-mounted so edits are live.
 
