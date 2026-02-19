@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "plugins": {
+    "ac-wp-translator": {
+      "name": "Translate",
+      "description": "AI-powered real-time translation using OpenAI with URL-based language prefixes and smart caching.",
+      "icon": "dashicons-translation"
+    },
+    "ac-bulk-meta": {
+      "name": "Meta",
+      "description": "AI-powered bulk SEO meta editor with FAQ generation and JSON-LD structured data.",
+      "icon": "dashicons-editor-code"
+    },
+    "ac-magic-links": {
+      "name": "Magic",
+      "description": "One-click magic links for password-protected pages with usage logging and IP geolocation.",
+      "icon": "dashicons-admin-links"
+    },
+    "ac-static-cache": {
+      "name": "LockCache",
+      "description": "Static HTML cache for password-protected posts with admin management and debug logging.",
+      "icon": "dashicons-performance"
+    },
+    "ac-pods": {
+      "name": "Pods",
+      "description": "Podcast carousel and floating player via Apple Podcasts RSS feed or built-in custom post type.",
+      "icon": "dashicons-microphone"
+    }
+  }
+}

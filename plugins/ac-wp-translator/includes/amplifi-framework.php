@@ -48,10 +48,11 @@ function amplifi_register_plugin( $slug, $name, $description, $version, $file, $
 }
 
 /**
- * Initialize the framework: admin menu, auto-updates.
+ * Initialize the framework: admin menu, auto-updates, AJAX handlers.
  */
 add_action( 'admin_menu', 'amplifi_admin_menu', 5 );
 add_action( 'admin_enqueue_scripts', 'amplifi_hub_assets' );
+add_action( 'wp_ajax_amplifi_install_plugin', 'amplifi_ajax_install_plugin' );
 
 // Auto-updates.
 add_filter( 'pre_set_site_transient_update_plugins', 'amplifi_check_for_updates' );
@@ -121,11 +122,45 @@ function amplifi_hub_assets( $hook ) {
 		.amplifi-plugin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 16px; }
 		.amplifi-plugin-card { background: #fff; border: 1px solid #c3c4c7; border-radius: 4px; padding: 20px; }
 		.amplifi-plugin-card h3 { margin: 0 0 8px; font-size: 16px; }
+		.amplifi-plugin-card h3 .dashicons { margin-right: 6px; color: #999; }
 		.amplifi-plugin-card .description { color: #666; margin-bottom: 12px; }
 		.amplifi-plugin-card .meta { font-size: 12px; color: #999; }
 		.amplifi-plugin-card .status { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
 		.amplifi-plugin-card .status.installed { background: #d4edda; color: #155724; }
 		.amplifi-plugin-card .status.available { background: #e2e3e5; color: #383d41; }
+		.amplifi-plugin-card .status.update-available { background: #fff3cd; color: #856404; }
+		.amplifi-plugin-card .actions { margin-top: 4px; }
+		.amplifi-plugin-card .actions .button { margin-right: 6px; }
+		.amplifi-install-btn.installing { opacity: 0.6; pointer-events: none; }
+	' );
+
+	wp_add_inline_script( 'jquery-core', '
+		jQuery(function($) {
+			$(".amplifi-hub").on("click", ".amplifi-install-btn", function(e) {
+				e.preventDefault();
+				var $btn = $(this);
+				if ($btn.hasClass("installing")) return;
+
+				var slug = $btn.data("slug");
+				$btn.addClass("installing").text("Installing\u2026");
+
+				$.post(ajaxurl, {
+					action: "amplifi_install_plugin",
+					slug: slug,
+					_ajax_nonce: $btn.data("nonce")
+				}, function(response) {
+					if (response.success) {
+						location.reload();
+					} else {
+						$btn.removeClass("installing").text("Install");
+						alert(response.data || "Installation failed.");
+					}
+				}).fail(function() {
+					$btn.removeClass("installing").text("Install");
+					alert("Request failed. Please try again.");
+				});
+			});
+		});
 	' );
 }
 
@@ -135,13 +170,10 @@ function amplifi_hub_assets( $hook ) {
 function amplifi_render_hub() {
 	global $amplifi_plugins;
 
-	// Known plugins in the amplifi.studio suite.
-	$catalog = array(
-		'ac-wp-translator' => array(
-			'name'        => 'Translate',
-			'description' => 'AI-powered real-time translation using OpenAI with URL-based language prefixes and smart caching.',
-		),
-	);
+	$catalog = amplifi_get_manifest();
+	$release = amplifi_get_latest_release();
+	$latest_version = $release ? ltrim( $release['tag_name'], 'v' ) : '';
+	$install_nonce  = wp_create_nonce( 'amplifi_install_plugin' );
 
 	?>
 	<div class="wrap amplifi-hub">
@@ -150,19 +182,34 @@ function amplifi_render_hub() {
 
 		<div class="amplifi-plugin-grid">
 			<?php foreach ( $catalog as $slug => $info ) :
-				$installed = isset( $amplifi_plugins[ $slug ] );
-				$version   = $installed ? $amplifi_plugins[ $slug ]['version'] : '';
+				$installed    = isset( $amplifi_plugins[ $slug ] );
+				$version      = $installed ? $amplifi_plugins[ $slug ]['version'] : '';
+				$has_update   = $installed && $latest_version && version_compare( $latest_version, $version, '>' );
+				$download_url = amplifi_get_download_url( $slug );
+				$icon_class   = ! empty( $info['icon'] ) ? $info['icon'] : 'dashicons-admin-plugins';
 			?>
 				<div class="amplifi-plugin-card">
-					<h3><?php echo esc_html( $info['name'] ); ?></h3>
+					<h3><span class="dashicons <?php echo esc_attr( $icon_class ); ?>"></span><?php echo esc_html( $info['name'] ); ?></h3>
 					<p class="description"><?php echo esc_html( $info['description'] ); ?></p>
 					<p>
-						<?php if ( $installed ) : ?>
+						<?php if ( $installed && $has_update ) : ?>
+							<span class="status update-available">Update available: <?php echo esc_html( $latest_version ); ?></span>
+						<?php elseif ( $installed ) : ?>
 							<span class="status installed">Installed <?php echo esc_html( $version ); ?></span>
-							<a href="<?php echo esc_url( admin_url( 'admin.php?page=amplifi-' . $slug ) ); ?>" class="button button-primary" style="margin-left: 8px;">Settings</a>
 						<?php else : ?>
 							<span class="status available">Available</span>
-							<a href="https://github.com/<?php echo esc_attr( AMPLIFI_GITHUB_REPO ); ?>/releases/latest" target="_blank" class="button" style="margin-left: 8px;">Download</a>
+						<?php endif; ?>
+					</p>
+					<p class="actions">
+						<?php if ( $installed && $has_update ) : ?>
+							<a href="<?php echo esc_url( admin_url( 'update-core.php' ) ); ?>" class="button button-primary">Update</a>
+							<a href="<?php echo esc_url( admin_url( 'admin.php?page=amplifi-' . $slug ) ); ?>" class="button">Settings</a>
+						<?php elseif ( $installed ) : ?>
+							<a href="<?php echo esc_url( admin_url( 'admin.php?page=amplifi-' . $slug ) ); ?>" class="button button-primary">Settings</a>
+						<?php elseif ( $download_url && current_user_can( 'install_plugins' ) ) : ?>
+							<button type="button" class="button button-primary amplifi-install-btn" data-slug="<?php echo esc_attr( $slug ); ?>" data-nonce="<?php echo esc_attr( $install_nonce ); ?>">Install</button>
+						<?php else : ?>
+							<a href="https://github.com/<?php echo esc_attr( AMPLIFI_GITHUB_REPO ); ?>/releases/latest" target="_blank" class="button">Download</a>
 						<?php endif; ?>
 					</p>
 				</div>
@@ -181,6 +228,167 @@ function amplifi_render_hub() {
 		</p>
 	</div>
 	<?php
+}
+
+// =============================================================================
+// Plugin Manifest & Install
+// =============================================================================
+
+/**
+ * Get the plugin catalog from the remote manifest, with hardcoded fallback.
+ *
+ * Looks for plugins-manifest.json in the latest GitHub release assets.
+ * Falls back to a hardcoded catalog if the manifest is unavailable.
+ *
+ * @return array Associative array of slug => plugin info.
+ */
+function amplifi_get_manifest() {
+	$cached = get_transient( 'amplifi_plugin_manifest' );
+	if ( is_array( $cached ) ) {
+		return $cached;
+	}
+
+	$catalog = null;
+	$release = amplifi_get_latest_release();
+
+	if ( $release && ! empty( $release['assets'] ) ) {
+		// Find the manifest asset.
+		$manifest_url = '';
+		foreach ( $release['assets'] as $asset ) {
+			if ( $asset['name'] === 'plugins-manifest.json' ) {
+				$manifest_url = $asset['browser_download_url'];
+				break;
+			}
+		}
+
+		if ( $manifest_url ) {
+			$response = wp_remote_get( $manifest_url, array( 'timeout' => 10 ) );
+
+			if ( ! is_wp_error( $response ) && wp_remote_retrieve_response_code( $response ) === 200 ) {
+				$data = json_decode( wp_remote_retrieve_body( $response ), true );
+
+				if ( ! empty( $data['plugins'] ) && ( ! isset( $data['schema_version'] ) || $data['schema_version'] === 1 ) ) {
+					$catalog = $data['plugins'];
+				}
+			}
+		}
+	}
+
+	// Fallback: hardcoded catalog for pre-manifest releases or when GitHub is unreachable.
+	if ( ! $catalog ) {
+		$catalog = array(
+			'ac-wp-translator' => array(
+				'name'        => 'Translate',
+				'description' => 'AI-powered real-time translation using OpenAI with URL-based language prefixes and smart caching.',
+				'icon'        => 'dashicons-translation',
+			),
+			'ac-bulk-meta' => array(
+				'name'        => 'Meta',
+				'description' => 'AI-powered bulk SEO meta editor with FAQ generation and JSON-LD structured data.',
+				'icon'        => 'dashicons-editor-code',
+			),
+			'ac-magic-links' => array(
+				'name'        => 'Magic',
+				'description' => 'One-click magic links for password-protected pages with usage logging and IP geolocation.',
+				'icon'        => 'dashicons-admin-links',
+			),
+			'ac-static-cache' => array(
+				'name'        => 'LockCache',
+				'description' => 'Static HTML cache for password-protected posts with admin management and debug logging.',
+				'icon'        => 'dashicons-performance',
+			),
+			'ac-pods' => array(
+				'name'        => 'Pods',
+				'description' => 'Podcast carousel and floating player via Apple Podcasts RSS feed or built-in custom post type.',
+				'icon'        => 'dashicons-microphone',
+			),
+		);
+	}
+
+	set_transient( 'amplifi_plugin_manifest', $catalog, 6 * HOUR_IN_SECONDS );
+	return $catalog;
+}
+
+/**
+ * Get the download URL for a plugin from the latest release assets.
+ *
+ * @param string $slug Plugin slug.
+ * @return string Download URL, or empty string if not found.
+ */
+function amplifi_get_download_url( $slug ) {
+	$release = amplifi_get_latest_release();
+	if ( ! $release || empty( $release['assets'] ) ) {
+		return '';
+	}
+
+	foreach ( $release['assets'] as $asset ) {
+		if ( strpos( $asset['name'], $slug ) !== false && substr( $asset['name'], -4 ) === '.zip' ) {
+			return $asset['browser_download_url'];
+		}
+	}
+
+	return '';
+}
+
+/**
+ * AJAX handler: install and activate a plugin from the latest release.
+ */
+function amplifi_ajax_install_plugin() {
+	check_ajax_referer( 'amplifi_install_plugin' );
+
+	if ( ! current_user_can( 'install_plugins' ) ) {
+		wp_send_json_error( 'You do not have permission to install plugins.' );
+	}
+
+	$slug = isset( $_POST['slug'] ) ? sanitize_text_field( wp_unslash( $_POST['slug'] ) ) : '';
+	if ( empty( $slug ) ) {
+		wp_send_json_error( 'No plugin specified.' );
+	}
+
+	$download_url = amplifi_get_download_url( $slug );
+	if ( empty( $download_url ) ) {
+		wp_send_json_error( 'Download URL not found for this plugin.' );
+	}
+
+	// Verify the URL points to our GitHub repo.
+	if ( strpos( $download_url, 'github.com/' . AMPLIFI_GITHUB_REPO ) === false
+		&& strpos( $download_url, 'objects.githubusercontent.com' ) === false ) {
+		wp_send_json_error( 'Invalid download source.' );
+	}
+
+	require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+	require_once ABSPATH . 'wp-admin/includes/plugin-install.php';
+
+	$skin     = new WP_Ajax_Upgrader_Skin();
+	$upgrader = new Plugin_Upgrader( $skin );
+	$result   = $upgrader->install( $download_url );
+
+	if ( is_wp_error( $result ) ) {
+		wp_send_json_error( $result->get_error_message() );
+	}
+
+	if ( is_wp_error( $skin->result ) ) {
+		wp_send_json_error( $skin->result->get_error_message() );
+	}
+
+	if ( ! $result ) {
+		wp_send_json_error( 'Installation failed. Check filesystem permissions.' );
+	}
+
+	// Activate the plugin.
+	$plugin_file = $slug . '/' . $slug . '.php';
+	$activated   = activate_plugin( $plugin_file );
+
+	if ( is_wp_error( $activated ) ) {
+		// Installed but activation failed — still a partial success.
+		wp_send_json_error( 'Installed but activation failed: ' . $activated->get_error_message() );
+	}
+
+	// Clear transients so the hub re-evaluates state.
+	delete_transient( 'amplifi_plugin_manifest' );
+	delete_transient( 'amplifi_latest_release' );
+
+	wp_send_json_success( array( 'slug' => $slug ) );
 }
 
 // =============================================================================

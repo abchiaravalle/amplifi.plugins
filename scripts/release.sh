@@ -132,6 +132,10 @@ for slug in "${PLUGINS[@]}"; do
     build_plugin_zip "$slug" "$VERSION"
 done
 
+# Copy manifest into dist.
+cp "${REPO_ROOT}/plugins-manifest.json" "${DIST_DIR}/plugins-manifest.json"
+echo "  -> dist/plugins-manifest.json"
+
 # Generate changelog.
 LAST_TAG="$(get_last_tag)"
 CHANGELOG="$(generate_changelog "$LAST_TAG" "$VERSION")"
@@ -149,7 +153,7 @@ git tag -a "$TAG" -m "Release ${TAG}"
 git push origin "$TAG"
 
 # Build the gh release command with all zip assets.
-ASSET_ARGS=()
+ASSET_ARGS=("${DIST_DIR}/plugins-manifest.json")
 for slug in "${PLUGINS[@]}"; do
     ASSET_ARGS+=("${DIST_DIR}/${slug}-v${VERSION}.zip")
 done
