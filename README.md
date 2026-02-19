@@ -15,6 +15,9 @@
 
 - [Plugins](#plugins)
   - [amplifi.translate](#amplifitranslate)
+  - [amplifi.meta](#amplifimeta)
+  - [amplifi.magic](#amplifimagic)
+  - [amplifi.lockcache](#amplifilockcache)
 - [Installation](#installation)
 - [Auto-Updates](#auto-updates)
 - [Releases](#releases)
@@ -48,6 +51,44 @@ AI-powered real-time translation for WordPress using OpenAI. Translates pages an
 
 [Full documentation](plugins/ac-wp-translator/README.md)
 
+### amplifi.meta
+
+AI-powered bulk SEO meta editor for WordPress. Edit Yoast SEO metadata (titles, descriptions, focus keyphrases) across all post types with bulk AI generation via OpenAI.
+
+**Features:**
+- Bulk edit Yoast SEO titles, meta descriptions, and focus keyphrases
+- AI-powered generation for all metadata types (single or bulk)
+- FAQ generation and deployment with accordion/expanded display modes
+- JSON-LD structured data generation (Organization + per-page)
+- Dark mode, webhook logging, CSV export
+- Custom AI writing style instructions
+- Global FAQ deploy settings with custom CSS
+
+### amplifi.magic
+
+One-click magic links for WordPress password-protected pages. Generate shareable tokens that auto-set WP password cookies — no password entry needed. Includes usage logging with IP geolocation.
+
+**Features:**
+- Generate named magic link tokens for any password-protected post/page
+- One-click access — sets hashed WP password cookies automatically
+- Token revocation with revoked tokens history
+- Per-token usage logs with date/time, IP address, and geolocation
+- Unified, filterable access logs table (filter by page, token, IP, location, date range)
+- Copy-to-clipboard for sharing magic links
+
+### amplifi.lockcache
+
+Static HTML cache for password-protected WordPress posts. Caches unlocked content for non-admin visitors, serves it instantly on subsequent visits, and provides an admin panel for cache management and debug logging.
+
+**Features:**
+- Automatic static HTML caching of unlocked password-protected posts
+- Skips caching for admin users (avoids admin bar in cache)
+- Skips caching for AJAX and Search & Filter Pro requests
+- Cache directory protected by `.htaccess` with 0600 file permissions
+- Admin panel: view all password-protected posts, cache status, clear individual or all caches
+- Preload all caches, debug log viewer (newest first)
+- No-cache headers for still-locked posts
+
 ## Installation
 
 1. Download the latest plugin zip from [Releases](https://github.com/abchiaravalle/amplifi.plugins/releases/latest)
@@ -66,6 +107,9 @@ Releases are created with the included release script:
 ```bash
 ./scripts/release.sh 1.2.0                    # Release all plugins
 ./scripts/release.sh 1.2.0 ac-wp-translator   # Release specific plugin
+./scripts/release.sh 1.2.0 ac-bulk-meta       # Release specific plugin
+./scripts/release.sh 1.2.0 ac-magic-links     # Release specific plugin
+./scripts/release.sh 1.2.0 ac-static-cache   # Release specific plugin
 ```
 
 This will:
@@ -89,13 +133,28 @@ Plugins that use external APIs (like OpenAI) require you to provide your own API
 ```
 amplifi.plugins/
 ├── plugins/
-│   └── ac-wp-translator/          # amplifi.translate plugin
-│       ├── ac-wp-translator.php   # Main plugin file
-│       ├── includes/              # PHP classes
-│       ├── assets/                # CSS, JS, screenshots, icon
+│   ├── ac-wp-translator/          # amplifi.translate plugin
+│   │   ├── ac-wp-translator.php   # Main plugin file
+│   │   ├── includes/              # PHP classes
+│   │   ├── assets/                # CSS, JS, screenshots, icon
+│   │   ├── uninstall.php          # Clean uninstall
+│   │   ├── docker-compose.yml     # Dev environment
+│   │   └── README.md              # Plugin-specific docs
+│   ├── ac-bulk-meta/              # amplifi.meta plugin
+│   │   ├── ac-bulk-meta.php       # Main plugin file (monolith)
+│   │   ├── includes/              # Framework (copied at release)
+│   │   ├── uninstall.php          # Clean uninstall
+│   │   └── docker-compose.yml     # Dev environment
+│   ├── ac-magic-links/            # amplifi.magic plugin
+│   │   ├── ac-magic-links.php     # Main plugin file
+│   │   ├── includes/              # Framework (copied at release)
+│   │   ├── uninstall.php          # Clean uninstall
+│   │   └── docker-compose.yml     # Dev environment
+│   └── ac-static-cache/           # amplifi.lockcache plugin
+│       ├── ac-static-cache.php    # Main plugin file
+│       ├── includes/              # Framework (copied at release)
 │       ├── uninstall.php          # Clean uninstall
-│       ├── docker-compose.yml     # Dev environment
-│       └── README.md              # Plugin-specific docs
+│       └── docker-compose.yml     # Dev environment
 ├── shared/
 │   └── amplifi-framework.php      # Shared: admin menu, auto-updates, hub
 ├── scripts/
@@ -111,6 +170,18 @@ Each plugin has its own `docker-compose.yml` for local development:
 cd plugins/ac-wp-translator
 docker-compose up -d
 # WordPress on :8085, MySQL on :3310
+
+cd plugins/ac-bulk-meta
+docker-compose up -d
+# WordPress on :8086, MySQL on :3311
+
+cd plugins/ac-magic-links
+docker-compose up -d
+# WordPress on :8088, MySQL on :3314
+
+cd plugins/ac-static-cache
+docker-compose up -d
+# WordPress on :8089, MySQL on :3315
 ```
 
 ## License
