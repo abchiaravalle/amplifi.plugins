@@ -5,17 +5,19 @@ set -euo pipefail
 # amplifi.plugins release script
 #
 # Usage:
-#   ./scripts/release.sh <version> [plugin-slug ...]
+#   ./scripts/release.sh <version>
 #
 # Examples:
-#   ./scripts/release.sh 1.2.0                      # Release all plugins
-#   ./scripts/release.sh 1.2.0 ac-wp-translator     # Release one plugin
+#   ./scripts/release.sh 1.2.0
 #
 # What it does:
 #   1. Validates version format (semver)
-#   2. Generates changelog from git log since last tag
-#   3. Zips each plugin (excluding dev files)
-#   4. Creates a GitHub release with the zips and changelog
+#   2. Zips ALL plugins (excluding dev files)
+#   3. Generates changelog from git log since last tag
+#   4. Creates a GitHub release with the zips, manifest, and changelog
+#
+# Note: Always releases all plugins. The dynamic plugin hub depends on
+# every plugin zip being present in the latest release.
 # ============================================================================
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -101,21 +103,16 @@ build_plugin_zip() {
 # Main
 # ---------------------------------------------------------------------------
 
-[[ $# -ge 1 ]] || die "Usage: $0 <version> [plugin-slug ...]"
+[[ $# -eq 1 ]] || die "Usage: $0 <version>"
 
 VERSION="$1"
-shift
 validate_version "$VERSION"
 
-# Determine which plugins to release.
-if [[ $# -gt 0 ]]; then
-    PLUGINS=("$@")
-else
-    PLUGINS=()
-    for d in "${PLUGINS_DIR}"/*/; do
-        [[ -d "$d" ]] && PLUGINS+=("$(basename "$d")")
-    done
-fi
+# Always release all plugins.
+PLUGINS=()
+for d in "${PLUGINS_DIR}"/*/; do
+    [[ -d "$d" ]] && PLUGINS+=("$(basename "$d")")
+done
 
 [[ ${#PLUGINS[@]} -gt 0 ]] || die "No plugins found in ${PLUGINS_DIR}"
 

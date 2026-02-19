@@ -6,12 +6,13 @@ Monorepo for the **amplifi.studio** WordPress plugin suite. All plugins share th
 ## Repository Structure
 - `plugins/` - Each plugin in its own directory (e.g. `plugins/ac-wp-translator/`)
 - `shared/amplifi-framework.php` - Shared code: top-level admin menu, plugin registry, GitHub auto-updater, hub page. Bundled into each plugin's `includes/` at release time.
-- `scripts/release.sh` - Builds plugin zips, generates changelog, creates GitHub release with assets.
+- `plugins-manifest.json` - Plugin catalog (name, description, icon) included as a release asset. The hub fetches this dynamically. Update when adding/removing plugins.
+- `scripts/release.sh` - Builds all plugin zips, includes manifest, generates changelog, creates GitHub release with assets.
 - `LICENSE` - MIT with zero warranty clause.
 
 ## amplifi.studio Framework (`shared/amplifi-framework.php`)
 - **Admin Menu**: Registers a top-level "amplifi.studio" menu at position 3. Each plugin adds itself as a submenu via `amplifi_register_plugin()`.
-- **Plugin Hub**: Hub page at `admin.php?page=amplifi-studio` lists all installed + available plugins.
+- **Plugin Hub**: Hub page at `admin.php?page=amplifi-studio` lists all installed + available plugins. Catalog fetched dynamically from `plugins-manifest.json` release asset (falls back to hardcoded catalog). One-click install/activate for uninstalled plugins via AJAX.
 - **Auto-Updates**: Checks `api.github.com/repos/{REPO}/releases/latest` every 6 hours. Matches release zip assets by plugin slug. Updates appear in WP's native update system.
 - **Guard**: `AMPLIFI_FRAMEWORK_LOADED` constant prevents double-loading when multiple plugins are active.
 
@@ -167,14 +168,11 @@ Hook suffix: `amplifi-studio_page_amplifi-ac-pods`
 
 ## Releasing
 ```bash
-./scripts/release.sh 1.0.0                  # All plugins
-./scripts/release.sh 1.0.0 ac-wp-translator # Just translate
-./scripts/release.sh 1.0.0 ac-bulk-meta     # Just meta
-./scripts/release.sh 1.0.0 ac-magic-links   # Just magic
-./scripts/release.sh 1.0.0 ac-static-cache  # Just cache
-./scripts/release.sh 1.0.0 ac-pods          # Just pods
+./scripts/release.sh 1.0.0
 ```
-The script: validates semver, copies `shared/amplifi-framework.php` + `LICENSE` into each plugin, zips them, generates changelog from git log, creates a GitHub release with assets.
+Always releases **all** plugins — single-plugin releases are not supported. The dynamic plugin hub depends on every plugin zip being present in the latest release for one-click install to work.
+
+The script: validates semver, copies `shared/amplifi-framework.php` + `LICENSE` into each plugin, zips them, includes `plugins-manifest.json`, generates changelog from git log, creates a GitHub release with all assets.
 
 ## Development
 ```bash
