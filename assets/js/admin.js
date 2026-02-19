@@ -1,6 +1,55 @@
 (function($) {
 	'use strict';
 
+	// Fetch available models from OpenAI and populate the select.
+	function fetchModels() {
+		var select  = $('#acwpt_model');
+		var status  = $('#acwpt-model-status');
+		var current = select.val();
+		var apiKey  = $('#acwpt_api_key').val();
+
+		status.text('Loading models...').removeClass('success error');
+
+		$.post(acwptAdmin.ajaxurl, {
+			action:  'acwpt_fetch_models',
+			nonce:   acwptAdmin.nonce,
+			api_key: apiKey
+		}, function(response) {
+			if (response.success && Array.isArray(response.data)) {
+				var models = response.data;
+				select.empty();
+
+				// Ensure current saved model is in the list.
+				if (current && models.indexOf(current) === -1) {
+					models.push(current);
+					models.sort();
+				}
+
+				for (var i = 0; i < models.length; i++) {
+					var label = models[i];
+					if (models[i] === 'gpt-4o-mini') {
+						label = 'gpt-4o-mini (recommended)';
+					}
+					var opt = $('<option>').val(models[i]).text(label);
+					if (models[i] === current) {
+						opt.prop('selected', true);
+					}
+					select.append(opt);
+				}
+
+				status.text(models.length + ' models loaded').addClass('success').removeClass('error');
+				setTimeout(function() { status.text(''); }, 3000);
+			} else {
+				status.text(response.data || 'Could not load models.').addClass('error').removeClass('success');
+			}
+		}).fail(function() {
+			status.text('Failed to fetch models.').addClass('error').removeClass('success');
+		});
+	}
+
+	// Load models on page load.
+	fetchModels();
+
 	// Test API key.
 	$('#acwpt-test-key').on('click', function() {
 		var btn    = $(this);
@@ -23,6 +72,8 @@
 			btn.prop('disabled', false);
 			if (response.success) {
 				status.text(response.data).removeClass('error').addClass('success');
+				// Refresh models list with the (possibly new) key.
+				fetchModels();
 			} else {
 				status.text(response.data).removeClass('success').addClass('error');
 			}

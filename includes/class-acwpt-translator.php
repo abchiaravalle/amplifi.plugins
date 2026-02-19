@@ -7,10 +7,16 @@ class ACWPT_Translator {
 
 	/**
 	 * Model pricing per token (as of 2025).
+	 * Unknown models fall back to gpt-4o-mini pricing.
 	 */
 	private static $pricing = array(
-		'gpt-4o-mini' => array( 'input' => 0.00000015, 'output' => 0.0000006 ),
-		'gpt-4o'      => array( 'input' => 0.0000025,  'output' => 0.00001 ),
+		'gpt-4o-mini'    => array( 'input' => 0.00000015,  'output' => 0.0000006 ),
+		'gpt-4o'         => array( 'input' => 0.0000025,   'output' => 0.00001 ),
+		'gpt-4.1'        => array( 'input' => 0.000002,    'output' => 0.000008 ),
+		'gpt-4.1-mini'   => array( 'input' => 0.0000004,   'output' => 0.0000016 ),
+		'gpt-4.1-nano'   => array( 'input' => 0.0000001,   'output' => 0.0000004 ),
+		'o3-mini'        => array( 'input' => 0.0000011,   'output' => 0.0000044 ),
+		'o4-mini'        => array( 'input' => 0.0000011,   'output' => 0.0000044 ),
 	);
 
 	/**

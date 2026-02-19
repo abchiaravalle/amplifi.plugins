@@ -20,6 +20,7 @@ class ACWPT_Admin {
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_action( 'wp_ajax_acwpt_test_api_key', array( $this, 'ajax_test_api_key' ) );
 		add_action( 'wp_ajax_acwpt_flush_cache', array( $this, 'ajax_flush_cache' ) );
+		add_action( 'wp_ajax_acwpt_fetch_models', array( $this, 'ajax_fetch_models' ) );
 
 		// Nav menu meta box for adding Language Switcher to menus.
 		add_action( 'admin_head-nav-menus.php', array( $this, 'add_nav_menu_meta_box' ) );
@@ -89,6 +90,12 @@ class ACWPT_Admin {
 		// Invalidate sitemap cache.
 		delete_transient( 'acwpt_sitemap_xml' );
 
+		// Clear models cache if API key changed.
+		$old = get_option( 'acwpt_settings', array() );
+		if ( ( $old['api_key'] ?? '' ) !== $clean['api_key'] ) {
+			delete_transient( 'acwpt_models_list' );
+		}
+
 		return $clean;
 	}
 
@@ -129,10 +136,10 @@ class ACWPT_Admin {
 							<th><label for="acwpt_model">OpenAI Model</label></th>
 							<td>
 								<select id="acwpt_model" name="acwpt_settings[model]">
-									<option value="gpt-4o-mini" <?php selected( $model, 'gpt-4o-mini' ); ?>>GPT-4o Mini (cheapest)</option>
-									<option value="gpt-4o" <?php selected( $model, 'gpt-4o' ); ?>>GPT-4o (higher quality)</option>
+									<option value="<?php echo esc_attr( $model ); ?>" selected><?php echo esc_html( $model ); ?></option>
 								</select>
-								<p class="description">GPT-4o Mini is recommended for cost-effective translation.</p>
+								<span id="acwpt-model-status"></span>
+								<p class="description">gpt-4o-mini is recommended for cost-effective translation. Models are fetched from your OpenAI account.</p>
 							</td>
 						</tr>
 					</table>
@@ -394,6 +401,102 @@ class ACWPT_Admin {
 
 		ACWPT_Cache::flush_all();
 		wp_send_json_success( 'Cache cleared.' );
+	}
+
+	/**
+	 * AJAX: fetch available models from OpenAI.
+	 */
+	public function ajax_fetch_models() {
+		check_ajax_referer( 'acwpt_admin', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Unauthorized' );
+		}
+
+		$api_key = sanitize_text_field( $_POST['api_key'] ?? '' );
+		if ( empty( $api_key ) ) {
+			// Fall back to saved key.
+			$settings = get_option( 'acwpt_settings', array() );
+			$api_key  = isset( $settings['api_key'] ) ? $settings['api_key'] : '';
+		}
+
+		if ( empty( $api_key ) ) {
+			wp_send_json_error( 'No API key available.' );
+		}
+
+		// Check transient cache first.
+		$cached = get_transient( 'acwpt_models_list' );
+		if ( $cached !== false ) {
+			wp_send_json_success( $cached );
+		}
+
+		$response = wp_remote_get(
+			'https://api.openai.com/v1/models',
+			array(
+				'timeout' => 15,
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $api_key,
+				),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			wp_send_json_error( $response->get_error_message() );
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		if ( $code !== 200 ) {
+			$msg = isset( $body['error']['message'] ) ? $body['error']['message'] : "HTTP {$code}";
+			wp_send_json_error( $msg );
+		}
+
+		if ( empty( $body['data'] ) || ! is_array( $body['data'] ) ) {
+			wp_send_json_error( 'No models returned.' );
+		}
+
+		// Filter to chat-compatible models only.
+		$chat_prefixes = array( 'gpt-3.5', 'gpt-4', 'gpt-5', 'o1', 'o3', 'o4' );
+		$exclude       = array( 'whisper', 'tts', 'dall-e', 'embedding', 'moderation', 'realtime', 'audio', 'transcribe', 'search', 'image', 'codex', 'instruct' );
+
+		$models = array();
+		foreach ( $body['data'] as $m ) {
+			$id = $m['id'];
+
+			// Skip excluded models.
+			$skip = false;
+			foreach ( $exclude as $ex ) {
+				if ( stripos( $id, $ex ) !== false ) {
+					$skip = true;
+					break;
+				}
+			}
+			if ( $skip ) {
+				continue;
+			}
+
+			// Only include models matching chat prefixes.
+			$match = false;
+			foreach ( $chat_prefixes as $prefix ) {
+				if ( strpos( $id, $prefix ) === 0 ) {
+					$match = true;
+					break;
+				}
+			}
+			if ( ! $match ) {
+				continue;
+			}
+
+			$models[] = $id;
+		}
+
+		sort( $models );
+
+		// Cache for 1 hour.
+		set_transient( 'acwpt_models_list', $models, HOUR_IN_SECONDS );
+
+		wp_send_json_success( $models );
 	}
 
 	// =========================================================================
