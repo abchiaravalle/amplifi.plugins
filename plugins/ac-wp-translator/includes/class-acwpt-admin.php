@@ -30,8 +30,8 @@ class ACWPT_Admin {
 		if ( 'amplifi-studio_page_amplifi-ac-wp-translator' !== $hook ) {
 			return;
 		}
-		wp_enqueue_style( 'acwpt-admin', ACWPT_PLUGIN_URL . 'assets/css/admin.css', array(), ACWPT_VERSION );
-		wp_enqueue_script( 'acwpt-admin', ACWPT_PLUGIN_URL . 'assets/js/admin.js', array( 'jquery' ), ACWPT_VERSION, true );
+		wp_enqueue_style( 'acwpt-admin', ACWPT_PLUGIN_URL . 'assets/css/admin.css', array(), acwpt_asset_version( 'assets/css/admin.css' ) );
+		wp_enqueue_script( 'acwpt-admin', ACWPT_PLUGIN_URL . 'assets/js/admin.js', array( 'jquery' ), acwpt_asset_version( 'assets/js/admin.js' ), true );
 		wp_localize_script( 'acwpt-admin', 'acwptAdmin', array(
 			'nonce'   => wp_create_nonce( 'acwpt_admin' ),
 			'ajaxurl' => admin_url( 'admin-ajax.php' ),

@@ -21,6 +21,20 @@ define( 'ACWPT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACWPT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACWPT_PLUGIN_FILE', __FILE__ );
 
+/**
+ * Cache-busting version string for an asset (uses file mtime when available).
+ *
+ * @param string $relative_path Path relative to plugin dir, e.g. 'assets/css/frontend.css'.
+ * @return string Version query arg for enqueue.
+ */
+function acwpt_asset_version( $relative_path ) {
+	$path = ACWPT_PLUGIN_DIR . $relative_path;
+	if ( file_exists( $path ) ) {
+		return ACWPT_VERSION . '.' . filemtime( $path );
+	}
+	return ACWPT_VERSION;
+}
+
 // Load amplifi.studio shared framework.
 require_once ACWPT_PLUGIN_DIR . 'includes/amplifi-framework.php';
 

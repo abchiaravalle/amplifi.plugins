@@ -85,6 +85,17 @@ class ACWPT_Frontend {
 
 		// Fix canonical URL for translated pages.
 		add_filter( 'get_canonical_url', array( $this, 'filter_canonical_url' ), 10, 2 );
+
+		// Prevent full-page cache from serving wrong language (e.g. WP Engine keys by path; /es is rewritten to /).
+		add_action( 'send_headers', array( $this, 'send_translated_page_headers' ) );
+
+		// Console log on translated pages (always, so it's visible without ACWPT_DEBUG).
+		add_action( 'wp_footer', array( $this, 'debug_console_log' ), 99 );
+
+		// Elementor: translate the final HTML output (Elementor bypasses the_content for builder content).
+		if ( class_exists( '\\Elementor\\Plugin' ) ) {
+			add_filter( 'elementor/frontend/the_content', array( $this, 'translate_elementor_content' ), 10, 1 );
+		}
 	}
 
 	// =========================================================================
@@ -119,6 +130,9 @@ class ACWPT_Frontend {
 				$new_relative = '/';
 			}
 			$_SERVER['REQUEST_URI'] = $home_path . ltrim( $new_relative, '/' );
+			if ( defined( 'ACWPT_DEBUG' ) && ACWPT_DEBUG ) {
+				error_log( 'ACWPT: Detected language ' . $this->current_language . ', rewritten REQUEST_URI to ' . $_SERVER['REQUEST_URI'] );
+			}
 		}
 	}
 
@@ -126,6 +140,24 @@ class ACWPT_Frontend {
 		$home = home_url();
 		$path = wp_parse_url( $home, PHP_URL_PATH );
 		return $path ? rtrim( $path, '/' ) . '/' : '/';
+	}
+
+	/**
+	 * Send cache-control and debug headers for translated pages so full-page
+	 * caches (e.g. WP Engine) don't serve the wrong language. When the URL is
+	 * /es, we rewrite REQUEST_URI to /, so the cache may key by "/" and serve
+	 * the English homepage for /es unless we prevent caching.
+	 */
+	public function send_translated_page_headers() {
+		if ( ! $this->current_language ) {
+			return;
+		}
+		// Prevent shared caches from storing this response (browsers may still cache briefly).
+		header( 'Cache-Control: private, no-cache, must-revalidate, max-age=0', true );
+		header( 'X-ACWPT-Language: ' . sanitize_text_field( $this->current_language ), true );
+		if ( defined( 'ACWPT_DEBUG' ) && ACWPT_DEBUG ) {
+			header( 'X-ACWPT-Debug: 1', true );
+		}
 	}
 
 	// =========================================================================
@@ -164,7 +196,14 @@ class ACWPT_Frontend {
 
 		if ( $cached && $cached->content_hash === $content_hash ) {
 			$this->translations[ $post->ID ] = $cached;
+			if ( defined( 'ACWPT_DEBUG' ) && ACWPT_DEBUG ) {
+				error_log( 'ACWPT: Using cached translation for post ' . $post->ID . ' lang=' . $this->current_language );
+			}
 			return;
+		}
+
+		if ( defined( 'ACWPT_DEBUG' ) && ACWPT_DEBUG ) {
+			error_log( 'ACWPT: Fetching translation for post ' . $post->ID . ' lang=' . $this->current_language );
 		}
 
 		$result = ACWPT_Translator::translate(
@@ -193,6 +232,10 @@ class ACWPT_Frontend {
 			'translated_content' => $result['content'],
 			'translated_excerpt' => $result['excerpt'],
 		);
+
+		if ( defined( 'ACWPT_DEBUG' ) && ACWPT_DEBUG ) {
+			error_log( 'ACWPT: Cached new translation for post ' . $post->ID . ' lang=' . $this->current_language );
+		}
 	}
 
 	// =========================================================================
@@ -630,6 +673,99 @@ class ACWPT_Frontend {
 		return $m[0];
 	}
 
+	// =========================================================================
+	// Elementor: translate builder output (Elementor bypasses the_content)
+	// =========================================================================
+
+	/**
+	 * Filter Elementor's frontend HTML so all visible text is translated.
+	 */
+	public function translate_elementor_content( $content ) {
+		if ( ! $this->current_language || empty( $content ) ) {
+			return $content;
+		}
+		$this->ensure_strings_cached_for_html( $content );
+		return $this->translate_html_blob( $content );
+	}
+
+	/**
+	 * Extract translatable strings from HTML and batch-translate any missing; update string cache.
+	 */
+	private function ensure_strings_cached_for_html( $html ) {
+		$cache = $this->load_string_cache();
+		$strings = $this->extract_translatable_strings_from_html( $html );
+		$to_translate = array();
+		foreach ( $strings as $s ) {
+			if ( ! isset( $cache[ $s ] ) ) {
+				$to_translate[] = $s;
+			}
+		}
+		if ( empty( $to_translate ) ) {
+			return;
+		}
+		// Chunk to avoid oversized API requests (e.g. 40 strings per batch).
+		$chunk_size = 40;
+		$chunks = array_chunk( array_unique( $to_translate ), $chunk_size );
+		foreach ( $chunks as $chunk ) {
+			$translated = ACWPT_Translator::translate_strings( $chunk, $this->current_language );
+			if ( is_wp_error( $translated ) ) {
+				continue;
+			}
+			foreach ( $translated as $orig => $trans ) {
+				$cache[ $orig ] = $trans;
+			}
+		}
+		$this->string_cache = $cache;
+		update_option( 'acwpt_strings_' . $this->current_language, $cache, false );
+	}
+
+	/**
+	 * Extract text from links and common block elements (for translation collection).
+	 */
+	private function extract_translatable_strings_from_html( $html ) {
+		$out = array();
+		// Link text.
+		if ( preg_match_all( '/(<a\b[^>]*>)([^<]+)(<\/a>)/i', $html, $m, PREG_SET_ORDER ) ) {
+			foreach ( $m as $match ) {
+				$text = trim( $match[2] );
+				if ( strlen( $text ) >= 2 && ! preg_match( '/^[\d\s\.\-:\/]+$/', $text ) ) {
+					$out[] = $text;
+				}
+			}
+		}
+		// Block/text elements (p, span, div, headings, li, td, th, label, figcaption, button).
+		if ( preg_match_all( '/(<(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button)\b[^>]*>)([^<]{2,})(<\/(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button)>)/i', $html, $m, PREG_SET_ORDER ) ) {
+			foreach ( $m as $match ) {
+				$text = trim( $match[2] );
+				if ( strlen( $text ) >= 2 && ! preg_match( '/^[\d\s\.\-:\/]+$/', $text ) ) {
+					if ( ! preg_match( '/^https?:/', $text ) && ! preg_match( '/[{}()<>]/', $text ) ) {
+						$out[] = $text;
+					}
+				}
+			}
+		}
+		return array_unique( $out );
+	}
+
+	/**
+	 * Run link and element translation over an HTML blob (uses string cache).
+	 */
+	private function translate_html_blob( $html ) {
+		// Translate <a> link text.
+		$html = preg_replace_callback(
+			'/(<a\b[^>]*>)([^<]+)(<\/a>)/i',
+			array( $this, 'translate_link_text_callback' ),
+			$html
+		);
+		// Translate text in block elements (same set as extract).
+		$html = preg_replace_callback(
+			'/(<(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button)\b[^>]*>)([^<]{2,})(<\/(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button)>)/i',
+			array( $this, 'translate_element_text_callback' ),
+			$html
+		);
+		return $html;
+	}
+
 	/**
 	 * Prefix all internal links with the current language code.
 	 */
@@ -905,12 +1041,12 @@ class ACWPT_Frontend {
 	public function enqueue_assets() {
 		$settings = get_option( 'acwpt_settings', array() );
 
-		wp_enqueue_style( 'acwpt-frontend', ACWPT_PLUGIN_URL . 'assets/css/frontend.css', array(), ACWPT_VERSION );
+		wp_enqueue_style( 'acwpt-frontend', ACWPT_PLUGIN_URL . 'assets/css/frontend.css', array(), acwpt_asset_version( 'assets/css/frontend.css' ) );
 
 		$show_suggestion = isset( $settings['show_suggestion'] ) ? (bool) $settings['show_suggestion'] : true;
 
 		if ( $show_suggestion && ! $this->current_language ) {
-			wp_enqueue_script( 'acwpt-detect', ACWPT_PLUGIN_URL . 'assets/js/detect.js', array(), ACWPT_VERSION, true );
+			wp_enqueue_script( 'acwpt-detect', ACWPT_PLUGIN_URL . 'assets/js/detect.js', array(), acwpt_asset_version( 'assets/js/detect.js' ), true );
 
 			$enabled    = ACWPT_Languages::get_enabled();
 			$lang_names = array();
@@ -926,6 +1062,25 @@ class ACWPT_Frontend {
 				'currentPath' => $this->get_current_page_path(),
 			) );
 		}
+	}
+
+	/**
+	 * Output debug script on translated pages (always, so console shows language state without ACWPT_DEBUG).
+	 */
+	public function debug_console_log() {
+		if ( ! $this->current_language ) {
+			return;
+		}
+		$queried = get_queried_object();
+		$post_id = ( $queried && $queried instanceof WP_Post ) ? $queried->ID : 0;
+		$has_translation = $post_id && isset( $this->translations[ $post_id ] );
+		$info = array(
+			'currentLanguage'  => $this->current_language,
+			'queriedPostId'    => $post_id,
+			'hasTranslation'  => $has_translation,
+			'translationCount' => count( $this->translations ),
+		);
+		echo '<script>if(typeof console!=="undefined"&&console.log){console.log("[ACWPT]", ' . wp_json_encode( $info ) . ');}</script>' . "\n";
 	}
 
 	// =========================================================================
