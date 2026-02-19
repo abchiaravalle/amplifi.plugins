@@ -1,12 +1,13 @@
 <p align="center">
-  <img src="assets/icon.svg" alt="Polyglot icon" width="96" height="96">
+  <img src="assets/icon.svg" alt="Amplifi Studio" width="280">
 </p>
 
-<h1 align="center">Polyglot</h1>
+<h1 align="center">amplifi.translate</h1>
 
 <p align="center">
   AI-powered real-time translation for WordPress using OpenAI.<br>
-  Translates pages and posts on the fly with URL-based language prefixes and smart caching.
+  Translates pages and posts on the fly with URL-based language prefixes and smart caching.<br><br>
+  Built by <a href="https://amplifi.studio">amplifi.studio</a>
 </p>
 
 ---
@@ -179,7 +180,7 @@ ac-wp-translator/
 │   ├── class-acwpt-admin.php     # Settings page & nav menu meta box
 │   └── class-acwpt-frontend.php  # URL routing, content filters, shortcode, SEO, sitemap
 ├── assets/
-│   ├── icon.svg                  # Plugin icon
+│   ├── icon.svg                  # Amplifi Studio logo
 │   ├── css/
 │   │   ├── admin.css             # Admin settings styles
 │   │   └── frontend.css          # Switcher & suggestion banner styles
