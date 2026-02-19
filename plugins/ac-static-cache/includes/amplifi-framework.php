@@ -149,10 +149,6 @@ function amplifi_render_hub() {
 			'name'        => 'Magic',
 			'description' => 'One-click magic links for password-protected pages with usage logging and IP geolocation.',
 		),
-		'ac-static-cache' => array(
-			'name'        => 'LockCache',
-			'description' => 'Static HTML cache for password-protected posts with admin management and debug logging.',
-		),
 	);
 
 	?>
