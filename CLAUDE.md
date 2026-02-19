@@ -1,45 +1,62 @@
-# CLAUDE.md - AC WP Translator
+# CLAUDE.md - amplifi.plugins
 
-## Project Overview
-WordPress plugin that translates site content in real-time using OpenAI (GPT-4o Mini). Serves translated pages at URL-prefixed paths (`/es/`, `/fr/`, `/zh/`) with database-backed caching.
+## Overview
+Monorepo for the **amplifi.studio** WordPress plugin suite. All plugins share the `amplifi-framework.php` for a unified admin menu, auto-updates from GitHub releases, and a plugin hub.
 
-## Architecture
-- **URL Detection**: Hooks into `plugins_loaded` to detect language prefix from `$_SERVER['REQUEST_URI']`, strips the prefix so WordPress resolves the original post/page normally
-- **Content Filters**: `the_title`, `the_content`, `the_excerpt` filters at priority 1 swap in translated content before any other processing (wpautop, do_blocks, do_shortcode)
-- **Full Page Translation**: Output buffer captures entire HTML, translates nav/header/footer text, meta tags, and prefixes internal links with the language code
-- **String Translation**: Site-wide strings (menu items, page titles, site title/tagline, common theme strings) are batch-translated in a single API call and cached in `wp_options` per language (`acwpt_strings_{lang}`)
-- **Translation**: Raw post content (with block markup and shortcodes intact) is sent to OpenAI. The AI preserves HTML/shortcodes and only translates text
-- **Caching**: Custom DB table `{prefix}_acwpt_translations` keyed by `post_id + language`. Content hash (md5) detects when posts are updated
-- **Cache Invalidation**: `save_post` hook deletes all cached translations for the updated post
-- **Usage Tracking**: Token counts and estimated costs recorded per month in `wp_options` key `acwpt_usage`, displayed in admin dashboard
-- **Multilingual Sitemap**: Generated at `/acwpt-sitemap.xml` via `parse_request` hook; each post gets a `<url>` entry per language with `<xhtml:link>` hreflang alternates. Cached as transient `acwpt_sitemap_xml` (1 hour), invalidated on post save and settings change. Added to `robots.txt` via filter.
+## Repository Structure
+- `plugins/` - Each plugin in its own directory (e.g. `plugins/ac-wp-translator/`)
+- `shared/amplifi-framework.php` - Shared code: top-level admin menu, plugin registry, GitHub auto-updater, hub page. Bundled into each plugin's `includes/` at release time.
+- `scripts/release.sh` - Builds plugin zips, generates changelog, creates GitHub release with assets.
+- `LICENSE` - MIT with zero warranty clause.
 
-## Key Files
-- `ac-wp-translator.php` - Bootstrap, activation/deactivation hooks, nav menu location registration
-- `includes/class-acwpt-frontend.php` - Core logic: URL routing, content filters, output buffer, shortcode, nav menu switcher, hreflang, language detection
+## amplifi.studio Framework (`shared/amplifi-framework.php`)
+- **Admin Menu**: Registers a top-level "amplifi.studio" menu at position 3. Each plugin adds itself as a submenu via `amplifi_register_plugin()`.
+- **Plugin Hub**: Hub page at `admin.php?page=amplifi-studio` lists all installed + available plugins.
+- **Auto-Updates**: Checks `api.github.com/repos/{REPO}/releases/latest` every 6 hours. Matches release zip assets by plugin slug. Updates appear in WP's native update system.
+- **Guard**: `AMPLIFI_FRAMEWORK_LOADED` constant prevents double-loading when multiple plugins are active.
+
+## Plugin: amplifi.translate (`plugins/ac-wp-translator/`)
+AI-powered WordPress translation using OpenAI.
+
+### Architecture
+- **URL Detection**: `plugins_loaded` hook detects language prefix from `$_SERVER['REQUEST_URI']`
+- **Content Filters**: `the_title`, `the_content`, `the_excerpt` at priority 1
+- **Full Page Translation**: Output buffer captures entire HTML for nav/header/footer translation
+- **String Translation**: Batch translation of UI strings via single API call, cached in `wp_options` per language
+- **Caching**: Custom DB table `{prefix}_acwpt_translations` keyed by `post_id + language`
+- **Cache Invalidation**: `save_post` hook deletes cached translations
+- **Usage Tracking**: Token counts and costs per month in `wp_options`
+- **Multilingual Sitemap**: `/acwpt-sitemap.xml` with hreflang alternates
+- **Dynamic Models**: Fetches available models from OpenAI `/v1/models` API, cached 1 hour
+
+### Key Files
+- `ac-wp-translator.php` - Bootstrap, activation, framework registration
+- `includes/amplifi-framework.php` - Shared framework (copied from `shared/`)
+- `includes/class-acwpt-frontend.php` - URL routing, content filters, output buffer, shortcode, nav menu switcher, hreflang, sitemap
 - `includes/class-acwpt-translator.php` - OpenAI API calls, response parsing, usage tracking
-- `includes/class-acwpt-cache.php` - Database CRUD operations
-- `includes/class-acwpt-admin.php` - Settings page, nav menu meta box, AJAX handlers, usage dashboard
-- `includes/class-acwpt-languages.php` - Language definitions (32 languages with native names and flag emojis)
+- `includes/class-acwpt-cache.php` - Database CRUD
+- `includes/class-acwpt-admin.php` - Settings page (submenu under amplifi.studio), AJAX handlers
+- `includes/class-acwpt-languages.php` - 33 language definitions
 
-## Language Switcher
-Two methods available:
-1. **Nav Menu Item**: Added via Appearance > Menus meta box. Uses `wp_nav_menu_objects` filter to expand a `#acwpt-language-switcher` placeholder into dynamic language items. Links are protected from output buffer re-prefixing via `data-acwpt-lang` attribute.
-2. **Shortcode**: `[acwpt_switcher]` renders a `<select>` dropdown.
+### Admin Menu
+The plugin's settings page is a submenu under the **amplifi.studio** top-level menu, not under Settings. The hook suffix for `enqueue_assets` is `amplifi-studio_page_amplifi-ac-wp-translator`.
 
-## Settings
-Stored as serialized array in `wp_options` key `acwpt_settings`:
-- `api_key`, `source_language`, `enabled_languages[]`, `show_flags`, `show_suggestion`, `model`
+### Settings
+`wp_options` key `acwpt_settings`: `api_key`, `source_language`, `enabled_languages[]`, `show_flags`, `show_suggestion`, `model`
+
+## Releasing
+```bash
+./scripts/release.sh 1.0.0                  # All plugins
+./scripts/release.sh 1.0.0 ac-wp-translator # Just translate
+```
+The script: validates semver, copies `shared/amplifi-framework.php` + `LICENSE` into each plugin, zips them, generates changelog from git log, creates a GitHub release with assets.
 
 ## Development
 ```bash
+cd plugins/ac-wp-translator
 docker-compose up -d    # WordPress on :8085, MySQL on :3310
 ```
 Plugin dir is volume-mounted so edits are live.
 
-## Testing Notes
-- Pretty permalinks MUST be enabled (not "Plain")
-- First visit to a translated URL is slow (API call). Subsequent visits are cached
-- The `[acwpt_switcher]` shortcode must be in post content or template, not in block editor's "Shortcode" block (use Custom HTML block instead)
-- For nav menu switcher in block themes: use the Classic Menu block in the Site Editor, or call `wp_nav_menu()` with the `acwpt_languages` theme location
-- Output buffer protects `data-acwpt-lang` links from being translated or re-prefixed
+## API Key Security
+Document to users: scope your OpenAI keys to Chat Completions only, set rate limits and spending caps in the OpenAI dashboard, and rotate if compromised. Keys are stored in `wp_options` and only sent to `api.openai.com`.

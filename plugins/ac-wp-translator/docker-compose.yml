@@ -26,6 +26,7 @@ services:
       WORDPRESS_DB_NAME: wordpress
     volumes:
       - wp_data:/var/www/html
+      - ./../../shared:/var/www/html/wp-content/plugins/ac-wp-translator-shared
       - ./:/var/www/html/wp-content/plugins/ac-wp-translator
 
 volumes:

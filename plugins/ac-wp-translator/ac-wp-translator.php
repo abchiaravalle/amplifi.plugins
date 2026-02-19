@@ -1,11 +1,12 @@
 <?php
 /**
- * Plugin Name: AC WP Translator
- * Plugin URI: https://github.com/adamchiaravalle/ac-wp-translator
- * Description: AI-powered real-time translation using OpenAI. Translates pages and posts with URL-based language prefixes (/es/, /fr/, etc.) and smart caching.
+ * Plugin Name: amplifi.translate
+ * Plugin URI: https://github.com/abchiaravalle/amplifi.plugins
+ * Description: AI-powered real-time translation using OpenAI. Translates pages and posts with URL-based language prefixes (/es/, /fr/, etc.) and smart caching. By amplifi.studio.
  * Version: 1.0.0
- * Author: Adam Chiaravalle
- * License: GPL v2 or later
+ * Author: amplifi.studio
+ * Author URI: https://amplifi.studio
+ * License: MIT
  * Text Domain: ac-wp-translator
  * Requires at least: 5.6
  * Requires PHP: 7.4
@@ -20,11 +21,24 @@ define( 'ACWPT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACWPT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACWPT_PLUGIN_FILE', __FILE__ );
 
+// Load amplifi.studio shared framework.
+require_once ACWPT_PLUGIN_DIR . 'includes/amplifi-framework.php';
+
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-languages.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-cache.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-translator.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-admin.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-frontend.php';
+
+// Register with the amplifi.studio framework.
+amplifi_register_plugin(
+	'ac-wp-translator',
+	'Translate',
+	'AI-powered real-time translation using OpenAI with URL-based language prefixes and smart caching.',
+	ACWPT_VERSION,
+	__FILE__,
+	array( ACWPT_Admin::instance(), 'render_page' )
+);
 
 // Bootstrap.
 add_action( 'plugins_loaded', 'acwpt_init', 1 );
@@ -42,7 +56,7 @@ add_action( 'after_setup_theme', 'acwpt_register_nav_menus', 20 );
 
 function acwpt_register_nav_menus() {
 	register_nav_menus( array(
-		'acwpt_languages' => 'Language Switcher (AC Translator)',
+		'acwpt_languages' => 'Language Switcher (amplifi.translate)',
 	) );
 }
 

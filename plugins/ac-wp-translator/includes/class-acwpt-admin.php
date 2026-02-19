@@ -15,7 +15,6 @@ class ACWPT_Admin {
 	}
 
 	public function init() {
-		add_action( 'admin_menu', array( $this, 'add_menu' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_action( 'wp_ajax_acwpt_test_api_key', array( $this, 'ajax_test_api_key' ) );
@@ -27,18 +26,8 @@ class ACWPT_Admin {
 		add_filter( 'wp_setup_nav_menu_item', array( $this, 'label_nav_menu_item' ) );
 	}
 
-	public function add_menu() {
-		add_options_page(
-			'AC WP Translator',
-			'AC Translator',
-			'manage_options',
-			'acwpt-settings',
-			array( $this, 'render_page' )
-		);
-	}
-
 	public function enqueue_assets( $hook ) {
-		if ( 'settings_page_acwpt-settings' !== $hook ) {
+		if ( 'amplifi-studio_page_amplifi-ac-wp-translator' !== $hook ) {
 			return;
 		}
 		wp_enqueue_style( 'acwpt-admin', ACWPT_PLUGIN_URL . 'assets/css/admin.css', array(), ACWPT_VERSION );
@@ -114,7 +103,7 @@ class ACWPT_Admin {
 		$usage_history = ACWPT_Translator::get_usage();
 		?>
 		<div class="wrap acwpt-settings">
-			<h1>AC WP Translator</h1>
+			<h1>amplifi.translate</h1>
 
 			<form method="post" action="options.php">
 				<?php settings_fields( 'acwpt_settings_group' ); ?>
