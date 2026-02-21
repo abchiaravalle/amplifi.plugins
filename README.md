@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="plugins/ac-wp-translator/assets/icon.svg" alt="amplifi.studio" width="280">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="assets/icon-on-dark.svg">
+    <source media="(prefers-color-scheme: dark)" srcset="plugins/ac-wp-translator/assets/icon.svg">
+    <img src="assets/icon-on-dark.svg" alt="amplifi.studio" width="280">
+  </picture>
 </p>
 
 <h1 align="center">amplifi.plugins</h1>
