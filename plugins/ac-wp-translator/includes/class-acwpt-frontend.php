@@ -85,10 +85,13 @@ class ACWPT_Frontend {
 			update_option( 'acwpt_flush_rules', true );
 		}
 
-		// Flush rewrite rules if pending (runs on the same page load as the version check above).
+		// Flush rewrite rules if pending — deferred to 'init' priority 999 so all post types
+		// and taxonomies have already registered their rewrite rules before we flush.
 		if ( get_option( 'acwpt_flush_rules' ) ) {
-			flush_rewrite_rules();
-			delete_option( 'acwpt_flush_rules' );
+			add_action( 'init', function() {
+				flush_rewrite_rules();
+				delete_option( 'acwpt_flush_rules' );
+			}, 999 );
 		}
 
 		// Multilingual sitemap.
