@@ -774,6 +774,61 @@ class ACWPT_Frontend {
 				}
 			}
 		}
+		// Leading text in block elements — text that appears directly after the opening tag but
+		// before a child inline tag or <br>. Catches things like "Here's how " before a <span>.
+		if ( preg_match_all( '/(?<=>)([^<]{3,})(?=<(?:span|strong|em|a|br|i|b|small|sup|sub)\b)/u', $html, $m ) ) {
+			foreach ( $m[1] as $text ) {
+				$text = trim( $text );
+				if ( strlen( $text ) >= 2
+					&& ! preg_match( '/^[\d\s\.\-:\/\?!,]+$/', $text )
+					&& ! preg_match( '/^https?:/', $text )
+					&& ! preg_match( '/[{}()\[\]<>]/', $text ) ) {
+					$out[] = $text;
+				}
+			}
+		}
+		// Trailing text in block elements — text that appears after a closing inline tag but
+		// before the closing block tag. Catches ". Builds sites that work reliably." after </span>.
+		if ( preg_match_all( '/(?:<\/(?:span|strong|em|a|i|b|small|sup|sub)>)([^<]{3,})(?=<\/(?:p|div|h[1-6]|li|td|th|label|figcaption|button|dt|dd|blockquote)>)/u', $html, $m ) ) {
+			foreach ( $m[1] as $text ) {
+				$text = trim( $text );
+				if ( strlen( $text ) >= 2
+					&& ! preg_match( '/^[\d\s\.\-:\/\?!,]+$/', $text )
+					&& ! preg_match( '/^https?:/', $text )
+					&& ! preg_match( '/[{}()\[\]<>]/', $text ) ) {
+					$out[] = $text;
+				}
+			}
+		}
+		// Text after <br> tags and before the closing block tag.
+		if ( preg_match_all( '/(?:<br\s*\/?>)([^<]{3,})(?=<\/(?:p|div|h[1-6]|li|td|th|label|figcaption|button|dt|dd|blockquote)>)/u', $html, $m ) ) {
+			foreach ( $m[1] as $text ) {
+				$text = trim( $text );
+				if ( strlen( $text ) >= 2
+					&& ! preg_match( '/^[\d\s\.\-:\/\?!,]+$/', $text )
+					&& ! preg_match( '/^https?:/', $text )
+					&& ! preg_match( '/[{}()\[\]<>]/', $text ) ) {
+					$out[] = $text;
+				}
+			}
+		}
+		// Form placeholder attributes.
+		if ( preg_match_all( '/\bplaceholder="([^"]{2,})"/i', $html, $m ) ) {
+			foreach ( $m[1] as $text ) {
+				$out[] = html_entity_decode( $text, ENT_QUOTES, 'UTF-8' );
+			}
+		}
+		// Submit button value attributes.
+		if ( preg_match_all( '/<input\b[^>]*\btype=["\']submit["\'][^>]*\bvalue="([^"]{2,})"/i', $html, $m ) ) {
+			foreach ( $m[1] as $text ) {
+				$out[] = html_entity_decode( $text, ENT_QUOTES, 'UTF-8' );
+			}
+		}
+		if ( preg_match_all( '/<input\b[^>]*\bvalue="([^"]{2,})"[^>]*\btype=["\']submit["\']/i', $html, $m ) ) {
+			foreach ( $m[1] as $text ) {
+				$out[] = html_entity_decode( $text, ENT_QUOTES, 'UTF-8' );
+			}
+		}
 		return array_unique( $out );
 	}
 
@@ -791,6 +846,92 @@ class ACWPT_Frontend {
 		$html = preg_replace_callback(
 			'/(<(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)\b[^>]*>)([^<]{2,})(<\/(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)>)/i',
 			array( $this, 'translate_element_text_callback' ),
+			$html
+		);
+		// Translate leading text nodes in block elements (text before a child inline tag or <br>).
+		$html = preg_replace_callback(
+			'/(?<=>)([^<]{3,})(?=<(?:span|strong|em|a|br|i|b|small|sup|sub)\b)/u',
+			function ( $m ) {
+				$raw  = $m[1];
+				$text = trim( $raw );
+				if ( strlen( $text ) < 2
+					|| preg_match( '/^[\d\s\.\-:\/\?!,]+$/', $text )
+					|| preg_match( '/^https?:/', $text )
+					|| preg_match( '/[{}()\[\]<>]/', $text ) ) {
+					return $m[0];
+				}
+				$translated = $this->get_string_translation( $text );
+				if ( $translated ) {
+					return str_replace( $text, $translated, $raw );
+				}
+				return $m[0];
+			},
+			$html
+		);
+		// Translate trailing text nodes in block elements (text after a closing inline tag).
+		$html = preg_replace_callback(
+			'/(<\/(?:span|strong|em|a|i|b|small|sup|sub)>)([^<]{3,})(<\/(?:p|div|h[1-6]|li|td|th|label|figcaption|button|dt|dd|blockquote)>)/u',
+			function ( $m ) {
+				$raw  = $m[2];
+				$text = trim( $raw );
+				if ( strlen( $text ) < 2
+					|| preg_match( '/^[\d\s\.\-:\/\?!,]+$/', $text )
+					|| preg_match( '/^https?:/', $text )
+					|| preg_match( '/[{}()\[\]<>]/', $text ) ) {
+					return $m[0];
+				}
+				$translated = $this->get_string_translation( $text );
+				if ( $translated ) {
+					return $m[1] . str_replace( $text, $translated, $raw ) . $m[3];
+				}
+				return $m[0];
+			},
+			$html
+		);
+		// Translate text after <br> tags (before the closing block tag).
+		$html = preg_replace_callback(
+			'/(<br\s*\/?>)([^<]{3,})(<\/(?:p|div|h[1-6]|li|td|th|label|figcaption|button|dt|dd|blockquote)>)/u',
+			function ( $m ) {
+				$raw  = $m[2];
+				$text = trim( $raw );
+				if ( strlen( $text ) < 2
+					|| preg_match( '/^[\d\s\.\-:\/\?!,]+$/', $text )
+					|| preg_match( '/^https?:/', $text )
+					|| preg_match( '/[{}()\[\]<>]/', $text ) ) {
+					return $m[0];
+				}
+				$translated = $this->get_string_translation( $text );
+				if ( $translated ) {
+					return $m[1] . str_replace( $text, $translated, $raw ) . $m[3];
+				}
+				return $m[0];
+			},
+			$html
+		);
+		// Translate form placeholder attributes.
+		$html = preg_replace_callback(
+			'/\bplaceholder="([^"]{2,})"/i',
+			function ( $m ) {
+				$original   = html_entity_decode( $m[1], ENT_QUOTES, 'UTF-8' );
+				$translated = $this->get_string_translation( $original );
+				return $translated ? 'placeholder="' . esc_attr( $translated ) . '"' : $m[0];
+			},
+			$html
+		);
+		// Translate submit button value attributes.
+		$html = preg_replace_callback(
+			'/<input\b([^>]*)\bvalue="([^"]{2,})"([^>]*)>/i',
+			function ( $m ) {
+				if ( ! preg_match( '/\btype=["\']submit["\']/i', $m[0] ) ) {
+					return $m[0];
+				}
+				$original   = html_entity_decode( $m[2], ENT_QUOTES, 'UTF-8' );
+				$translated = $this->get_string_translation( $original );
+				if ( $translated ) {
+					return '<input' . $m[1] . 'value="' . esc_attr( $translated ) . '"' . $m[3] . '>';
+				}
+				return $m[0];
+			},
 			$html
 		);
 		return $html;
