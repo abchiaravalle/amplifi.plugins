@@ -98,6 +98,9 @@ class ACWPT_Frontend {
 		// Fix canonical URL for translated pages.
 		add_filter( 'get_canonical_url', array( $this, 'filter_canonical_url' ), 10, 2 );
 
+		// Prevent WordPress redirect_canonical from redirecting /es/blog/ → /blog/.
+		add_filter( 'redirect_canonical', array( $this, 'prevent_canonical_redirect' ), 10, 2 );
+
 		// Identify translated pages with a debug header.
 		add_action( 'send_headers', array( $this, 'send_translated_page_headers' ) );
 
@@ -139,12 +142,17 @@ class ACWPT_Frontend {
 		$lang_group = '(' . implode( '|', array_map( 'preg_quote', $enabled ) ) . ')';
 		$new_rules  = array();
 
+		// Add the homepage rule FIRST so it is evaluated before WordPress's
+		// catch-all pagename rule ((.?.+?)(?:/([0-9]+))?/?$), which would
+		// otherwise match /es/ as pagename "es", find no such page, and 404.
+		$new_rules[ '^' . $lang_group . '/?$' ] = 'index.php?acwpt_lang=$matches[1]';
+
 		foreach ( $rules as $regex => $redirect ) {
 			$stripped = ltrim( $regex, '^' );
 
 			if ( $stripped === '' || $stripped === '$' ) {
-				// Home page: /es/ or /es
-				$new_rules[ '^' . $lang_group . '/?$' ] = 'index.php?acwpt_lang=$matches[1]';
+				// Homepage rule already added above — just preserve the original.
+				$new_rules[ $regex ] = $redirect;
 			} else {
 				// Shift all $matches[N] indices up by 1 (the lang group becomes $matches[1]).
 				$shifted = preg_replace_callback(
@@ -153,9 +161,8 @@ class ACWPT_Frontend {
 					$redirect
 				);
 				$new_rules[ '^' . $lang_group . '/' . $stripped ] = $shifted . '&acwpt_lang=$matches[1]';
+				$new_rules[ $regex ] = $redirect;
 			}
-
-			$new_rules[ $regex ] = $redirect;
 		}
 
 		return $new_rules;
@@ -542,6 +549,21 @@ class ACWPT_Frontend {
 			$canonical = $this->get_translated_url( $this->current_language, $post );
 		}
 		return $canonical;
+	}
+
+	/**
+	 * Prevent WordPress from redirecting /es/about/ back to /about/.
+	 *
+	 * WordPress's redirect_canonical() compares the request URI to the post
+	 * permalink and redirects if they differ. On translated URLs the request URI
+	 * always differs from the original permalink, so without this filter every
+	 * translated page would 301 back to the source-language URL.
+	 */
+	public function prevent_canonical_redirect( $redirect_url, $requested_url ) {
+		if ( $this->current_language ) {
+			return false;
+		}
+		return $redirect_url;
 	}
 
 	// =========================================================================
