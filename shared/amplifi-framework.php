@@ -141,6 +141,8 @@ if ( ! defined( 'AMPLIFI_FRAMEWORK_LOADED' ) ) {
 			.amplifi-install-btn.installing { opacity: 0.6; pointer-events: none; }
 		' );
 
+		$check_nonce = wp_create_nonce( 'amplifi_check_updates' );
+
 		wp_add_inline_script( 'jquery-core', '
 			jQuery(function($) {
 				$(".amplifi-hub").on("click", ".amplifi-install-btn", function(e) {
@@ -175,7 +177,7 @@ if ( ! defined( 'AMPLIFI_FRAMEWORK_LOADED' ) ) {
 					$status.text("Checking\u2026");
 					$.post(ajaxurl, {
 						action: "amplifi_check_updates",
-						_ajax_nonce: "<?php echo esc_js( wp_create_nonce( 'amplifi_check_updates' ) ); ?>"
+						_ajax_nonce: "' . esc_js( $check_nonce ) . '"
 					}, function(response) {
 						$btn.prop("disabled", false);
 						if (response.success) {
