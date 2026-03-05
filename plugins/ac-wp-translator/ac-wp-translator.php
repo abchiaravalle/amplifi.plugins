@@ -3,7 +3,7 @@
  * Plugin Name: amplifi.translate
  * Plugin URI: https://github.com/abchiaravalle/amplifi.plugins
  * Description: AI-powered real-time translation using OpenAI. Translates pages and posts with URL-based language prefixes (/es/, /fr/, etc.) and smart caching. By amplifi.studio.
- * Version: 1.0.0
+ * Version: 1.2.2
  * Author: amplifi.studio
  * Author URI: https://amplifi.studio
  * License: MIT
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'ACWPT_VERSION', '1.0.0' );
+define( 'ACWPT_VERSION', '1.2.2' );
 define( 'ACWPT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACWPT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACWPT_PLUGIN_FILE', __FILE__ );

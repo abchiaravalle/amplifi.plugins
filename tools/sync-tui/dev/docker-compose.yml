@@ -1,0 +1,134 @@
+services:
+
+  # ── Production site ──────────────────────────────────────────────────────────
+  db_prod:
+    image: mariadb:10.11
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wpuser
+      MYSQL_PASSWORD: wppass
+    volumes:
+      - db_prod_data:/var/lib/mysql
+    ports:
+      - "3317:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  wordpress_prod:
+    image: wordpress:6.7-php8.2-apache
+    restart: unless-stopped
+    depends_on:
+      db_prod:
+        condition: service_healthy
+    ports:
+      - "8091:80"
+    environment:
+      WORDPRESS_DB_HOST: db_prod:3306
+      WORDPRESS_DB_USER: wpuser
+      WORDPRESS_DB_PASSWORD: wppass
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DEBUG: "1"
+    volumes:
+      - wp_prod_data:/var/www/html
+      - ../../../plugins/ac-sync:/var/www/html/wp-content/plugins/ac-sync
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/wp-login.php"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # ── Staging site ─────────────────────────────────────────────────────────────
+  db_staging:
+    image: mariadb:10.11
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wpuser
+      MYSQL_PASSWORD: wppass
+    volumes:
+      - db_staging_data:/var/lib/mysql
+    ports:
+      - "3318:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  wordpress_staging:
+    image: wordpress:6.7-php8.2-apache
+    restart: unless-stopped
+    depends_on:
+      db_staging:
+        condition: service_healthy
+    ports:
+      - "8092:80"
+    environment:
+      WORDPRESS_DB_HOST: db_staging:3306
+      WORDPRESS_DB_USER: wpuser
+      WORDPRESS_DB_PASSWORD: wppass
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DEBUG: "1"
+    volumes:
+      - wp_staging_data:/var/www/html
+      - ../../../plugins/ac-sync:/var/www/html/wp-content/plugins/ac-sync
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/wp-login.php"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # ── WP-CLI helpers (share WP volumes for seeding) ───────────────────────────
+  wpcli_prod:
+    image: wordpress:cli-php8.2
+    # Run as uid 33 (Debian www-data) to match the wordpress container's file owner,
+    # so WP-CLI can write to wp-content/uploads and other www-data-owned directories.
+    user: "33:33"
+    restart: "no"
+    depends_on:
+      - db_prod
+      - wordpress_prod
+    environment:
+      WORDPRESS_DB_HOST: db_prod:3306
+      WORDPRESS_DB_USER: wpuser
+      WORDPRESS_DB_PASSWORD: wppass
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - wp_prod_data:/var/www/html
+      - ../../../plugins/ac-sync:/var/www/html/wp-content/plugins/ac-sync
+    working_dir: /var/www/html
+    entrypoint: ["wp", "--allow-root"]
+    command: ["--info"]
+
+  wpcli_staging:
+    image: wordpress:cli-php8.2
+    user: "33:33"
+    restart: "no"
+    depends_on:
+      - db_staging
+      - wordpress_staging
+    environment:
+      WORDPRESS_DB_HOST: db_staging:3306
+      WORDPRESS_DB_USER: wpuser
+      WORDPRESS_DB_PASSWORD: wppass
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - wp_staging_data:/var/www/html
+      - ../../../plugins/ac-sync:/var/www/html/wp-content/plugins/ac-sync
+    working_dir: /var/www/html
+    entrypoint: ["wp", "--allow-root"]
+    command: ["--info"]
+
+volumes:
+  db_prod_data:
+  db_staging_data:
+  wp_prod_data:
+  wp_staging_data:

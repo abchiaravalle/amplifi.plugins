@@ -25,6 +25,11 @@
       "name": "Pods",
       "description": "Podcast carousel and floating player via Apple Podcasts RSS feed or built-in custom post type.",
       "icon": "dashicons-microphone"
+    },
+    "ac-sync": {
+      "name": "Sync",
+      "description": "WordPress environment sync with REST API for file, database, and media operations between production and staging.",
+      "icon": "dashicons-update"
     }
   }
 }

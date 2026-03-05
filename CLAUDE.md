@@ -174,6 +174,96 @@ Always releases **all** plugins — single-plugin releases are not supported. Th
 
 The script: validates semver, copies `shared/amplifi-framework.php` + `LICENSE` into each plugin, zips them, includes `plugins-manifest.json`, generates changelog from git log, creates a GitHub release with all assets.
 
+## Plugin: amplifi.sync (`plugins/ac-sync/`)
+WordPress environment sync — REST API endpoints for file, database, and media operations between production and staging.
+
+### Architecture
+- **Multi-file plugin**: Bootstrap (`ac-sync.php`), API endpoints (`class-acsync-api.php`), admin page (`class-acsync-admin.php`)
+- **REST API**: Full REST API under `amplifi-sync/v1` namespace with API key auth via `X-AmpliSync-Key` header
+- **File Operations**: Manifest (tree with MD5 hashes), read/write/delete — restricted to `wp-content/`
+- **Database Operations**: Table listing, paginated export/import, raw SQL (read-only + confirmed writes), full backup/restore
+- **Media Operations**: Paginated media library listing, sideload import from URL
+- **Elementor**: CSS cache regeneration endpoint
+- **Security**: API key generated on activation, confirmation tokens for write SQL, file ops restricted to wp-content
+
+### Key Files
+- `ac-sync.php` - Bootstrap, constants, activation hook (API key generation)
+- `includes/class-acsync-api.php` - All REST API endpoints (15 routes)
+- `includes/class-acsync-admin.php` - Settings page with API key management and connection log
+- `includes/amplifi-framework.php` - Shared framework (copied from `shared/`)
+- `uninstall.php` - Cleans up options and backup files
+
+### Admin Menu
+Single page under the **amplifi.studio** menu:
+- **Sync** — registered via `amplifi_register_plugin()` → slug: `amplifi-ac-sync`
+
+Hook suffix: `amplifi-studio_page_amplifi-ac-sync`
+
+### REST API Endpoints (namespace: `amplifi-sync/v1`)
+| Method | Route | Purpose |
+|--------|-------|---------|
+| GET | `/status` | Site info, versions, active plugins/themes |
+| GET | `/files/manifest` | File tree with MD5 hashes |
+| GET | `/files/read` | Download file content (base64) |
+| POST | `/files/write` | Upload file (base64) |
+| DELETE | `/files/delete` | Delete file |
+| GET | `/db/tables` | List tables + confirmation token |
+| GET | `/db/export` | Export table as JSON (paginated) |
+| POST | `/db/import` | Import rows (truncate/merge) |
+| POST | `/db/query` | Read-only SQL |
+| POST | `/db/execute` | Write SQL (requires token) |
+| POST | `/db/backup` | Full database dump |
+| POST | `/db/restore` | Restore from SQL dump |
+| GET | `/media/list` | Media library items |
+| POST | `/media/import` | Import media from URL |
+| POST | `/elementor/regenerate` | Clear Elementor CSS cache |
+
+### Data Storage
+- `acsync_settings` (wp_options) — API key
+- `acsync_connection_log` (wp_options) — Last 50 API requests
+- `acsync_db_token` (transient, 5min) — Write confirmation token
+- Backup files in `wp-content/uploads/acsync-backups/`
+
+## Go TUI: amplifi.sync (`tools/sync-tui/`)
+Terminal UI orchestrator for syncing between WordPress environments.
+
+### Architecture
+- **Bubbletea TUI**: Tab-based interface (Dashboard, Files, Database, Media, Logs, Settings)
+- **REST API Client**: Connects to amplifi.sync WP plugin on both sites
+- **SSH/SFTP**: Direct file operations and WP-CLI for emergency recovery
+- **Serializer**: PHP serialize/unserialize in Go with serialization-safe search/replace
+- **Backup Manager**: Local backups with JSON table exports and SQL dumps
+
+### Directory Structure
+```
+tools/sync-tui/
+├── main.go                          # Entry point, .env loading, TUI launch
+├── go.mod / go.sum
+├── .env.example
+└── internal/
+    ├── config/                      # Config loading + interactive wizard
+    ├── api/                         # WP REST API client + types
+    ├── remote/                      # SSH, SFTP, WP-CLI connections
+    ├── sync/                        # File/DB/media sync engines + backup
+    ├── serializer/                  # PHP serializer + safe replace (31 tests)
+    └── tui/                         # Bubbletea views (app, dashboard, files, db, media, logs, settings)
+```
+
+### Config (.env)
+`PROD_SITE_URL`, `PROD_API_KEY`, `PROD_SFTP_HOST`, `PROD_SFTP_USER`, `PROD_SSH_KEY_PATH` (repeated for `STAGING_*`), `BACKUP_DIR`, `BACKUP_RETENTION`
+
+### Building
+```bash
+cd tools/sync-tui
+go build -o amplifi-sync .
+./amplifi-sync
+```
+
+### Key Packages
+- `internal/serializer` — PHP serialize/unserialize, serialization-safe URL replacement (handles nested serialization, JSON inside serialized data like Elementor). 31 tests.
+- `internal/sync` — File diff (hash-based), database comparison/sync with URL mappings, media transfer, backup/rollback.
+- `internal/remote` — SSH connection pool shared by SFTP + WP-CLI. Emergency recovery via `wp db import`.
+
 ## Development
 ```bash
 cd plugins/ac-wp-translator
@@ -190,6 +280,9 @@ docker-compose up -d    # WordPress on :8089, MySQL on :3315
 
 cd plugins/ac-pods
 docker-compose up -d    # WordPress on :8090, MySQL on :3316
+
+cd plugins/ac-sync
+docker-compose up -d    # WordPress on :8091, MySQL on :3317
 ```
 Plugin dirs are volume-mounted so edits are live.
 
