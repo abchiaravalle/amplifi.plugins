@@ -3,7 +3,7 @@
  * Plugin Name: amplifi.meta
  * Plugin URI: https://github.com/abchiaravalle/amplifi.plugins
  * Description: AI-powered bulk SEO meta editor with FAQ generation and JSON-LD structured data. Edit Yoast SEO metadata across all post types with bulk AI generation. By amplifi.studio.
- * Version: 1.2.4
+ * Version: 1.2.5
  * Author: amplifi.studio
  * Author URI: https://amplifi.studio
  * License: MIT
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'ACMETA_VERSION', '1.2.4' );
+define( 'ACMETA_VERSION', '1.2.5' );
 define( 'ACMETA_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACMETA_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACMETA_PLUGIN_FILE', __FILE__ );
