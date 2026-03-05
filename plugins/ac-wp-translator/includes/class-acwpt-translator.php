@@ -55,7 +55,7 @@ class ACWPT_Translator {
 		$response = wp_remote_post(
 			'https://api.openai.com/v1/chat/completions',
 			array(
-				'timeout' => 120,
+				'timeout' => 30,
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $api_key,
 					'Content-Type'  => 'application/json',
@@ -133,7 +133,7 @@ class ACWPT_Translator {
 		$response = wp_remote_post(
 			'https://api.openai.com/v1/chat/completions',
 			array(
-				'timeout' => 60,
+				'timeout' => 20,
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $api_key,
 					'Content-Type'  => 'application/json',

@@ -20,6 +20,9 @@ class ACWPT_Admin {
 		add_action( 'wp_ajax_acwpt_test_api_key', array( $this, 'ajax_test_api_key' ) );
 		add_action( 'wp_ajax_acwpt_flush_cache', array( $this, 'ajax_flush_cache' ) );
 		add_action( 'wp_ajax_acwpt_fetch_models', array( $this, 'ajax_fetch_models' ) );
+		add_action( 'wp_ajax_acwpt_preload_start', array( $this, 'ajax_preload_start' ) );
+		add_action( 'wp_ajax_acwpt_preload_status', array( $this, 'ajax_preload_status' ) );
+		add_action( 'wp_ajax_acwpt_preload_stop', array( $this, 'ajax_preload_stop' ) );
 
 		// Nav menu meta box for adding Language Switcher to menus.
 		add_action( 'admin_head-nav-menus.php', array( $this, 'add_nav_menu_meta_box' ) );
@@ -52,6 +55,7 @@ class ACWPT_Admin {
 		$clean['model']           = sanitize_text_field( $input['model'] ?? 'gpt-4o-mini' );
 		$clean['show_flags']      = ! empty( $input['show_flags'] );
 		$clean['show_suggestion'] = ! empty( $input['show_suggestion'] );
+		$clean['preload_auto']    = ! empty( $input['preload_auto'] );
 
 		$enabled = array();
 		if ( ! empty( $input['enabled_languages'] ) && is_array( $input['enabled_languages'] ) ) {
@@ -89,14 +93,15 @@ class ACWPT_Admin {
 	}
 
 	public function render_page() {
-		$settings    = get_option( 'acwpt_settings', array() );
-		$all_langs   = ACWPT_Languages::get_all();
-		$enabled     = isset( $settings['enabled_languages'] ) ? $settings['enabled_languages'] : array();
-		$source      = isset( $settings['source_language'] ) ? $settings['source_language'] : 'en';
-		$show_flags  = isset( $settings['show_flags'] ) ? (bool) $settings['show_flags'] : true;
-		$show_sugg   = isset( $settings['show_suggestion'] ) ? (bool) $settings['show_suggestion'] : true;
-		$api_key     = isset( $settings['api_key'] ) ? $settings['api_key'] : '';
-		$model       = isset( $settings['model'] ) ? $settings['model'] : 'gpt-4o-mini';
+		$settings      = get_option( 'acwpt_settings', array() );
+		$all_langs     = ACWPT_Languages::get_all();
+		$enabled       = isset( $settings['enabled_languages'] ) ? $settings['enabled_languages'] : array();
+		$source        = isset( $settings['source_language'] ) ? $settings['source_language'] : 'en';
+		$show_flags    = isset( $settings['show_flags'] ) ? (bool) $settings['show_flags'] : true;
+		$show_sugg     = isset( $settings['show_suggestion'] ) ? (bool) $settings['show_suggestion'] : true;
+		$api_key       = isset( $settings['api_key'] ) ? $settings['api_key'] : '';
+		$model         = isset( $settings['model'] ) ? $settings['model'] : 'gpt-4o-mini';
+		$preload_auto  = isset( $settings['preload_auto'] ) ? (bool) $settings['preload_auto'] : false;
 		$cache_stats   = ACWPT_Cache::stats();
 		$current_usage = ACWPT_Translator::get_current_month_usage();
 		$total_usage   = ACWPT_Translator::get_total_usage();
@@ -193,6 +198,16 @@ class ACWPT_Admin {
 								</label>
 							</td>
 						</tr>
+						<tr>
+							<th>Auto-Preload</th>
+							<td>
+								<label>
+									<input type="checkbox" name="acwpt_settings[preload_auto]" value="1" <?php checked( $preload_auto ); ?> />
+									Automatically translate and cache pages/posts in the background when they are published or updated
+								</label>
+								<p class="description">When enabled, saving a page queues its translations immediately so the first visitor never waits.</p>
+							</td>
+						</tr>
 					</table>
 				</div>
 
@@ -255,6 +270,24 @@ class ACWPT_Admin {
 					<span id="acwpt-flush-status"></span>
 				</p>
 				<p class="description">Translations are automatically re-cached when a page is updated or when the cache is cleared.</p>
+			</div>
+
+			<!-- Preload Cache -->
+			<div class="acwpt-card" id="acwpt-preload-card">
+				<h2>Preload Cache</h2>
+				<p>Translate and cache every page &amp; post for all enabled languages in the background. Once complete, every visitor gets an instant first load &mdash; no live API calls.</p>
+				<div id="acwpt-preload-bar-wrap" style="display:none; margin-bottom:12px;">
+					<div style="background:#e0e0e0; border-radius:4px; height:14px; overflow:hidden;">
+						<div id="acwpt-preload-bar" style="background:#2271b1; height:100%; width:0%; transition:width 0.4s;"></div>
+					</div>
+					<p id="acwpt-preload-label" style="margin:6px 0 0; font-size:13px;"></p>
+				</div>
+				<p>
+					<button type="button" id="acwpt-preload-start" class="button button-primary">Preload All Languages Now</button>
+					<button type="button" id="acwpt-preload-stop" class="button button-secondary" style="display:none;">Stop</button>
+					<span id="acwpt-preload-status" style="margin-left:8px;"></span>
+				</p>
+				<p class="description">Each page is translated per language via OpenAI and stored in the cache table. Only pages that are not yet cached (or whose content has changed) will be translated.</p>
 			</div>
 
 			<!-- API Usage & Cost -->
@@ -486,6 +519,51 @@ class ACWPT_Admin {
 		set_transient( 'acwpt_models_list', $models, HOUR_IN_SECONDS );
 
 		wp_send_json_success( $models );
+	}
+
+	// =========================================================================
+	// Preload AJAX Handlers
+	// =========================================================================
+
+	public function ajax_preload_start() {
+		check_ajax_referer( 'acwpt_admin', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Unauthorized' );
+		}
+		$count = ACWPT_Preloader::start_all();
+		if ( $count === 0 ) {
+			wp_send_json_success( array( 'message' => 'All translations are already cached.', 'done' => true ) );
+		}
+		wp_send_json_success( array( 'message' => 'Preload started.', 'done' => false, 'total' => $count ) );
+	}
+
+	public function ajax_preload_status() {
+		check_ajax_referer( 'acwpt_admin', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Unauthorized' );
+		}
+		$status = ACWPT_Preloader::get_status();
+		if ( ! $status ) {
+			wp_send_json_success( array( 'running' => false ) );
+		}
+		$running = empty( $status['finished_at'] );
+		wp_send_json_success( array(
+			'running'     => $running,
+			'total'       => (int) ( $status['total'] ?? 0 ),
+			'completed'   => (int) ( $status['completed'] ?? 0 ),
+			'failed'      => (int) ( $status['failed'] ?? 0 ),
+			'started_at'  => $status['started_at'] ?? null,
+			'finished_at' => $status['finished_at'] ?? null,
+		) );
+	}
+
+	public function ajax_preload_stop() {
+		check_ajax_referer( 'acwpt_admin', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Unauthorized' );
+		}
+		ACWPT_Preloader::stop();
+		wp_send_json_success( 'Preload stopped.' );
 	}
 
 	// =========================================================================

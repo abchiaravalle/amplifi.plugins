@@ -41,6 +41,7 @@ require_once ACWPT_PLUGIN_DIR . 'includes/amplifi-framework.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-languages.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-cache.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-translator.php';
+require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-preloader.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-admin.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-frontend.php';
 
@@ -58,6 +59,7 @@ amplifi_register_plugin(
 add_action( 'plugins_loaded', 'acwpt_init', 1 );
 
 function acwpt_init() {
+	ACWPT_Preloader::register();
 	ACWPT_Frontend::instance()->init();
 
 	if ( is_admin() ) {
@@ -87,6 +89,7 @@ function acwpt_activate() {
 		'show_flags'         => true,
 		'show_suggestion'    => true,
 		'model'              => 'gpt-4o-mini',
+		'preload_auto'       => false,
 	);
 
 	if ( ! get_option( 'acwpt_settings' ) ) {

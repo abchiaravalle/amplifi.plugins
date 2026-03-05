@@ -111,4 +111,106 @@
 			status.text('Request failed.');
 		});
 	});
+	// -------------------------------------------------------------------------
+	// Preload Cache
+	// -------------------------------------------------------------------------
+
+	var preloadPollTimer = null;
+
+	function preloadUpdateUI( data ) {
+		var $start  = $('#acwpt-preload-start');
+		var $stop   = $('#acwpt-preload-stop');
+		var $bar    = $('#acwpt-preload-bar');
+		var $wrap   = $('#acwpt-preload-bar-wrap');
+		var $label  = $('#acwpt-preload-label');
+		var $status = $('#acwpt-preload-status');
+
+		if ( ! data || ! data.running && ! data.total ) {
+			$wrap.hide();
+			$start.prop('disabled', false).show();
+			$stop.hide();
+			$status.text('');
+			return;
+		}
+
+		var total     = data.total || 0;
+		var completed = data.completed || 0;
+		var failed    = data.failed || 0;
+		var pct       = total > 0 ? Math.round( ( completed / total ) * 100 ) : 0;
+
+		$wrap.show();
+		$bar.css('width', pct + '%');
+
+		var labelParts = [ completed + ' / ' + total + ' translated' ];
+		if ( failed > 0 ) { labelParts.push( failed + ' failed' ); }
+		$label.text( labelParts.join( ', ' ) );
+
+		if ( data.running ) {
+			$start.prop('disabled', true).hide();
+			$stop.show();
+			$status.text('Running\u2026');
+		} else {
+			$start.prop('disabled', false).show();
+			$stop.hide();
+			$status.text( 'Complete! ' + completed + ' translations cached.' + ( failed > 0 ? ' (' + failed + ' failed)' : '' ) );
+			stopPreloadPoll();
+		}
+	}
+
+	function startPreloadPoll() {
+		if ( preloadPollTimer ) { return; }
+		preloadPollTimer = setInterval( function() {
+			$.post( acwptAdmin.ajaxurl, { action: 'acwpt_preload_status', nonce: acwptAdmin.nonce }, function( r ) {
+				if ( r.success ) { preloadUpdateUI( r.data ); }
+			});
+		}, 2500 );
+	}
+
+	function stopPreloadPoll() {
+		if ( preloadPollTimer ) {
+			clearInterval( preloadPollTimer );
+			preloadPollTimer = null;
+		}
+	}
+
+	// Restore state on page load if a run is already in progress.
+	$.post( acwptAdmin.ajaxurl, { action: 'acwpt_preload_status', nonce: acwptAdmin.nonce }, function( r ) {
+		if ( r.success && r.data && r.data.running ) {
+			preloadUpdateUI( r.data );
+			startPreloadPoll();
+		}
+	});
+
+	$('#acwpt-preload-start').on('click', function() {
+		var $btn = $(this);
+		$btn.prop('disabled', true);
+		$('#acwpt-preload-status').text('Starting\u2026');
+
+		$.post( acwptAdmin.ajaxurl, { action: 'acwpt_preload_start', nonce: acwptAdmin.nonce }, function( r ) {
+			if ( r.success ) {
+				if ( r.data.done ) {
+					$btn.prop('disabled', false);
+					$('#acwpt-preload-status').text( r.data.message );
+				} else {
+					preloadUpdateUI({ running: true, total: r.data.total, completed: 0, failed: 0 });
+					startPreloadPoll();
+				}
+			} else {
+				$btn.prop('disabled', false);
+				$('#acwpt-preload-status').text('Error: ' + ( r.data || 'Unknown error' ) );
+			}
+		}).fail(function() {
+			$btn.prop('disabled', false);
+			$('#acwpt-preload-status').text('Request failed.');
+		});
+	});
+
+	$('#acwpt-preload-stop').on('click', function() {
+		stopPreloadPoll();
+		$.post( acwptAdmin.ajaxurl, { action: 'acwpt_preload_stop', nonce: acwptAdmin.nonce }, function() {
+			preloadUpdateUI( null );
+			$('#acwpt-preload-status').text('Stopped.');
+		});
+	});
+
 })(jQuery);

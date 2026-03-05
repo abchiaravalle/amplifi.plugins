@@ -31,8 +31,13 @@ class ACWPT_Frontend {
 	}
 
 	public function init() {
-		// Detect language from URL as early as possible.
-		$this->detect_language();
+		// Register language URL prefix as a WordPress query var and inject rewrite rules.
+		add_filter( 'query_vars', array( $this, 'add_language_query_var' ) );
+		add_filter( 'rewrite_rules_array', array( $this, 'add_language_rewrite_rules' ) );
+
+		// Detect language from the parsed query var (fires after WP routes the URL).
+		// Priority 1 so it runs before maybe_serve_sitemap.
+		add_action( 'parse_request', array( $this, 'detect_language_from_query' ), 1 );
 
 		// Content filters for post body.
 		add_filter( 'the_title', array( $this, 'filter_title' ), 1, 2 );
@@ -47,7 +52,7 @@ class ACWPT_Frontend {
 		// Pre-fetch translations once the query is ready.
 		add_action( 'wp', array( $this, 'prepare_translations' ) );
 
-		// Full page output buffer to translate nav, footer, meta, and prefix links.
+		// Full page output buffer to translate all visible text and prefix links.
 		add_action( 'template_redirect', array( $this, 'start_output_buffer' ), 0 );
 
 		// SEO: hreflang tags.
@@ -73,7 +78,14 @@ class ACWPT_Frontend {
 		add_action( 'update_option_blogname', array( $this, 'clear_all_string_caches' ) );
 		add_action( 'update_option_blogdescription', array( $this, 'clear_all_string_caches' ) );
 
-		// Flush rewrite rules if pending.
+		// Schedule a rewrite flush if the plugin version changed (new rules may have been added).
+		$installed_version = get_option( 'acwpt_version', '0' );
+		if ( version_compare( $installed_version, ACWPT_VERSION, '<' ) ) {
+			update_option( 'acwpt_version', ACWPT_VERSION );
+			update_option( 'acwpt_flush_rules', true );
+		}
+
+		// Flush rewrite rules if pending (runs on the same page load as the version check above).
 		if ( get_option( 'acwpt_flush_rules' ) ) {
 			flush_rewrite_rules();
 			delete_option( 'acwpt_flush_rules' );
@@ -86,10 +98,10 @@ class ACWPT_Frontend {
 		// Fix canonical URL for translated pages.
 		add_filter( 'get_canonical_url', array( $this, 'filter_canonical_url' ), 10, 2 );
 
-		// Prevent full-page cache from serving wrong language (e.g. WP Engine keys by path; /es is rewritten to /).
+		// Identify translated pages with a debug header.
 		add_action( 'send_headers', array( $this, 'send_translated_page_headers' ) );
 
-		// Console log on translated pages (always, so it's visible without ACWPT_DEBUG).
+		// Console log on translated pages for admins.
 		add_action( 'wp_footer', array( $this, 'debug_console_log' ), 99 );
 
 		// Elementor: translate the final HTML output (Elementor bypasses the_content for builder content).
@@ -99,40 +111,83 @@ class ACWPT_Frontend {
 	}
 
 	// =========================================================================
-	// URL / Language Detection
+	// URL / Language Detection (via WordPress rewrite rules)
 	// =========================================================================
 
-	private function detect_language() {
+	/**
+	 * Register acwpt_lang as an allowed WordPress query var.
+	 */
+	public function add_language_query_var( $vars ) {
+		$vars[] = 'acwpt_lang';
+		return $vars;
+	}
+
+	/**
+	 * Inject language-prefixed rewrite rules for every enabled language.
+	 *
+	 * For each existing WordPress rewrite rule we create a parallel rule with
+	 * the language code prepended, e.g. ^es/about/?$ in addition to ^about/?$.
+	 * This means /es/about/ is a genuine, distinct URL — host caches key to it
+	 * correctly and there is no REQUEST_URI mutation.
+	 */
+	public function add_language_rewrite_rules( $rules ) {
+		$enabled = ACWPT_Languages::get_enabled_codes();
+		if ( empty( $enabled ) ) {
+			return $rules;
+		}
+
+		$lang_group = '(' . implode( '|', array_map( 'preg_quote', $enabled ) ) . ')';
+		$new_rules  = array();
+
+		foreach ( $rules as $regex => $redirect ) {
+			$stripped = ltrim( $regex, '^' );
+
+			if ( $stripped === '' || $stripped === '$' ) {
+				// Home page: /es/ or /es
+				$new_rules[ '^' . $lang_group . '/?$' ] = 'index.php?acwpt_lang=$matches[1]';
+			} else {
+				// Shift all $matches[N] indices up by 1 (the lang group becomes $matches[1]).
+				$shifted = preg_replace_callback(
+					'/\$matches\[(\d+)\]/',
+					function( $m ) { return '$matches[' . ( (int) $m[1] + 1 ) . ']'; },
+					$redirect
+				);
+				$new_rules[ '^' . $lang_group . '/' . $stripped ] = $shifted . '&acwpt_lang=$matches[1]';
+			}
+
+			$new_rules[ $regex ] = $redirect;
+		}
+
+		return $new_rules;
+	}
+
+	/**
+	 * Detect the current language from the acwpt_lang query var set by rewrite rules.
+	 * Runs on parse_request, after WordPress has matched the URL to its rewrite rules.
+	 */
+	public function detect_language_from_query( $wp ) {
 		if ( is_admin() ) {
 			return;
 		}
 
-		$enabled = ACWPT_Languages::get_enabled_codes();
-		if ( empty( $enabled ) ) {
+		if ( empty( $wp->query_vars['acwpt_lang'] ) ) {
 			return;
 		}
 
-		$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '';
-		$home_path   = $this->get_home_path();
+		$lang    = $wp->query_vars['acwpt_lang'];
+		$enabled = ACWPT_Languages::get_enabled_codes();
 
-		$relative = $request_uri;
-		if ( $home_path && strpos( $relative, $home_path ) === 0 ) {
-			$relative = substr( $relative, strlen( $home_path ) );
+		if ( ! in_array( $lang, $enabled, true ) ) {
+			return;
 		}
-		$relative = '/' . ltrim( $relative, '/' );
 
-		$codes_pattern = implode( '|', array_map( 'preg_quote', $enabled ) );
+		$this->current_language = $lang;
 
-		if ( preg_match( '#^/(' . $codes_pattern . ')(/.*)?$#', $relative, $matches ) ) {
-			$this->current_language = $matches[1];
-			$new_relative           = isset( $matches[2] ) ? $matches[2] : '/';
-			if ( empty( $new_relative ) ) {
-				$new_relative = '/';
-			}
-			$_SERVER['REQUEST_URI'] = $home_path . ltrim( $new_relative, '/' );
-			if ( defined( 'ACWPT_DEBUG' ) && ACWPT_DEBUG ) {
-				error_log( 'ACWPT: Detected language ' . $this->current_language . ', rewritten REQUEST_URI to ' . $_SERVER['REQUEST_URI'] );
-			}
+		// Remove from query vars so WP_Query doesn't see it as a public parameter.
+		unset( $wp->query_vars['acwpt_lang'] );
+
+		if ( defined( 'ACWPT_DEBUG' ) && ACWPT_DEBUG ) {
+			error_log( 'ACWPT: Detected language ' . $this->current_language . ' via rewrite rule.' );
 		}
 	}
 
@@ -143,21 +198,15 @@ class ACWPT_Frontend {
 	}
 
 	/**
-	 * Send cache-control and debug headers for translated pages so full-page
-	 * caches (e.g. WP Engine) don't serve the wrong language. When the URL is
-	 * /es, we rewrite REQUEST_URI to /, so the cache may key by "/" and serve
-	 * the English homepage for /es unless we prevent caching.
+	 * Send an informational header identifying the active translation language.
+	 * Translated pages now have distinct URLs via rewrite rules, so host caches
+	 * key them correctly — no need to suppress caching.
 	 */
 	public function send_translated_page_headers() {
 		if ( ! $this->current_language ) {
 			return;
 		}
-		// Prevent shared caches from storing this response (browsers may still cache briefly).
-		header( 'Cache-Control: private, no-cache, must-revalidate, max-age=0', true );
 		header( 'X-ACWPT-Language: ' . sanitize_text_field( $this->current_language ), true );
-		if ( defined( 'ACWPT_DEBUG' ) && ACWPT_DEBUG ) {
-			header( 'X-ACWPT-Debug: 1', true );
-		}
 	}
 
 	// =========================================================================
@@ -202,6 +251,14 @@ class ACWPT_Frontend {
 			return;
 		}
 
+		// Prevent concurrent requests from all hitting the API for the same post+language.
+		// A second request in-flight will serve the source language rather than block.
+		$lock_key = 'acwpt_lock_' . $post->ID . '_' . $this->current_language;
+		if ( get_transient( $lock_key ) ) {
+			return;
+		}
+		set_transient( $lock_key, 1, 45 );
+
 		if ( defined( 'ACWPT_DEBUG' ) && ACWPT_DEBUG ) {
 			error_log( 'ACWPT: Fetching translation for post ' . $post->ID . ' lang=' . $this->current_language );
 		}
@@ -212,6 +269,8 @@ class ACWPT_Frontend {
 			$post->post_excerpt,
 			$this->current_language
 		);
+
+		delete_transient( $lock_key );
 
 		if ( is_wp_error( $result ) ) {
 			error_log( 'ACWPT translation error for post ' . $post->ID . ': ' . $result->get_error_message() );
@@ -243,6 +302,26 @@ class ACWPT_Frontend {
 	// =========================================================================
 
 	/**
+	 * Save the string cache to the database, capping at 500 entries to prevent unbounded growth.
+	 * Preserves the _populated_at timestamp across trims.
+	 */
+	private function save_string_cache( $cache ) {
+		$populated_at = isset( $cache['_populated_at'] ) ? $cache['_populated_at'] : null;
+		unset( $cache['_populated_at'] );
+
+		if ( count( $cache ) > 500 ) {
+			$cache = array_slice( $cache, -500, null, true );
+		}
+
+		if ( null !== $populated_at ) {
+			$cache['_populated_at'] = $populated_at;
+		}
+
+		$this->string_cache = $cache;
+		update_option( 'acwpt_strings_' . $this->current_language, $cache, false );
+	}
+
+	/**
 	 * Load the string translation cache for the current language.
 	 */
 	private function load_string_cache() {
@@ -265,13 +344,20 @@ class ACWPT_Frontend {
 
 	/**
 	 * Pre-translate all site-wide strings in a single batch API call.
+	 * Skips expensive DB queries if the cache was fully populated within the last hour.
 	 */
 	private function prepare_string_translations() {
 		$cache = $this->load_string_cache();
 
+		// If the cache was fully populated recently, skip the DB queries entirely.
+		$populated_at = isset( $cache['_populated_at'] ) ? (int) $cache['_populated_at'] : 0;
+		if ( $populated_at && ( time() - $populated_at ) < HOUR_IN_SECONDS ) {
+			return;
+		}
+
 		$strings_needed = array();
 
-		// Site title.
+		// Site title and tagline.
 		$this->filtering_option = true;
 		$blogname = get_option( 'blogname' );
 		$blogdesc = get_option( 'blogdescription' );
@@ -284,7 +370,7 @@ class ACWPT_Frontend {
 			$strings_needed[] = $blogdesc;
 		}
 
-		// Collect nav menu items from all registered menus.
+		// Nav menu items from all registered menus.
 		$locations = get_nav_menu_locations();
 		if ( ! empty( $locations ) ) {
 			foreach ( $locations as $location => $menu_id ) {
@@ -303,7 +389,7 @@ class ACWPT_Frontend {
 			}
 		}
 
-		// Also collect page titles used in block nav (core/page-list).
+		// Page titles used in block nav (core/page-list).
 		$pages = get_pages( array( 'post_status' => 'publish', 'number' => 50 ) );
 		if ( $pages ) {
 			foreach ( $pages as $page ) {
@@ -329,25 +415,21 @@ class ACWPT_Frontend {
 
 		$strings_needed = array_unique( array_filter( $strings_needed ) );
 
-		if ( empty( $strings_needed ) ) {
-			return;
+		if ( ! empty( $strings_needed ) ) {
+			$translated = ACWPT_Translator::translate_strings( $strings_needed, $this->current_language );
+
+			if ( is_wp_error( $translated ) ) {
+				error_log( 'ACWPT string translation error: ' . $translated->get_error_message() );
+			} else {
+				foreach ( $translated as $original => $trans ) {
+					$cache[ $original ] = $trans;
+				}
+			}
 		}
 
-		// Batch translate in one API call.
-		$translated = ACWPT_Translator::translate_strings( $strings_needed, $this->current_language );
-
-		if ( is_wp_error( $translated ) ) {
-			error_log( 'ACWPT string translation error: ' . $translated->get_error_message() );
-			return;
-		}
-
-		// Merge into cache.
-		foreach ( $translated as $original => $trans ) {
-			$cache[ $original ] = $trans;
-		}
-
-		$this->string_cache = $cache;
-		update_option( 'acwpt_strings_' . $this->current_language, $cache, false );
+		// Mark the cache as fully populated so DB queries are skipped for the next hour.
+		$cache['_populated_at'] = time();
+		$this->save_string_cache( $cache );
 	}
 
 	/**
@@ -446,7 +528,7 @@ class ACWPT_Frontend {
 
 	public function filter_language_attributes( $output ) {
 		if ( $this->current_language ) {
-			$output = preg_replace( '/lang="[^"]*"/', 'lang="' . esc_attr( $this->current_language ) . '"', $output );
+			$output = preg_replace( '/lang="[^"]*"/', 'lang="' . esc_attr( ACWPT_Languages::bcp47( $this->current_language ) ) . '"', $output );
 		}
 		return $output;
 	}
@@ -486,7 +568,7 @@ class ACWPT_Frontend {
 
 		// Protect language switcher links from being translated or re-prefixed.
 		$protected_links = array();
-		$html = preg_replace_callback(
+		$result = preg_replace_callback(
 			'/<a\s[^>]*data-acwpt-lang[^>]*>.*?<\/a>/is',
 			function( $m ) use ( &$protected_links ) {
 				$placeholder = '<!--ACWPT_PROT_' . count( $protected_links ) . '-->';
@@ -495,24 +577,26 @@ class ACWPT_Frontend {
 			},
 			$html
 		);
+		$html = $result !== null ? $result : $html;
 
 		// 1. Translate meta tags (description, OG, Twitter).
-		$html = $this->translate_meta_tags( $html );
+		$result = $this->translate_meta_tags( $html );
+		$html   = $result !== null ? $result : $html;
 
-		// 2. Translate text in <nav> sections (menus).
-		$html = $this->translate_nav_text( $html );
+		// 2. Ensure all visible strings in the full page HTML are cached, then
+		//    translate in one pass — covers nav, header, footer, sections, divs, etc.
+		//    This replaces separate per-section passes; no duplicative API calls since
+		//    ensure_strings_cached_for_html() batches any missing strings first.
+		$this->ensure_strings_cached_for_html( $html );
+		$result = $this->translate_html_blob( $html );
+		$html   = $result !== null ? $result : $html;
 
-		// 3. Translate text in <footer> sections.
-		$html = $this->translate_footer_text( $html );
-
-		// 4. Translate text in <header> sections (outside of main content).
-		$html = $this->translate_header_text( $html );
-
-		// 5. Prefix all internal links with language code.
+		// 3. Prefix all internal links with language code.
 		$html = $this->prefix_internal_links( $html );
 
-		// 6. Fix og:url to point to translated URL.
-		$html = $this->fix_og_url( $html );
+		// 4. Fix og:url to point to translated URL.
+		$result = $this->fix_og_url( $html );
+		$html   = $result !== null ? $result : $html;
 
 		// Restore protected language switcher links.
 		foreach ( $protected_links as $placeholder => $link ) {
@@ -549,11 +633,9 @@ class ACWPT_Frontend {
 				$result = ACWPT_Translator::translate_strings( array( $original ), $this->current_language );
 				if ( ! is_wp_error( $result ) && isset( $result[ $original ] ) ) {
 					$translated = $result[ $original ];
-					// Update cache.
-					$cache = $this->load_string_cache();
+					$cache      = $this->load_string_cache();
 					$cache[ $original ] = $translated;
-					$this->string_cache = $cache;
-					update_option( 'acwpt_strings_' . $this->current_language, $cache, false );
+					$this->save_string_cache( $cache );
 				}
 			}
 			if ( $translated && $translated !== $original ) {
@@ -561,82 +643,6 @@ class ACWPT_Frontend {
 			}
 		}
 		return $tag;
-	}
-
-	/**
-	 * Translate text within <nav> elements.
-	 */
-	private function translate_nav_text( $html ) {
-		return preg_replace_callback(
-			'/(<nav\b[^>]*>)(.*?)(<\/nav>)/si',
-			array( $this, 'translate_section_links' ),
-			$html
-		);
-	}
-
-	/**
-	 * Translate text within <header> elements.
-	 */
-	private function translate_header_text( $html ) {
-		return preg_replace_callback(
-			'/(<header\b[^>]*>)(.*?)(<\/header>)/si',
-			array( $this, 'translate_section_links' ),
-			$html
-		);
-	}
-
-	/**
-	 * Translate text within <footer> elements.
-	 */
-	private function translate_footer_text( $html ) {
-		return preg_replace_callback(
-			'/(<footer\b[^>]*>)(.*?)(<\/footer>)/si',
-			array( $this, 'translate_section_text_and_links' ),
-			$html
-		);
-	}
-
-	/**
-	 * Translate link text within a section.
-	 */
-	public function translate_section_links( $match ) {
-		$open    = $match[1];
-		$content = $match[2];
-		$close   = $match[3];
-
-		// Translate <a> link text.
-		$content = preg_replace_callback(
-			'/(<a\b[^>]*>)([^<]+)(<\/a>)/i',
-			array( $this, 'translate_link_text_callback' ),
-			$content
-		);
-
-		return $open . $content . $close;
-	}
-
-	/**
-	 * Translate both link text and plain text within a section (for footer).
-	 */
-	public function translate_section_text_and_links( $match ) {
-		$open    = $match[1];
-		$content = $match[2];
-		$close   = $match[3];
-
-		// Translate <a> link text.
-		$content = preg_replace_callback(
-			'/(<a\b[^>]*>)([^<]+)(<\/a>)/i',
-			array( $this, 'translate_link_text_callback' ),
-			$content
-		);
-
-		// Translate text in <p>, <span>, <div>, <h1>-<h6>, <li> (direct text, not nested).
-		$content = preg_replace_callback(
-			'/(<(?:p|span|div|h[1-6]|li)\b[^>]*>)([^<]{2,})(<\/(?:p|span|div|h[1-6]|li)>)/i',
-			array( $this, 'translate_element_text_callback' ),
-			$content
-		);
-
-		return $open . $content . $close;
 	}
 
 	/**
@@ -715,8 +721,7 @@ class ACWPT_Frontend {
 				$cache[ $orig ] = $trans;
 			}
 		}
-		$this->string_cache = $cache;
-		update_option( 'acwpt_strings_' . $this->current_language, $cache, false );
+		$this->save_string_cache( $cache );
 	}
 
 	/**
@@ -733,8 +738,8 @@ class ACWPT_Frontend {
 				}
 			}
 		}
-		// Block/text elements (p, span, div, headings, li, td, th, label, figcaption, button).
-		if ( preg_match_all( '/(<(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button)\b[^>]*>)([^<]{2,})(<\/(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button)>)/i', $html, $m, PREG_SET_ORDER ) ) {
+		// Block/text elements (p, span, div, headings, li, td, th, label, figcaption, button, strong, em, b, dt, dd, blockquote, cite, caption).
+		if ( preg_match_all( '/(<(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)\b[^>]*>)([^<]{2,})(<\/(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)>)/i', $html, $m, PREG_SET_ORDER ) ) {
 			foreach ( $m as $match ) {
 				$text = trim( $match[2] );
 				if ( strlen( $text ) >= 2 && ! preg_match( '/^[\d\s\.\-:\/]+$/', $text ) ) {
@@ -759,7 +764,7 @@ class ACWPT_Frontend {
 		);
 		// Translate text in block elements (same set as extract).
 		$html = preg_replace_callback(
-			'/(<(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button)\b[^>]*>)([^<]{2,})(<\/(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button)>)/i',
+			'/(<(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)\b[^>]*>)([^<]{2,})(<\/(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)>)/i',
 			array( $this, 'translate_element_text_callback' ),
 			$html
 		);
@@ -838,11 +843,11 @@ class ACWPT_Frontend {
 		$original_url = get_permalink( $post );
 
 		echo '<link rel="alternate" hreflang="x-default" href="' . esc_url( $original_url ) . '" />' . "\n";
-		echo '<link rel="alternate" hreflang="' . esc_attr( $source ) . '" href="' . esc_url( $original_url ) . '" />' . "\n";
+		echo '<link rel="alternate" hreflang="' . esc_attr( ACWPT_Languages::bcp47( $source ) ) . '" href="' . esc_url( $original_url ) . '" />' . "\n";
 
 		foreach ( $enabled as $code ) {
 			$url = $this->get_translated_url( $code, $post );
-			echo '<link rel="alternate" hreflang="' . esc_attr( $code ) . '" href="' . esc_url( $url ) . '" />' . "\n";
+			echo '<link rel="alternate" hreflang="' . esc_attr( ACWPT_Languages::bcp47( $code ) ) . '" href="' . esc_url( $url ) . '" />' . "\n";
 		}
 	}
 
@@ -1018,6 +1023,17 @@ class ACWPT_Frontend {
 		$path = '/' . ltrim( $path, '/' );
 		$path = strtok( $path, '?' );
 
+		// Strip language prefix — REQUEST_URI is no longer mutated by the plugin,
+		// so /es/about/ needs to be normalised to /about/ for switcher URL generation.
+		if ( $this->current_language ) {
+			$prefix = '/' . $this->current_language . '/';
+			if ( strpos( $path, $prefix ) === 0 ) {
+				$path = '/' . substr( $path, strlen( $prefix ) );
+			} elseif ( $path === '/' . $this->current_language || $path === '/' . $this->current_language . '/' ) {
+				$path = '/';
+			}
+		}
+
 		return $path;
 	}
 
@@ -1068,7 +1084,7 @@ class ACWPT_Frontend {
 	 * Output debug script on translated pages (always, so console shows language state without ACWPT_DEBUG).
 	 */
 	public function debug_console_log() {
-		if ( ! $this->current_language ) {
+		if ( ! $this->current_language || ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
 		$queried = get_queried_object();
@@ -1093,11 +1109,22 @@ class ACWPT_Frontend {
 		}
 		ACWPT_Cache::delete_post( $post_id );
 
-		// Also clear string caches since page titles may have changed (used in nav).
-		$this->clear_all_string_caches();
+		// Only clear string caches for pages — they appear in nav menus and page lists.
+		// Regular post saves don't affect nav text so there's no need to re-translate strings.
+		if ( $post->post_type === 'page' ) {
+			$this->clear_all_string_caches();
+		}
 
 		// Invalidate the sitemap cache.
 		delete_transient( 'acwpt_sitemap_xml' );
+
+		// Auto-preload: queue background translation for this post if enabled.
+		if ( $post->post_status === 'publish' ) {
+			$settings = get_option( 'acwpt_settings', array() );
+			if ( ! empty( $settings['preload_auto'] ) ) {
+				ACWPT_Preloader::start_for_post( $post_id );
+			}
+		}
 	}
 
 	// =========================================================================
@@ -1190,7 +1217,7 @@ class ACWPT_Frontend {
 				}
 				// Hreflang alternates (every version, including self).
 				foreach ( $lang_urls as $alt_lang => $alt_url ) {
-					$xml .= '    <xhtml:link rel="alternate" hreflang="' . esc_attr( $alt_lang ) . '" href="' . esc_url( $alt_url ) . '" />' . "\n";
+					$xml .= '    <xhtml:link rel="alternate" hreflang="' . esc_attr( ACWPT_Languages::bcp47( $alt_lang ) ) . '" href="' . esc_url( $alt_url ) . '" />' . "\n";
 				}
 				$xml .= '    <xhtml:link rel="alternate" hreflang="x-default" href="' . esc_url( $permalink ) . '" />' . "\n";
 				$xml .= "  </url>\n";

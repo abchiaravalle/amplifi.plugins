@@ -42,8 +42,17 @@ class ACWPT_Languages {
 			'bg' => array( 'name' => 'Bulgarian',            'native' => "\xD0\x91\xD1\x8A\xD0\xBB\xD0\xB3\xD0\xB0\xD1\x80\xD1\x81\xD0\xBA\xD0\xB8", 'flag' => "\xF0\x9F\x87\xA7\xF0\x9F\x87\xAC" ),
 			'ms' => array( 'name' => 'Malay',                'native' => 'Bahasa Melayu',      'flag' => "\xF0\x9F\x87\xB2\xF0\x9F\x87\xBE" ),
 			'ta' => array( 'name' => 'Tamil',                'native' => "\xE0\xAE\xA4\xE0\xAE\xAE\xE0\xAE\xBF\xE0\xAE\xB4\xE0\xAF\x8D", 'flag' => "\xF0\x9F\x87\xAE\xF0\x9F\x87\xB3" ),
-			'bn' => array( 'name' => 'Bengali',              'native' => "\xE0\xA6\xAC\xE0\xA6\xBE\xE0\xA6\x82\xE0\xA6\xB2\xE0\xA6\xBE", 'flag' => "\xF0\x9F\x87\xA7\xF0\x9F\x87\xA9" ),
+			'bn'  => array( 'name' => 'Bengali',              'native' => "\xE0\xA6\xAC\xE0\xA6\xBE\xE0\xA6\x82\xE0\xA6\xB2\xE0\xA6\xBE", 'flag' => "\xF0\x9F\x87\xA7\xF0\x9F\x87\xA9" ),
+			'val' => array( 'name' => 'Valencian',             'native' => "Valenci\xC3\xA0",    'flag' => "\xF0\x9F\x87\xAA\xF0\x9F\x87\xB8", 'bcp47' => 'ca-valencia' ),
 		);
+	}
+
+	/**
+	 * Get the BCP 47 language tag for a code (falls back to the code itself).
+	 */
+	public static function bcp47( $code ) {
+		$all = self::get_all();
+		return ( isset( $all[ $code ]['bcp47'] ) ) ? $all[ $code ]['bcp47'] : $code;
 	}
 
 	/**

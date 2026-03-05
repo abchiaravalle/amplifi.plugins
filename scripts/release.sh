@@ -63,6 +63,22 @@ generate_changelog() {
     echo "Built by [amplifi.studio](https://amplifi.studio)"
 }
 
+bump_plugin_version() {
+    local slug="$1"
+    local version="$2"
+    local main_file="${PLUGINS_DIR}/${slug}/${slug}.php"
+
+    [[ -f "$main_file" ]] || return 0
+
+    echo "  Bumping version in ${slug}/${slug}.php to ${version}..."
+
+    # Update "Version: X.X.X" in the plugin file header.
+    perl -i -pe "s/(Version:\s+)[0-9]+\.[0-9]+\.[0-9]+/\${1}${version}/" "$main_file"
+
+    # Update define( 'AC*_VERSION', 'X.X.X' ) constant.
+    perl -i -pe "s/(define\(\s*'[A-Z_]+VERSION',\s*')[0-9]+\.[0-9]+\.[0-9]+'/\${1}${version}'/" "$main_file"
+}
+
 build_plugin_zip() {
     local slug="$1"
     local version="$2"
@@ -119,6 +135,18 @@ done
 echo "==> Releasing amplifi.plugins v${VERSION}"
 echo "    Plugins: ${PLUGINS[*]}"
 echo ""
+
+# Bump version numbers in all plugin main PHP files.
+echo "==> Bumping version numbers to ${VERSION}..."
+for slug in "${PLUGINS[@]}"; do
+    bump_plugin_version "$slug" "$VERSION"
+done
+
+# Commit the version bumps.
+git add -A
+if ! git diff --cached --quiet; then
+    git commit -m "Bump version to ${VERSION}"
+fi
 
 # Clean and create dist dir.
 rm -rf "${DIST_DIR}"
