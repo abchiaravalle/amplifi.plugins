@@ -59,6 +59,7 @@ if ( ! defined( 'AMPLIFI_FRAMEWORK_LOADED' ) ) {
 	add_action( 'admin_menu', 'amplifi_admin_menu', 5 );
 	add_action( 'admin_enqueue_scripts', 'amplifi_hub_assets' );
 	add_action( 'wp_ajax_amplifi_install_plugin', 'amplifi_ajax_install_plugin' );
+	add_action( 'wp_ajax_amplifi_check_updates', 'amplifi_ajax_check_updates' );
 
 	// Auto-updates.
 	add_filter( 'pre_set_site_transient_update_plugins', 'amplifi_check_for_updates' );
@@ -166,6 +167,28 @@ if ( ! defined( 'AMPLIFI_FRAMEWORK_LOADED' ) ) {
 						alert("Request failed. Please try again.");
 					});
 				});
+
+				$("#amplifi-check-updates").on("click", function() {
+					var $btn = $(this);
+					var $status = $("#amplifi-check-status");
+					$btn.prop("disabled", true);
+					$status.text("Checking\u2026");
+					$.post(ajaxurl, {
+						action: "amplifi_check_updates",
+						_ajax_nonce: "<?php echo esc_js( wp_create_nonce( 'amplifi_check_updates' ) ); ?>"
+					}, function(response) {
+						$btn.prop("disabled", false);
+						if (response.success) {
+							$status.text("Done \u2014 reloading\u2026");
+							setTimeout(function() { location.reload(); }, 800);
+						} else {
+							$status.text(response.data || "Failed.");
+						}
+					}).fail(function() {
+						$btn.prop("disabled", false);
+						$status.text("Request failed.");
+					});
+				});
 			});
 		' );
 	}
@@ -225,7 +248,10 @@ if ( ! defined( 'AMPLIFI_FRAMEWORK_LOADED' ) ) {
 			<div style="margin-top: 32px; padding: 16px; background: #f0f6fc; border-left: 4px solid #2271b1; border-radius: 2px;">
 				<strong>Auto-Updates Enabled</strong><br>
 				Plugins check for new releases from <a href="https://github.com/<?php echo esc_attr( AMPLIFI_GITHUB_REPO ); ?>/releases" target="_blank">GitHub</a> automatically.
-				Updates appear in <strong>Dashboard > Updates</strong> like any other plugin.
+				Updates appear in <strong>Dashboard &gt; Updates</strong> like any other plugin.
+				Release data is cached for 6 hours.
+				<button type="button" id="amplifi-check-updates" class="button button-secondary" style="margin-left:12px; vertical-align:middle;">Check Now</button>
+				<span id="amplifi-check-status" style="margin-left:8px; font-size:13px;"></span>
 			</div>
 
 			<p style="margin-top: 24px; color: #999; font-size: 12px;">
@@ -334,6 +360,25 @@ if ( ! defined( 'AMPLIFI_FRAMEWORK_LOADED' ) ) {
 		}
 
 		return '';
+	}
+
+	/**
+	 * AJAX handler: clear the cached release data and force a fresh GitHub check.
+	 */
+	function amplifi_ajax_check_updates() {
+		check_ajax_referer( 'amplifi_check_updates' );
+
+		if ( ! current_user_can( 'update_plugins' ) ) {
+			wp_send_json_error( 'Unauthorized' );
+		}
+
+		delete_transient( 'amplifi_latest_release' );
+		delete_transient( 'amplifi_plugin_manifest' );
+
+		// Force WP to re-run its update check on next load.
+		delete_site_transient( 'update_plugins' );
+
+		wp_send_json_success();
 	}
 
 	/**
