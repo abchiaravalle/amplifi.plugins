@@ -125,20 +125,20 @@ Hook suffix: `amplifi-studio_page_amplifi-ac-static-cache`
 - No `wp_options` or post meta used
 
 ## Plugin: amplifi.pods (`plugins/ac-pods/`)
-Podcast carousel and floating player via Apple Podcasts RSS feed or built-in custom post type.
+Podcast carousel and floating player via shortcode — mirrors the Norwest Resources page podcast player with Apple Podcasts CPT + Spotify playlist support.
 
 ### Architecture
-- **Single-file plugin**: All logic in `ac-pods.php` — CPT, taxonomy, meta boxes, shortcode, carousel, floating player, admin page
-- **Dual Mode**: RSS Feed mode (parses Apple Podcasts RSS) or CPT mode (queries `amplifi-podcasts` posts)
-- **Swiper Carousel**: Responsive card carousel via Swiper.js CDN, multiple instances per page
-- **Floating Player**: Fixed-position Apple Podcasts embed player with slide-up animation
-- **RSS Caching**: 1-hour transient cache keyed on `md5($feed_url)`
-- **Site-Agnostic**: No font declarations, no Bootstrap, all styling via `--acpods-*` CSS custom properties
+- **Single-file plugin**: All logic in `ac-pods.php` — CPT, ACF fields, shortcode, carousel, floating player, admin page
+- **Dual Source**: Merges Apple Podcasts CPT (`podcast` post type with ACF fields) + Spotify playlist episodes (via `nwr_spotify_get_all_episodes()` if available)
+- **Swiper Carousel**: Responsive card carousel via Swiper.js CDN with equal-height slides and playlist filter pills
+- **Floating Player**: Fixed-position embed player (Apple Podcasts or Spotify) with teal header, loading spinner, smooth slide-up transition, and collapsible episode description
+- **ACF Integration**: Registers its own ACF field group for the `podcast` CPT; falls back to native meta box if ACF is not installed
+- **Site-Agnostic**: No font declarations, no Bootstrap, no Iconify dependency — all icons are inline SVG, styling via `--acpods-accent` CSS custom property
 
 ### Key Files
-- `ac-pods.php` - Everything: bootstrap, framework registration, CPT, taxonomy, meta boxes, shortcode, carousel, player, CSS, JS, admin page
+- `ac-pods.php` - Everything: bootstrap, framework registration, CPT, ACF fields, meta box fallback, shortcode, carousel, player, CSS, JS, admin page
 - `includes/amplifi-framework.php` - Shared framework (copied from `shared/`)
-- `uninstall.php` - Removes all `amplifi-podcasts` posts and RSS cache transients
+- `uninstall.php` - Removes all `podcast` posts and transients
 
 ### Admin Menu
 Single page under the **amplifi.studio** menu:
@@ -147,24 +147,35 @@ Single page under the **amplifi.studio** menu:
 Hook suffix: `amplifi-studio_page_amplifi-ac-pods`
 
 ### Data Storage
-**Post meta on `amplifi-podcasts` CPT:**
-| Key | Purpose |
-|-----|---------|
-| `_acpods_show_name` | Podcast show name |
-| `_acpods_apple_show_id` | Apple show ID (for embed) |
-| `_acpods_apple_episode_id` | Apple episode ID (for embed) |
-| `_acpods_artwork_url` | Episode artwork URL |
-| `_acpods_episode_number` | Episode number |
-| `_acpods_duration` | Duration (e.g. "42 min") |
+**ACF fields on `podcast` CPT (or post meta fallback):**
+| Field / Key | Purpose |
+|-------------|---------|
+| `podcast_show_name` | Podcast show name |
+| `podcast_apple_show_id` | Apple show ID (for embed URL) |
+| `podcast_apple_episode_id` | Apple episode ID (for embed URL) |
+| `podcast_artwork_url` | Episode artwork URL |
+| `podcast_episode_number` | Episode label (e.g. "Episode 42" or "Feb 13, 2026") |
+| `podcast_duration` | Duration (e.g. "45 min") |
 
-**Transients:** `acpods_rss_{md5}` — cached RSS feed data (1 hour)
+**Spotify integration:** If `nwr_spotify_get_all_episodes()` exists, Spotify episodes are merged and sorted by date. Playlist filter pills use `nwr_spotify_playlist_links` transient.
 
 ### Shortcode
-```
-[amplifi-pods feed="https://..." count="8"]   <!-- RSS mode -->
-[amplifi-pods]                                 <!-- CPT mode, all episodes -->
-[amplifi-pods category="tech" count="6"]       <!-- CPT mode, filtered -->
-```
+\`\`\`
+[amplifi-pods]                                          <!-- All episodes, full header -->
+[amplifi-pods count="8" show_header="false"]          <!-- 8 episodes, no header -->
+[amplifi-pods heading="Our Podcasts" accent_color="#6366f1"]
+[amplifi-pods show_filters="false" description=""]     <!-- No filters or description -->
+\`\`\`
+
+| Attribute | Description | Default |
+|-----------|-------------|---------|
+| `count` | Max episodes (-1 = all) | `-1` |
+| `show_filters` | Show Spotify playlist filter pills | `true` |
+| `show_header` | Show heading/subheading/description | `true` |
+| `heading` | Main heading text | `Podcasts` |
+| `subheading` | Uppercase label above heading | `Featured Podcasts` |
+| `description` | Paragraph below heading | *(default)* |
+| `accent_color` | Hex color for accents | `#055c5f` |
 
 ## Releasing
 ```bash

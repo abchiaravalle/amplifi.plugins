@@ -2,8 +2,8 @@
 /*
 Plugin Name: amplifi.pods
 Plugin URI: https://github.com/abchiaravalle/amplifi.plugins
-Description: Podcast carousel and floating player via Apple Podcasts RSS feed or built-in custom post type.
-Version: 1.2.7
+Description: Podcast carousel and floating player via shortcode — mirrors the Resources page podcast player with Apple Podcasts CPT + Spotify playlist support.
+Version: 2.0.0
 Author: amplifi.studio
 Author URI: https://amplifi.studio
 License: MIT
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'ACPODS_VERSION', '1.2.7' );
+define( 'ACPODS_VERSION', '2.0.0' );
 define( 'ACPODS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACPODS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACPODS_PLUGIN_FILE', __FILE__ );
@@ -23,17 +23,14 @@ require_once ACPODS_PLUGIN_DIR . 'includes/amplifi-framework.php';
 
 class Amplifi_Pods {
 
-	/**
-	 * Whether the floating player HTML has been rendered (once per page).
-	 */
 	private static $player_rendered = false;
+	private static $instance_count  = 0;
 
 	public function __construct() {
-		// Register with the amplifi.studio framework.
 		amplifi_register_plugin(
 			'ac-pods',
 			'Pods',
-			'Podcast carousel and floating player via Apple Podcasts RSS feed or built-in custom post type.',
+			'Podcast carousel and floating player via shortcode — mirrors the Resources page podcast player.',
 			ACPODS_VERSION,
 			ACPODS_PLUGIN_FILE,
 			array( $this, 'render_admin_page' )
@@ -42,7 +39,7 @@ class Amplifi_Pods {
 		add_action( 'init', array( $this, 'register_cpt' ) );
 		add_action( 'init', array( $this, 'register_taxonomy' ) );
 		add_action( 'add_meta_boxes', array( $this, 'add_episode_meta_box' ) );
-		add_action( 'save_post_amplifi-podcasts', array( $this, 'save_episode_meta' ) );
+		add_action( 'save_post_podcast', array( $this, 'save_episode_meta' ) );
 		add_shortcode( 'amplifi-pods', array( $this, 'render_shortcode' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'register_assets' ) );
 	}
@@ -51,39 +48,41 @@ class Amplifi_Pods {
 	// CPT + Taxonomy
 	// =========================================================================
 
-	/**
-	 * Register the amplifi-podcasts custom post type.
-	 */
 	public function register_cpt() {
-		register_post_type( 'amplifi-podcasts', array(
+		if ( post_type_exists( 'podcast' ) ) {
+			return;
+		}
+		register_post_type( 'podcast', array(
 			'labels' => array(
-				'name'               => 'Podcast Episodes',
-				'singular_name'      => 'Episode',
-				'add_new'            => 'Add Episode',
-				'add_new_item'       => 'Add New Episode',
-				'edit_item'          => 'Edit Episode',
-				'new_item'           => 'New Episode',
-				'view_item'          => 'View Episode',
-				'search_items'       => 'Search Episodes',
-				'not_found'          => 'No episodes found',
-				'not_found_in_trash' => 'No episodes found in Trash',
-				'menu_name'          => 'Podcast Episodes',
+				'name'               => 'Podcasts',
+				'singular_name'      => 'Podcast',
+				'add_new'            => 'Add New Podcast',
+				'add_new_item'       => 'Add New Podcast',
+				'edit_item'          => 'Edit Podcast',
+				'new_item'           => 'New Podcast',
+				'view_item'          => 'View Podcast',
+				'search_items'       => 'Search Podcasts',
+				'not_found'          => 'No podcasts found',
+				'not_found_in_trash' => 'No podcasts found in Trash',
+				'all_items'          => 'All Podcasts',
+				'menu_name'          => 'Podcasts',
 			),
-			'public'       => false,
-			'show_ui'      => true,
-			'show_in_menu' => true,
-			'menu_icon'    => 'dashicons-microphone',
-			'supports'     => array( 'title', 'editor', 'thumbnail' ),
-			'has_archive'  => false,
-			'rewrite'      => false,
+			'public'             => true,
+			'has_archive'        => true,
+			'rewrite'            => array( 'slug' => 'podcasts' ),
+			'menu_icon'          => 'dashicons-microphone',
+			'menu_position'      => 21,
+			'supports'           => array( 'title', 'editor', 'thumbnail', 'excerpt' ),
+			'show_in_rest'       => true,
+			'show_in_nav_menus'  => true,
 		) );
 	}
 
-	/**
-	 * Register the acpods_category taxonomy.
-	 */
 	public function register_taxonomy() {
-		register_taxonomy( 'acpods_category', 'amplifi-podcasts', array(
+		if ( taxonomy_exists( 'acpods_category' ) ) {
+			return;
+		}
+		register_taxonomy( 'acpods_category', 'podcast', array(
 			'labels' => array(
 				'name'          => 'Episode Categories',
 				'singular_name' => 'Category',
@@ -95,44 +94,118 @@ class Amplifi_Pods {
 				'new_item_name' => 'New Category Name',
 				'menu_name'     => 'Categories',
 			),
-			'hierarchical' => true,
-			'show_ui'      => true,
+			'hierarchical'      => true,
+			'show_ui'           => true,
 			'show_admin_column' => true,
-			'rewrite'      => false,
+			'rewrite'           => false,
 		) );
 	}
 
 	// =========================================================================
-	// Meta Box
+	// ACF Fields (registered if ACF is available)
 	// =========================================================================
 
-	/**
-	 * Add the episode details meta box.
-	 */
+	public static function register_acf_fields() {
+		if ( ! function_exists( 'acf_add_local_field_group' ) ) {
+			return;
+		}
+
+		acf_add_local_field_group( array(
+			'key'      => 'group_acpods_episode',
+			'title'    => 'Podcast Episode Details',
+			'fields'   => array(
+				array(
+					'key'          => 'field_acpods_show_name',
+					'label'        => 'Show Name',
+					'name'         => 'podcast_show_name',
+					'type'         => 'text',
+					'instructions' => 'e.g. "Planet Money", "Up First"',
+					'required'     => 1,
+				),
+				array(
+					'key'          => 'field_acpods_apple_show_id',
+					'label'        => 'Apple Podcasts Show ID',
+					'name'         => 'podcast_apple_show_id',
+					'type'         => 'text',
+					'instructions' => 'Numeric ID from the Apple Podcasts URL, e.g. 290783428',
+					'required'     => 1,
+				),
+				array(
+					'key'          => 'field_acpods_apple_episode_id',
+					'label'        => 'Apple Podcasts Episode ID',
+					'name'         => 'podcast_apple_episode_id',
+					'type'         => 'text',
+					'instructions' => 'The ?i= parameter from the episode URL, e.g. 1000743335282',
+					'required'     => 1,
+				),
+				array(
+					'key'          => 'field_acpods_artwork_url',
+					'label'        => 'Artwork URL',
+					'name'         => 'podcast_artwork_url',
+					'type'         => 'url',
+					'instructions' => 'Apple Podcasts artwork image URL (mzstatic.com)',
+					'required'     => 1,
+				),
+				array(
+					'key'          => 'field_acpods_episode_number',
+					'label'        => 'Episode Label',
+					'name'         => 'podcast_episode_number',
+					'type'         => 'text',
+					'instructions' => 'e.g. "Episode 42" or "Feb 13, 2026"',
+				),
+				array(
+					'key'          => 'field_acpods_duration',
+					'label'        => 'Duration',
+					'name'         => 'podcast_duration',
+					'type'         => 'text',
+					'instructions' => 'e.g. "45 min", "12 min"',
+				),
+			),
+			'location' => array(
+				array(
+					array(
+						'param'    => 'post_type',
+						'operator' => '==',
+						'value'    => 'podcast',
+					),
+				),
+			),
+			'position'              => 'normal',
+			'style'                 => 'default',
+			'label_placement'       => 'top',
+			'instruction_placement' => 'label',
+			'active'                => true,
+		) );
+	}
+
+	// =========================================================================
+	// Meta Box (fallback when ACF is not installed)
+	// =========================================================================
+
 	public function add_episode_meta_box() {
+		if ( function_exists( 'acf_add_local_field_group' ) ) {
+			return; // ACF handles the fields
+		}
 		add_meta_box(
 			'acpods_episode_details',
 			'Episode Details',
 			array( $this, 'render_episode_meta_box' ),
-			'amplifi-podcasts',
+			'podcast',
 			'normal',
 			'high'
 		);
 	}
 
-	/**
-	 * Render the episode details meta box fields.
-	 */
 	public function render_episode_meta_box( $post ) {
 		wp_nonce_field( 'acpods_save_meta', 'acpods_meta_nonce' );
 
 		$fields = array(
-			'_acpods_show_name'          => array( 'label' => 'Show Name',          'placeholder' => 'e.g. The Daily' ),
-			'_acpods_apple_show_id'      => array( 'label' => 'Apple Show ID',      'placeholder' => 'e.g. 1200361736' ),
-			'_acpods_apple_episode_id'   => array( 'label' => 'Apple Episode ID',   'placeholder' => 'e.g. 1000612345678' ),
-			'_acpods_artwork_url'        => array( 'label' => 'Artwork URL',        'placeholder' => 'https://...' ),
-			'_acpods_episode_number'     => array( 'label' => 'Episode Number',     'placeholder' => 'e.g. 42' ),
-			'_acpods_duration'           => array( 'label' => 'Duration',           'placeholder' => 'e.g. 42 min' ),
+			'podcast_show_name'        => array( 'label' => 'Show Name',          'placeholder' => 'e.g. Planet Money' ),
+			'podcast_apple_show_id'    => array( 'label' => 'Apple Show ID',      'placeholder' => 'e.g. 290783428' ),
+			'podcast_apple_episode_id' => array( 'label' => 'Apple Episode ID',   'placeholder' => 'e.g. 1000743335282' ),
+			'podcast_artwork_url'      => array( 'label' => 'Artwork URL',        'placeholder' => 'https://...' ),
+			'podcast_episode_number'   => array( 'label' => 'Episode Label',      'placeholder' => 'e.g. Episode 42' ),
+			'podcast_duration'         => array( 'label' => 'Duration',           'placeholder' => 'e.g. 45 min' ),
 		);
 
 		echo '<table class="form-table"><tbody>';
@@ -144,14 +217,12 @@ class Amplifi_Pods {
 			echo '</tr>';
 		}
 		echo '</tbody></table>';
-
-		echo '<p class="description">If Artwork URL is empty, the post\'s featured image will be used. Apple Show ID and Episode ID are used to build the embed player URL.</p>';
 	}
 
-	/**
-	 * Save episode meta fields.
-	 */
 	public function save_episode_meta( $post_id ) {
+		if ( function_exists( 'acf_add_local_field_group' ) ) {
+			return; // ACF handles saving
+		}
 		if ( ! isset( $_POST['acpods_meta_nonce'] ) || ! wp_verify_nonce( $_POST['acpods_meta_nonce'], 'acpods_save_meta' ) ) {
 			return;
 		}
@@ -163,12 +234,12 @@ class Amplifi_Pods {
 		}
 
 		$keys = array(
-			'_acpods_show_name',
-			'_acpods_apple_show_id',
-			'_acpods_apple_episode_id',
-			'_acpods_artwork_url',
-			'_acpods_episode_number',
-			'_acpods_duration',
+			'podcast_show_name',
+			'podcast_apple_show_id',
+			'podcast_apple_episode_id',
+			'podcast_artwork_url',
+			'podcast_episode_number',
+			'podcast_duration',
 		);
 
 		foreach ( $keys as $key ) {
@@ -179,272 +250,54 @@ class Amplifi_Pods {
 	}
 
 	// =========================================================================
-	// Shortcode
+	// Episode Data Helpers
 	// =========================================================================
 
-	/**
-	 * [amplifi-pods] shortcode handler.
-	 *
-	 * @param array $atts Shortcode attributes.
-	 * @return string HTML output.
-	 */
-	public function render_shortcode( $atts ) {
-		$atts = shortcode_atts( array(
-			'feed'     => '',
-			'category' => '',
-			'count'    => 12,
-		), $atts, 'amplifi-pods' );
-
-		$count = absint( $atts['count'] ) ?: 12;
-
-		// Determine mode: RSS feed vs CPT.
-		if ( ! empty( $atts['feed'] ) ) {
-			$episodes = $this->fetch_rss_episodes( $atts['feed'], $count );
-		} else {
-			$episodes = $this->query_cpt_episodes( $atts['category'], $count );
+	private function get_field_value( $field_name, $post_id = false ) {
+		if ( function_exists( 'get_field' ) ) {
+			return get_field( $field_name, $post_id );
 		}
-
-		if ( empty( $episodes ) ) {
-			return '<p class="acpods-empty">No podcast episodes found.</p>';
-		}
-
-		// Enqueue assets on demand.
-		wp_enqueue_style( 'acpods-swiper' );
-		wp_enqueue_script( 'acpods-swiper' );
-		wp_enqueue_style( 'acpods-styles' );
-		wp_enqueue_script( 'acpods-scripts' );
-
-		$html  = $this->render_carousel_html( $episodes );
-		$html .= $this->render_player_html();
-
-		return $html;
+		return get_post_meta( $post_id, $field_name, true );
 	}
 
-	// =========================================================================
-	// RSS Feed Mode
-	// =========================================================================
-
-	/**
-	 * Fetch and parse episodes from an Apple Podcasts RSS feed.
-	 *
-	 * @param string $feed_url RSS feed URL.
-	 * @param int    $count    Max episodes.
-	 * @return array Normalized episode data.
-	 */
-	private function fetch_rss_episodes( $feed_url, $count ) {
-		$cache_key = 'acpods_rss_' . md5( $feed_url );
-		$cached    = get_transient( $cache_key );
-		if ( $cached !== false ) {
-			return array_slice( $cached, 0, $count );
-		}
-
-		$response = wp_remote_get( $feed_url, array( 'timeout' => 15 ) );
-		if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) {
-			return array();
-		}
-
-		$body = wp_remote_retrieve_body( $response );
-		if ( empty( $body ) ) {
-			return array();
-		}
-
-		libxml_use_internal_errors( true );
-		$xml = simplexml_load_string( $body );
-		if ( ! $xml ) {
-			return array();
-		}
-
-		$itunes = $xml->channel->children( 'http://www.itunes.com/dtds/podcast-1.0.dtd' );
-
-		// Show-level info.
-		$show_name     = (string) $xml->channel->title;
-		$show_artwork  = '';
-		if ( isset( $itunes->image ) ) {
-			$show_artwork = (string) $itunes->image->attributes()->href;
-		}
-
-		// Try to extract Apple show ID from the channel link or atom links.
-		$apple_show_id = $this->extract_apple_show_id( $xml );
-
-		$episodes = array();
-		$ep_num   = 0;
-
-		foreach ( $xml->channel->item as $item ) {
-			$ep_itunes = $item->children( 'http://www.itunes.com/dtds/podcast-1.0.dtd' );
-			$ep_num++;
-
-			// Episode number from iTunes tag or counter.
-			$episode_number = '';
-			if ( isset( $ep_itunes->episode ) ) {
-				$episode_number = (string) $ep_itunes->episode;
-			}
-			if ( empty( $episode_number ) ) {
-				$episode_number = (string) $ep_num;
-			}
-
-			// Duration.
-			$duration = '';
-			if ( isset( $ep_itunes->duration ) ) {
-				$duration = $this->normalize_duration( (string) $ep_itunes->duration );
-			}
-
-			// Artwork: episode-level, then show-level.
-			$artwork = '';
-			if ( isset( $ep_itunes->image ) ) {
-				$artwork = (string) $ep_itunes->image->attributes()->href;
-			}
-			if ( empty( $artwork ) ) {
-				$artwork = $show_artwork;
-			}
-
-			// Description.
-			$description = '';
-			if ( isset( $ep_itunes->summary ) ) {
-				$description = (string) $ep_itunes->summary;
-			} elseif ( isset( $item->description ) ) {
-				$description = (string) $item->description;
-			}
-
-			// Apple episode ID from the guid or link.
-			$apple_episode_id = $this->extract_apple_episode_id( $item );
-
-			$episodes[] = array(
-				'title'            => (string) $item->title,
-				'description'      => wp_strip_all_tags( $description ),
-				'show_name'        => $show_name,
-				'apple_show_id'    => $apple_show_id,
-				'apple_episode_id' => $apple_episode_id,
-				'artwork_url'      => $artwork,
-				'episode_number'   => $episode_number,
-				'duration'         => $duration,
-			);
-		}
-
-		// Cache all episodes for 1 hour, then slice on retrieval.
-		set_transient( $cache_key, $episodes, HOUR_IN_SECONDS );
-
-		return array_slice( $episodes, 0, $count );
-	}
-
-	/**
-	 * Try to extract the Apple Podcasts show ID from the RSS feed.
-	 */
-	private function extract_apple_show_id( $xml ) {
-		// Check channel link.
-		$link = (string) $xml->channel->link;
-		if ( preg_match( '/\/id(\d+)/', $link, $m ) ) {
-			return $m[1];
-		}
-
-		// Check Atom links.
-		$atom = $xml->channel->children( 'http://www.w3.org/2005/Atom' );
-		if ( isset( $atom->link ) ) {
-			foreach ( $atom->link as $alink ) {
-				$href = (string) $alink->attributes()->href;
-				if ( preg_match( '/\/id(\d+)/', $href, $m ) ) {
-					return $m[1];
-				}
-			}
-		}
-
-		return '';
-	}
-
-	/**
-	 * Try to extract an Apple episode ID from an RSS item.
-	 */
-	private function extract_apple_episode_id( $item ) {
-		// Check <link>.
-		$link = (string) $item->link;
-		if ( preg_match( '/i=(\d+)/', $link, $m ) ) {
-			return $m[1];
-		}
-
-		// Check <guid>.
-		$guid = (string) $item->guid;
-		if ( preg_match( '/i=(\d+)/', $guid, $m ) ) {
-			return $m[1];
-		}
-
-		return '';
-	}
-
-	/**
-	 * Normalize a duration value to "X min" format.
-	 *
-	 * Accepts seconds (integer), "HH:MM:SS", or "MM:SS".
-	 */
-	private function normalize_duration( $raw ) {
-		$raw = trim( $raw );
-
-		// Pure integer = seconds.
-		if ( ctype_digit( $raw ) ) {
-			$minutes = max( 1, round( intval( $raw ) / 60 ) );
-			return $minutes . ' min';
-		}
-
-		// HH:MM:SS or MM:SS.
-		$parts = explode( ':', $raw );
-		if ( count( $parts ) === 3 ) {
-			$minutes = max( 1, intval( $parts[0] ) * 60 + intval( $parts[1] ) + round( intval( $parts[2] ) / 60 ) );
-			return $minutes . ' min';
-		}
-		if ( count( $parts ) === 2 ) {
-			$minutes = max( 1, intval( $parts[0] ) + round( intval( $parts[1] ) / 60 ) );
-			return $minutes . ' min';
-		}
-
-		return $raw;
-	}
-
-	// =========================================================================
-	// CPT Mode
-	// =========================================================================
-
-	/**
-	 * Query episodes from the amplifi-podcasts CPT.
-	 *
-	 * @param string $category Taxonomy slug to filter by.
-	 * @param int    $count    Max episodes.
-	 * @return array Normalized episode data.
-	 */
-	private function query_cpt_episodes( $category, $count ) {
+	private function query_cpt_episodes( $count ) {
 		$args = array(
-			'post_type'      => 'amplifi-podcasts',
+			'post_type'      => 'podcast',
 			'posts_per_page' => $count,
 			'post_status'    => 'publish',
 			'orderby'        => 'date',
 			'order'          => 'DESC',
 		);
 
-		if ( ! empty( $category ) ) {
-			$args['tax_query'] = array(
-				array(
-					'taxonomy' => 'acpods_category',
-					'field'    => 'slug',
-					'terms'    => sanitize_text_field( $category ),
-				),
-			);
-		}
-
 		$query    = new WP_Query( $args );
 		$episodes = array();
 
 		foreach ( $query->posts as $post ) {
-			$artwork = get_post_meta( $post->ID, '_acpods_artwork_url', true );
+			$artwork = $this->get_field_value( 'podcast_artwork_url', $post->ID );
 			if ( empty( $artwork ) && has_post_thumbnail( $post->ID ) ) {
 				$artwork = get_the_post_thumbnail_url( $post->ID, 'medium' );
 			}
 
+			$apple_show_id = $this->get_field_value( 'podcast_apple_show_id', $post->ID );
+			$show_link     = '';
+			if ( ! empty( $apple_show_id ) ) {
+				$show_link = 'https://podcasts.apple.com/us/podcast/id' . urlencode( $apple_show_id );
+			}
+
 			$episodes[] = array(
-				'title'            => $post->post_title,
-				'description'      => wp_strip_all_tags( $post->post_content ),
-				'show_name'        => get_post_meta( $post->ID, '_acpods_show_name', true ),
-				'apple_show_id'    => get_post_meta( $post->ID, '_acpods_apple_show_id', true ),
-				'apple_episode_id' => get_post_meta( $post->ID, '_acpods_apple_episode_id', true ),
-				'artwork_url'      => $artwork,
-				'episode_number'   => get_post_meta( $post->ID, '_acpods_episode_number', true ),
-				'duration'         => get_post_meta( $post->ID, '_acpods_duration', true ),
+				'source'             => 'apple',
+				'title'              => $post->post_title,
+				'description'        => get_the_excerpt( $post ),
+				'show_name'          => $this->get_field_value( 'podcast_show_name', $post->ID ),
+				'artwork_url'        => $artwork,
+				'duration'           => $this->get_field_value( 'podcast_duration', $post->ID ),
+				'episode_num'        => $this->get_field_value( 'podcast_episode_number', $post->ID ),
+				'apple_show_id'      => $apple_show_id,
+				'apple_episode_id'   => $this->get_field_value( 'podcast_apple_episode_id', $post->ID ),
+				'release_date'       => get_the_date( 'Y-m-d', $post ),
+				'spotify_episode_id' => '',
+				'playlist_id'        => 'apple',
+				'show_link'          => $show_link,
 			);
 		}
 
@@ -452,100 +305,251 @@ class Amplifi_Pods {
 		return $episodes;
 	}
 
+	private function get_spotify_episodes() {
+		if ( ! function_exists( 'nwr_spotify_get_all_episodes' ) ) {
+			return array();
+		}
+
+		$episodes = array();
+		$spotify_episodes = nwr_spotify_get_all_episodes();
+
+		foreach ( $spotify_episodes as $sep ) {
+			$show_link = '';
+			if ( ! empty( $sep['episode_id'] ) ) {
+				$show_link = 'https://open.spotify.com/episode/' . urlencode( $sep['episode_id'] );
+			}
+
+			$episodes[] = array(
+				'source'             => 'spotify',
+				'title'              => $sep['title'],
+				'description'        => $sep['description'],
+				'show_name'          => $sep['show_name'],
+				'artwork_url'        => $sep['artwork_url'],
+				'duration'           => $sep['duration'],
+				'episode_num'        => '',
+				'apple_show_id'      => '',
+				'apple_episode_id'   => '',
+				'release_date'       => $sep['release_date'],
+				'spotify_episode_id' => $sep['episode_id'],
+				'playlist_id'        => isset( $sep['playlist_id'] ) ? $sep['playlist_id'] : '',
+				'show_link'          => $show_link,
+			);
+		}
+
+		return $episodes;
+	}
+
 	// =========================================================================
-	// Carousel + Player Rendering
+	// Shortcode
 	// =========================================================================
 
-	/**
-	 * Build the Swiper carousel HTML for a set of episodes.
-	 */
-	private function render_carousel_html( $episodes ) {
-		$id = 'acpods-' . wp_unique_id();
+	public function render_shortcode( $atts ) {
+		$atts = shortcode_atts( array(
+			'count'          => -1,
+			'show_filters'   => 'true',
+			'show_header'    => 'true',
+			'heading'        => 'Podcasts',
+			'subheading'     => 'Featured Podcasts',
+			'description'    => 'Listen to conversations with industry leaders, entrepreneurs, and innovators shaping the future of technology and business.',
+			'accent_color'   => '#055c5f',
+		), $atts, 'amplifi-pods' );
 
-		$html  = '<div class="acpods-carousel-wrap" id="' . esc_attr( $id ) . '">';
+		$count         = intval( $atts['count'] );
+		$show_filters  = filter_var( $atts['show_filters'], FILTER_VALIDATE_BOOLEAN );
+		$show_header   = filter_var( $atts['show_header'], FILTER_VALIDATE_BOOLEAN );
+		$accent_color  = sanitize_hex_color( $atts['accent_color'] ) ?: '#055c5f';
+
+		// Merge Apple CPT + Spotify episodes
+		$merged = $this->query_cpt_episodes( $count );
+		$spotify = $this->get_spotify_episodes();
+		$merged = array_merge( $merged, $spotify );
+
+		// Sort by release date DESC
+		usort( $merged, function( $a, $b ) {
+			return strcmp( $b['release_date'], $a['release_date'] );
+		} );
+
+		if ( $count > 0 ) {
+			$merged = array_slice( $merged, 0, $count );
+		}
+
+		if ( empty( $merged ) ) {
+			return '<p style="color: rgba(49,62,92,0.5); text-align: center; padding: 20px;">No podcast episodes found.</p>';
+		}
+
+		// Enqueue assets
+		wp_enqueue_style( 'acpods-swiper' );
+		wp_enqueue_script( 'acpods-swiper' );
+		wp_enqueue_style( 'acpods-styles' );
+		wp_enqueue_script( 'acpods-scripts' );
+
+		self::$instance_count++;
+		$instance_id = 'acpods-instance-' . self::$instance_count;
+
+		// Spotify playlist links for filter pills
+		$playlist_links = get_transient( 'nwr_spotify_playlist_links' );
+		if ( ! is_array( $playlist_links ) ) {
+			$playlist_links = array();
+		}
+
+		$html = '<div class="acpods-wrap" id="' . esc_attr( $instance_id ) . '" style="--acpods-accent: ' . esc_attr( $accent_color ) . ';">';
+
+		// Header
+		if ( $show_header ) {
+			$html .= '<div class="acpods-header">';
+			if ( ! empty( $atts['subheading'] ) ) {
+				$html .= '<div class="acpods-subheading">' . esc_html( $atts['subheading'] ) . '</div>';
+			}
+			if ( ! empty( $atts['heading'] ) ) {
+				$html .= '<h2 class="acpods-heading">' . esc_html( $atts['heading'] ) . '</h2>';
+			}
+			if ( ! empty( $atts['description'] ) ) {
+				$html .= '<p class="acpods-description">' . esc_html( $atts['description'] ) . '</p>';
+			}
+			$html .= '</div>';
+		}
+
+		// Filter pills
+		if ( $show_filters && ( ! empty( $playlist_links ) || count( $merged ) > 0 ) ) {
+			$html .= '<div class="acpods-filters">';
+			$html .= '<button type="button" class="acpods-filter-pill active" data-filter="all">All</button>';
+			foreach ( $playlist_links as $pl ) {
+				$html .= '<span class="acpods-filter-group">';
+				$html .= '<button type="button" class="acpods-filter-pill" data-filter="' . esc_attr( $pl['id'] ) . '">';
+				$html .= '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#1DB954"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>';
+				$html .= esc_html( $pl['name'] );
+				$html .= '</button>';
+				if ( ! empty( $pl['url'] ) ) {
+					$html .= '<a href="' . esc_url( $pl['url'] ) . '" target="_blank" rel="noopener noreferrer" class="acpods-external-link" title="Open on Spotify">';
+					$html .= '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+					$html .= '</a>';
+				}
+				$html .= '</span>';
+			}
+			$html .= '</div>';
+		}
+
+		// Swiper carousel
+		$html .= '<div class="acpods-swiper-container">';
 		$html .= '<div class="swiper acpods-swiper">';
 		$html .= '<div class="swiper-wrapper">';
 
-		foreach ( $episodes as $ep ) {
-			$embed_src = '';
-			if ( ! empty( $ep['apple_show_id'] ) && ! empty( $ep['apple_episode_id'] ) ) {
-				$embed_src = 'https://embed.podcasts.apple.com/us/podcast/id' . esc_attr( $ep['apple_show_id'] ) . '?i=' . esc_attr( $ep['apple_episode_id'] ) . '&theme=auto';
-			}
+		foreach ( $merged as $ep ) {
+			$source_icon_svg = $ep['source'] === 'spotify'
+				? '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="#1DB954"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>'
+				: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="#000"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>';
 
-			$html .= '<div class="swiper-slide acpods-card"'
-				. ' data-embed-src="' . esc_attr( $embed_src ) . '"'
-				. ' data-title="' . esc_attr( $ep['title'] ) . '"'
-				. ' data-show="' . esc_attr( $ep['show_name'] ) . '"'
-				. ' data-artwork="' . esc_attr( $ep['artwork_url'] ) . '"'
-				. ' data-episode-number="' . esc_attr( $ep['episode_number'] ) . '"'
-				. ' data-duration="' . esc_attr( $ep['duration'] ) . '"'
-				. ' data-description="' . esc_attr( wp_trim_words( $ep['description'], 40, '...' ) ) . '"'
+			$show_icon_svg = $ep['source'] === 'spotify'
+				? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="#1DB954"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>'
+				: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="#000"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>';
+
+			$html .= '<div class="swiper-slide">';
+			$html .= '<div class="acpods-card"'
+				. ' data-source="' . esc_attr( $ep['source'] ) . '"'
+				. ' data-show-id="' . esc_attr( $ep['apple_show_id'] ) . '"'
+				. ' data-episode-id="' . esc_attr( $ep['apple_episode_id'] ) . '"'
+				. ' data-spotify-episode-id="' . esc_attr( $ep['spotify_episode_id'] ) . '"'
+				. ' data-show-name="' . esc_attr( $ep['show_name'] ) . '"'
+				. ' data-episode-title="' . esc_attr( $ep['title'] ) . '"'
+				. ' data-episode-desc="' . esc_attr( $ep['description'] ) . '"'
+				. ' data-show-link="' . esc_attr( $ep['show_link'] ) . '"'
+				. ' data-playlist-id="' . esc_attr( $ep['playlist_id'] ) . '"'
 				. '>';
 
-			// Artwork.
+			// Artwork with play overlay
+			$html .= '<div class="acpods-card-artwork">';
 			if ( ! empty( $ep['artwork_url'] ) ) {
-				$html .= '<div class="acpods-card-artwork">';
 				$html .= '<img src="' . esc_url( $ep['artwork_url'] ) . '" alt="' . esc_attr( $ep['title'] ) . '" loading="lazy">';
-				$html .= '<div class="acpods-play-overlay"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="32" height="32"><path d="M8 5v14l11-7z"/></svg></div>';
-				$html .= '</div>';
 			}
+			$html .= '<div class="acpods-play-btn"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>';
+			// Source badge
+			$html .= '<div class="acpods-source-badge">' . $source_icon_svg . '</div>';
+			$html .= '</div>';
 
-			// Info.
-			$html .= '<div class="acpods-card-info">';
-			$html .= '<div class="acpods-card-title">' . esc_html( $ep['title'] ) . '</div>';
-			$html .= '<div class="acpods-card-meta">';
+			// Show name bar
+			$html .= '<div class="acpods-show-bar">';
 			if ( ! empty( $ep['show_name'] ) ) {
-				$html .= '<span class="acpods-show-name">' . esc_html( $ep['show_name'] ) . '</span>';
+				if ( ! empty( $ep['show_link'] ) ) {
+					$html .= '<a href="' . esc_url( $ep['show_link'] ) . '" target="_blank" rel="noopener noreferrer" class="acpods-show-link">';
+				} else {
+					$html .= '<span class="acpods-show-link">';
+				}
+				$html .= $show_icon_svg . ' ';
+				$html .= esc_html( $ep['show_name'] );
+				$html .= ! empty( $ep['show_link'] ) ? '</a>' : '</span>';
 			}
-			if ( ! empty( $ep['episode_number'] ) ) {
-				$html .= '<span class="acpods-ep-num">Ep. ' . esc_html( $ep['episode_number'] ) . '</span>';
+			$html .= '</div>';
+
+			// Meta line
+			$html .= '<div class="acpods-card-meta">';
+			if ( ! empty( $ep['release_date'] ) ) {
+				$ts = strtotime( $ep['release_date'] );
+				if ( $ts ) {
+					$html .= '<span>' . esc_html( date( 'M j, Y', $ts ) ) . '</span>';
+				}
+			}
+			if ( ! empty( $ep['episode_num'] ) ) {
+				$html .= '<span>&bull;</span><span>' . esc_html( $ep['episode_num'] ) . '</span>';
 			}
 			if ( ! empty( $ep['duration'] ) ) {
-				$html .= '<span class="acpods-duration">' . esc_html( $ep['duration'] ) . '</span>';
+				$html .= '<span>&bull;</span><span>' . esc_html( $ep['duration'] ) . '</span>';
 			}
 			$html .= '</div>';
-			$html .= '</div>';
 
+			// Title + description
+			$html .= '<h4 class="acpods-card-title">' . esc_html( $ep['title'] ) . '</h4>';
+			$html .= '<p class="acpods-card-desc">' . esc_html( $ep['description'] ) . '</p>';
+
+			// Listen CTA
+			$html .= '<div class="acpods-card-cta">Listen Now <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>';
+
+			$html .= '</div>'; // .acpods-card
 			$html .= '</div>'; // .swiper-slide
 		}
 
 		$html .= '</div>'; // .swiper-wrapper
-		$html .= '<div class="swiper-button-prev acpods-nav-prev"></div>';
-		$html .= '<div class="swiper-button-next acpods-nav-next"></div>';
 		$html .= '</div>'; // .swiper
-		$html .= '</div>'; // .acpods-carousel-wrap
+		$html .= '<div class="acpods-nav"><div class="swiper-button-prev acpods-nav-prev"></div><div class="swiper-button-next acpods-nav-next"></div></div>';
+		$html .= '</div>'; // .acpods-swiper-container
+
+		// Floating player (once per page)
+		$html .= $this->render_player_html();
+
+		$html .= '</div>'; // .acpods-wrap
 
 		return $html;
 	}
 
-	/**
-	 * Render the floating player HTML (once per page load).
-	 */
+	// =========================================================================
+	// Floating Player
+	// =========================================================================
+
 	private function render_player_html() {
 		if ( self::$player_rendered ) {
 			return '';
 		}
 		self::$player_rendered = true;
 
-		$html  = '<div class="acpods-player" id="acpods-player" style="display:none;">';
+		$html  = '<div class="acpods-player" id="acpods-player">';
 		$html .= '<div class="acpods-player-header">';
-		$html .= '<span class="acpods-player-title">Now Playing</span>';
-		$html .= '<button class="acpods-player-close" aria-label="Close player">&times;</button>';
+		$html .= '<div class="acpods-player-header-info">';
+		$html .= '<span class="acpods-player-show-name"></span>';
+		$html .= '<span class="acpods-player-ep-title"></span>';
+		$html .= '</div>';
+		$html .= '<button class="acpods-player-close" aria-label="Close player">';
+		$html .= '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+		$html .= '</button>';
 		$html .= '</div>';
 		$html .= '<div class="acpods-player-body">';
-		$html .= '<div class="acpods-player-artwork"><img src="" alt=""></div>';
-		$html .= '<div class="acpods-player-meta">';
-		$html .= '<div class="acpods-player-ep-title"></div>';
-		$html .= '<div class="acpods-player-show"></div>';
-		$html .= '<div class="acpods-player-details"></div>';
+		$html .= '<div class="acpods-player-loader"><div class="acpods-spinner"></div></div>';
+		$html .= '<iframe id="acpods-player-iframe" allow="autoplay *; encrypted-media *; fullscreen *; clipboard-write" src=""></iframe>';
 		$html .= '</div>';
-		$html .= '</div>';
-		$html .= '<div class="acpods-player-embed">';
-		$html .= '<iframe id="acpods-player-iframe" src="about:blank" allow="autoplay *; encrypted-media *;" frameborder="0" sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-top-navigation-by-user-activation" style="width:100%;height:175px;"></iframe>';
-		$html .= '</div>';
-		$html .= '<div class="acpods-player-desc-toggle">';
-		$html .= '<button class="acpods-desc-btn">Show Description</button>';
-		$html .= '<div class="acpods-player-desc" style="display:none;"></div>';
+		$html .= '<button class="acpods-player-desc-toggle" aria-expanded="false">';
+		$html .= '<span>Episode Details</span>';
+		$html .= '<svg class="acpods-chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+		$html .= '</button>';
+		$html .= '<div class="acpods-player-desc-panel">';
+		$html .= '<div class="acpods-player-desc-text"></div>';
 		$html .= '</div>';
 		$html .= '</div>';
 
@@ -556,76 +560,148 @@ class Amplifi_Pods {
 	// Assets
 	// =========================================================================
 
-	/**
-	 * Register (not enqueue) Swiper and plugin assets.
-	 * The shortcode handler enqueues on demand.
-	 */
 	public function register_assets() {
-		// Swiper from CDN.
 		wp_register_style( 'acpods-swiper', 'https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css', array(), '11' );
 		wp_register_script( 'acpods-swiper', 'https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js', array(), '11', true );
 
-		// Plugin styles.
 		wp_register_style( 'acpods-styles', false );
 		wp_add_inline_style( 'acpods-styles', $this->get_inline_css() );
 
-		// Plugin scripts.
 		wp_register_script( 'acpods-scripts', false, array( 'acpods-swiper' ), ACPODS_VERSION, true );
 		wp_add_inline_script( 'acpods-scripts', $this->get_inline_js() );
 	}
 
-	/**
-	 * Site-agnostic CSS with --acpods-* custom properties.
-	 */
 	private function get_inline_css() {
 		return '
-:root {
-	--acpods-card-bg: #ffffff;
-	--acpods-card-border: #e0e0e0;
-	--acpods-card-radius: 12px;
-	--acpods-card-shadow: 0 2px 8px rgba(0,0,0,0.08);
-	--acpods-card-hover-shadow: 0 4px 16px rgba(0,0,0,0.15);
-	--acpods-text-primary: #1a1a1a;
-	--acpods-text-secondary: #666666;
-	--acpods-text-muted: #999999;
-	--acpods-accent: #6366f1;
-	--acpods-player-bg: #ffffff;
-	--acpods-player-border: #e0e0e0;
-	--acpods-player-shadow: 0 -4px 20px rgba(0,0,0,0.15);
-	--acpods-overlay-bg: rgba(0,0,0,0.4);
-	--acpods-overlay-color: #ffffff;
-	--acpods-nav-color: var(--acpods-accent);
+/* amplifi.pods v2 — Podcast carousel + floating player */
+.acpods-wrap {
+	--acpods-accent: #055c5f;
 }
 
-.acpods-carousel-wrap {
+.acpods-header {
+	margin-bottom: 2rem;
+}
+
+.acpods-subheading {
+	text-transform: uppercase;
+	letter-spacing: 3px;
+	font-weight: 600;
+	color: #000;
+	margin-bottom: 0.5rem;
+	font-size: 0.85rem;
+}
+
+.acpods-heading {
+	color: #000;
+	margin-bottom: 1rem;
+}
+
+.acpods-description {
+	max-width: 36rem;
+	color: #000;
+	line-height: 1.75;
+	font-size: 1.1rem;
+}
+
+/* Filter pills */
+.acpods-filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+	margin-bottom: 1.5rem;
+}
+
+.acpods-filter-group {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.acpods-filter-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	background: transparent;
+	color: var(--acpods-accent);
+	font-size: 0.8rem;
+	padding: 6px 16px;
+	border-radius: 20px;
+	font-weight: 500;
+	border: 2px solid var(--acpods-accent);
+	cursor: pointer;
+	transition: all 0.2s;
+}
+
+.acpods-filter-pill.active {
+	background: var(--acpods-accent);
+	color: #fff;
+}
+
+.acpods-filter-pill:hover {
+	opacity: 0.85;
+}
+
+.acpods-external-link {
+	color: var(--acpods-accent);
+	opacity: 0.5;
+	transition: opacity 0.2s;
+}
+
+.acpods-external-link:hover {
+	opacity: 1;
+}
+
+/* Swiper container */
+.acpods-swiper-container {
 	position: relative;
-	padding: 0 40px;
-	margin: 24px 0;
 }
 
 .acpods-swiper {
+	padding: 0;
 	overflow: hidden;
+	width: 100%;
 }
 
+.acpods-swiper .swiper-wrapper {
+	display: flex;
+	align-items: stretch;
+	width: 100%;
+}
+
+.acpods-swiper .swiper-slide {
+	height: auto;
+	display: flex;
+	align-items: stretch;
+	box-sizing: border-box;
+	flex-shrink: 0;
+}
+
+/* Card */
 .acpods-card {
-	background: var(--acpods-card-bg);
-	border: 1px solid var(--acpods-card-border);
-	border-radius: var(--acpods-card-radius);
-	overflow: hidden;
+	width: 100%;
+	background: #fff;
+	border: 1px solid rgba(5,92,95,0.1);
+	padding: 1rem;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
 	cursor: pointer;
-	transition: box-shadow 0.2s ease, transform 0.2s ease;
-	box-shadow: var(--acpods-card-shadow);
+	box-sizing: border-box;
+	min-height: 100%;
+	transition: box-shadow 0.2s ease;
 }
 
 .acpods-card:hover {
-	box-shadow: var(--acpods-card-hover-shadow);
-	transform: translateY(-2px);
+	box-shadow: 0 4px 16px rgba(0,0,0,0.1);
 }
 
 .acpods-card-artwork {
 	position: relative;
 	width: 100%;
 	aspect-ratio: 1;
+	background-color: rgba(7,72,91,0.05);
+	margin-bottom: 0.75rem;
 	overflow: hidden;
 }
 
@@ -636,83 +712,188 @@ class Amplifi_Pods {
 	display: block;
 }
 
-.acpods-play-overlay {
+.acpods-play-btn {
 	position: absolute;
-	inset: 0;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 80px;
+	height: 80px;
+	background-color: rgba(255,255,255,0.9);
+	border-radius: 50%;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background: var(--acpods-overlay-bg);
-	color: var(--acpods-overlay-color);
-	opacity: 0;
-	transition: opacity 0.2s ease;
+	z-index: 2;
+	transition: all 0.3s ease;
+	cursor: pointer;
+	color: var(--acpods-accent);
 }
 
-.acpods-card:hover .acpods-play-overlay {
-	opacity: 1;
+.acpods-play-btn svg {
+	margin-left: 4px;
 }
 
-.acpods-card-info {
-	padding: 12px;
+.acpods-card:hover .acpods-play-btn {
+	background-color: rgba(255,255,255,1);
+	transform: translate(-50%, -50%) scale(1.1);
 }
 
-.acpods-card-title {
-	color: var(--acpods-text-primary);
-	font-size: 0.9em;
+.acpods-source-badge {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	z-index: 3;
+	background: rgba(255,255,255,0.92);
+	border-radius: 50%;
+	width: 28px;
+	height: 28px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.acpods-show-bar {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 0.75rem;
+	margin-bottom: 0.75rem;
+	padding-top: 0.75rem;
+	letter-spacing: 0.05em;
+	color: var(--acpods-accent);
+	font-size: 0.8rem;
 	font-weight: 600;
-	line-height: 1.3;
-	display: -webkit-box;
-	-webkit-line-clamp: 2;
-	-webkit-box-orient: vertical;
-	overflow: hidden;
-	margin-bottom: 6px;
+	border-top: 1px solid rgba(5,92,95,0.1);
+}
+
+.acpods-show-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--acpods-accent);
+	text-decoration: underline;
+	text-decoration-style: dotted;
+	text-underline-offset: 3px;
+}
+
+a.acpods-show-link:hover {
+	text-decoration-style: solid;
 }
 
 .acpods-card-meta {
 	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	font-size: 0.75em;
-	color: var(--acpods-text-muted);
+	align-items: center;
+	gap: 6px;
+	text-transform: uppercase;
+	margin-bottom: 0.5rem;
+	letter-spacing: 0.1em;
+	color: rgba(49,62,92,0.6);
+	font-size: 0.7rem;
+	font-weight: 500;
 }
 
-.acpods-card-meta span::after {
-	content: "\00b7";
-	margin-left: 8px;
-}
-.acpods-card-meta span:last-child::after {
-	content: none;
+.acpods-card-title {
+	color: var(--acpods-accent);
+	line-height: 1.25;
+	margin-bottom: 0.5rem;
+	font-size: 1.1rem;
 }
 
-/* Navigation arrows */
+.acpods-card-desc {
+	color: rgba(49,62,92,0.7);
+	font-size: 0.875rem;
+	line-height: 1.5;
+	margin-bottom: 0;
+	display: -webkit-box;
+	-webkit-line-clamp: 3;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.acpods-card-cta {
+	margin-top: 1rem;
+	display: flex;
+	align-items: center;
+	text-transform: uppercase;
+	color: var(--acpods-accent);
+	letter-spacing: 0.1em;
+	font-size: 0.85rem;
+	font-weight: 500;
+}
+
+.acpods-card-cta svg {
+	margin-left: 4px;
+}
+
+/* Navigation */
+.acpods-nav {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	margin-top: 2rem;
+	gap: 1rem;
+}
+
 .acpods-nav-prev,
 .acpods-nav-next {
-	color: var(--acpods-nav-color) !important;
+	color: #000 !important;
+	width: 40px !important;
+	height: 40px !important;
+	background: transparent !important;
+	border: none !important;
+	position: static !important;
+	margin: 0 8px !important;
+	top: auto !important;
+	left: auto !important;
+	right: auto !important;
+	bottom: auto !important;
+	transform: none !important;
 }
+
 .acpods-nav-prev::after,
 .acpods-nav-next::after {
-	font-size: 20px !important;
+	font-size: 18px !important;
+	font-weight: bold;
 }
 
-/* Floating player */
+.acpods-nav-prev:hover,
+.acpods-nav-next:hover {
+	opacity: 1;
+}
+
+/* Hidden slides */
+.acpods-swiper .swiper-slide-hidden {
+	display: none !important;
+	width: 0 !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	overflow: hidden;
+}
+
+/* ── Floating Player ── */
 .acpods-player {
 	position: fixed;
-	bottom: 20px;
-	left: 20px;
-	width: 380px;
-	max-width: calc(100vw - 40px);
-	background: var(--acpods-player-bg);
-	border: 1px solid var(--acpods-player-border);
-	border-radius: 16px;
-	box-shadow: var(--acpods-player-shadow);
+	bottom: 24px;
+	left: 24px;
 	z-index: 99999;
+	width: 520px;
+	max-width: calc(100vw - 48px);
+	background: #fff;
+	border-radius: 12px;
+	box-shadow: 0 8px 32px rgba(0,0,0,0.18);
 	overflow: hidden;
-	animation: acpodsSlideUp 0.3s ease;
+	transform: translateY(120%);
+	opacity: 0;
+	transition: transform 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.35s ease;
+	pointer-events: none;
 }
 
-@keyframes acpodsSlideUp {
-	from { transform: translateY(100%); opacity: 0; }
-	to   { transform: translateY(0); opacity: 1; }
+.acpods-player.is-visible {
+	transform: translateY(0);
+	opacity: 1;
+	pointer-events: auto;
 }
 
 .acpods-player-header {
@@ -720,195 +901,315 @@ class Amplifi_Pods {
 	align-items: center;
 	justify-content: space-between;
 	padding: 12px 16px;
-	border-bottom: 1px solid var(--acpods-player-border);
+	background: var(--acpods-accent, #055c5f);
+	color: #fff;
 }
 
-.acpods-player-title {
-	font-weight: 600;
-	font-size: 0.85em;
-	color: var(--acpods-text-secondary);
-	text-transform: uppercase;
-	letter-spacing: 0.5px;
-}
-
-.acpods-player-close {
-	background: none;
-	border: none;
-	font-size: 24px;
-	cursor: pointer;
-	color: var(--acpods-text-secondary);
-	line-height: 1;
-	padding: 0;
-}
-
-.acpods-player-body {
+.acpods-player-header-info {
 	display: flex;
-	gap: 12px;
-	padding: 12px 16px;
-}
-
-.acpods-player-artwork {
-	flex-shrink: 0;
-	width: 60px;
-	height: 60px;
-	border-radius: 8px;
-	overflow: hidden;
-}
-
-.acpods-player-artwork img {
-	width: 100%;
-	height: 100%;
-	object-fit: cover;
-}
-
-.acpods-player-meta {
+	flex-direction: column;
 	min-width: 0;
+	flex: 1;
+	margin-right: 8px;
 }
 
-.acpods-player-ep-title {
-	font-weight: 600;
-	font-size: 0.9em;
-	color: var(--acpods-text-primary);
+.acpods-player-show-name {
+	font-size: 0.65rem;
+	text-transform: uppercase;
+	letter-spacing: 0.1em;
+	opacity: 0.8;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 
-.acpods-player-show {
-	font-size: 0.8em;
-	color: var(--acpods-text-secondary);
-	margin-top: 2px;
+.acpods-player-ep-title {
+	font-size: 0.8rem;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
-.acpods-player-details {
-	font-size: 0.75em;
-	color: var(--acpods-text-muted);
-	margin-top: 2px;
+.acpods-player-close {
+	background: none;
+	border: none;
+	color: #fff;
+	cursor: pointer;
+	padding: 4px;
+	line-height: 1;
+	opacity: 0.8;
+	transition: opacity 0.2s;
+	flex-shrink: 0;
 }
 
-.acpods-player-embed {
-	padding: 0 16px;
+.acpods-player-close:hover {
+	opacity: 1;
+}
+
+.acpods-player-body {
+	height: 175px;
+	position: relative;
+	background: #000;
+}
+
+.acpods-player-loader {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: #f8f8f8;
+	z-index: 2;
+	transition: opacity 0.3s ease;
+}
+
+.acpods-player-loader.is-hidden {
+	opacity: 0;
+	pointer-events: none;
+}
+
+.acpods-spinner {
+	width: 28px;
+	height: 28px;
+	border: 3px solid rgba(5,92,95,0.2);
+	border-top-color: var(--acpods-accent, #055c5f);
+	border-radius: 50%;
+	animation: acpods-spin 0.8s linear infinite;
+}
+
+@keyframes acpods-spin {
+	to { transform: rotate(360deg); }
+}
+
+.acpods-player-body iframe {
+	width: 100%;
+	height: 100%;
+	border: 0;
 }
 
 .acpods-player-desc-toggle {
-	padding: 8px 16px 12px;
-}
-
-.acpods-desc-btn {
-	background: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	width: 100%;
+	padding: 8px 16px;
 	border: none;
-	color: var(--acpods-accent);
+	border-top: 1px solid rgba(0,0,0,0.08);
+	background: #fff;
+	color: var(--acpods-accent, #055c5f);
+	font-size: 0.7rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
 	cursor: pointer;
-	font-size: 0.8em;
-	padding: 0;
-	text-decoration: underline;
+	transition: background 0.2s;
 }
 
-.acpods-player-desc {
-	font-size: 0.8em;
-	color: var(--acpods-text-secondary);
+.acpods-player-desc-toggle:hover {
+	background: rgba(0,0,0,0.03);
+}
+
+.acpods-chevron {
+	transition: transform 0.25s ease;
+}
+
+.acpods-player-desc-toggle.is-open .acpods-chevron {
+	transform: rotate(180deg);
+}
+
+.acpods-player-desc-panel {
+	max-height: 0;
+	overflow: hidden;
+	transition: max-height 0.3s ease;
+}
+
+.acpods-player-desc-panel.is-open {
+	max-height: 200px;
+}
+
+.acpods-player-desc-text {
+	padding: 12px 16px;
+	font-size: 0.8rem;
 	line-height: 1.5;
-	margin-top: 8px;
-	max-height: 120px;
-	overflow-y: auto;
+	color: rgba(0,0,0,0.65);
+	border-top: 1px solid rgba(0,0,0,0.08);
 }
 
-.acpods-empty {
-	color: var(--acpods-text-secondary, #666);
-	text-align: center;
-	padding: 20px;
-}
-
-/* Responsive */
 @media (max-width: 768px) {
-	.acpods-carousel-wrap {
-		padding: 0 30px;
+	.acpods-nav-prev,
+	.acpods-nav-next {
+		width: 32px !important;
+		height: 32px !important;
 	}
+	.acpods-nav-prev::after,
+	.acpods-nav-next::after {
+		font-size: 18px !important;
+	}
+}
+
+@media (max-width: 480px) {
 	.acpods-player {
-		left: 10px;
-		bottom: 10px;
-		width: calc(100vw - 20px);
+		left: 12px;
+		right: 12px;
+		bottom: 12px;
+		width: auto;
 		max-width: none;
 	}
 }
 ';
 	}
 
-	/**
-	 * Inline JavaScript for Swiper init and floating player.
-	 */
 	private function get_inline_js() {
 		return '
 document.addEventListener("DOMContentLoaded", function() {
-	// Init Swiper for each carousel instance.
+	// Init Swiper for each acpods instance
 	document.querySelectorAll(".acpods-swiper").forEach(function(el) {
-		new Swiper(el, {
-			slidesPerView: 1.2,
-			spaceBetween: 16,
-			grabCursor: true,
+		var wrap = el.closest(".acpods-swiper-container");
+		var swiperInstance = new Swiper(el, {
+			slidesPerView: 1,
+			spaceBetween: 12,
+			autoHeight: false,
 			navigation: {
-				prevEl: el.parentElement.querySelector(".acpods-nav-prev"),
-				nextEl: el.parentElement.querySelector(".acpods-nav-next"),
+				nextEl: wrap ? wrap.querySelector(".acpods-nav-next") : null,
+				prevEl: wrap ? wrap.querySelector(".acpods-nav-prev") : null,
 			},
 			breakpoints: {
-				480:  { slidesPerView: 2.2, spaceBetween: 16 },
-				768:  { slidesPerView: 3.2, spaceBetween: 20 },
-				1024: { slidesPerView: 4.2, spaceBetween: 20 },
-				1280: { slidesPerView: 5.2, spaceBetween: 24 },
+				768:  { slidesPerView: 2, spaceBetween: 12 },
+				992:  { slidesPerView: 4, spaceBetween: 12 },
+			},
+			on: {
+				init: function() {
+					var slides = this.slides;
+					var maxH = 0;
+					slides.forEach(function(s) { if (s.offsetHeight > maxH) maxH = s.offsetHeight; });
+					slides.forEach(function(s) { s.style.height = maxH + "px"; });
+				},
+				resize: function() {
+					var slides = this.slides;
+					var maxH = 0;
+					slides.forEach(function(s) { s.style.height = "auto"; if (s.offsetHeight > maxH) maxH = s.offsetHeight; });
+					slides.forEach(function(s) { s.style.height = maxH + "px"; });
+				}
 			}
+		});
+
+		// Store swiper reference for filters
+		el._acpodsSwiper = swiperInstance;
+	});
+
+	// Filter pills
+	document.querySelectorAll(".acpods-filters").forEach(function(filterWrap) {
+		var instance = filterWrap.closest(".acpods-wrap");
+		if (!instance) return;
+		var swiperEl = instance.querySelector(".acpods-swiper");
+		if (!swiperEl || !swiperEl._acpodsSwiper) return;
+		var swiper = swiperEl._acpodsSwiper;
+		var pills = filterWrap.querySelectorAll(".acpods-filter-pill");
+
+		pills.forEach(function(pill) {
+			pill.addEventListener("click", function() {
+				var filterVal = this.getAttribute("data-filter");
+
+				pills.forEach(function(p) {
+					p.style.background = "transparent";
+					p.style.color = "var(--acpods-accent, #055c5f)";
+					p.classList.remove("active");
+				});
+				this.style.background = "var(--acpods-accent, #055c5f)";
+				this.style.color = "#fff";
+				this.classList.add("active");
+
+				swiper.slides.forEach(function(slide) {
+					var card = slide.querySelector(".acpods-card");
+					if (!card) return;
+					var plId = card.getAttribute("data-playlist-id") || "";
+					if (filterVal === "all" || plId === filterVal) {
+						slide.style.display = "";
+						slide.classList.remove("swiper-slide-hidden");
+					} else {
+						slide.style.display = "none";
+						slide.classList.add("swiper-slide-hidden");
+					}
+				});
+
+				swiper.update();
+				swiper.slideTo(0, 0);
+			});
 		});
 	});
 
-	// Floating player logic.
-	var player   = document.getElementById("acpods-player");
-	var iframe   = document.getElementById("acpods-player-iframe");
-	if (!player || !iframe) return;
+	// Floating player
+	var player = document.getElementById("acpods-player");
+	if (!player) return;
 
-	var pTitle   = player.querySelector(".acpods-player-ep-title");
-	var pShow    = player.querySelector(".acpods-player-show");
-	var pDetails = player.querySelector(".acpods-player-details");
-	var pArt     = player.querySelector(".acpods-player-artwork img");
-	var pDesc    = player.querySelector(".acpods-player-desc");
-	var descBtn  = player.querySelector(".acpods-desc-btn");
-	var closeBtn = player.querySelector(".acpods-player-close");
+	var iframe     = player.querySelector("iframe");
+	var loader     = player.querySelector(".acpods-player-loader");
+	var showName   = player.querySelector(".acpods-player-show-name");
+	var epTitle    = player.querySelector(".acpods-player-ep-title");
+	var closeBtn   = player.querySelector(".acpods-player-close");
+	var descToggle = player.querySelector(".acpods-player-desc-toggle");
+	var descPanel  = player.querySelector(".acpods-player-desc-panel");
+	var descText   = player.querySelector(".acpods-player-desc-text");
+	var fpBody     = player.querySelector(".acpods-player-body");
 
-	// Card click -> open player.
+	iframe.addEventListener("load", function() {
+		loader.classList.add("is-hidden");
+	});
+
+	descToggle.addEventListener("click", function() {
+		var isOpen = descPanel.classList.toggle("is-open");
+		descToggle.classList.toggle("is-open", isOpen);
+		descToggle.setAttribute("aria-expanded", isOpen);
+	});
+
 	document.addEventListener("click", function(e) {
 		var card = e.target.closest(".acpods-card");
 		if (!card) return;
 
-		var embedSrc = card.dataset.embedSrc;
-		if (!embedSrc) return;
+		// Let show name links navigate normally
+		if (e.target.closest(".acpods-show-link")) return;
+		e.preventDefault();
 
-		pTitle.textContent   = card.dataset.title || "";
-		pShow.textContent    = card.dataset.show || "";
-		pArt.src             = card.dataset.artwork || "";
-		pArt.alt             = card.dataset.title || "";
+		var source = card.getAttribute("data-source") || "apple";
+		var sName  = card.getAttribute("data-show-name") || "";
+		var eTitle = card.getAttribute("data-episode-title") || "";
+		var eDesc  = card.getAttribute("data-episode-desc") || "";
+		var embedURL = "";
 
-		var details = [];
-		if (card.dataset.episodeNumber) details.push("Ep. " + card.dataset.episodeNumber);
-		if (card.dataset.duration) details.push(card.dataset.duration);
-		pDetails.textContent = details.join(" \u00b7 ");
+		if (source === "spotify") {
+			var spotifyId = card.getAttribute("data-spotify-episode-id") || "";
+			embedURL = "https://open.spotify.com/embed/episode/" + spotifyId + "?utm_source=generator&theme=0";
+			fpBody.style.height = "232px";
+		} else {
+			var sId = card.getAttribute("data-show-id") || "";
+			var eId = card.getAttribute("data-episode-id") || "";
+			embedURL = "https://embed.podcasts.apple.com/us/podcast/id" + sId + "?i=" + eId + "&theme=light";
+			fpBody.style.height = "175px";
+		}
 
-		pDesc.textContent    = card.dataset.description || "";
-		pDesc.style.display  = "none";
-		descBtn.textContent  = "Show Description";
+		loader.classList.remove("is-hidden");
+		descPanel.classList.remove("is-open");
+		descToggle.classList.remove("is-open");
+		descToggle.setAttribute("aria-expanded", "false");
 
-		iframe.src = embedSrc;
-		player.style.display = "block";
+		iframe.src = embedURL;
+		showName.textContent = sName;
+		epTitle.textContent = eTitle;
+		descText.textContent = eDesc;
+		player.classList.add("is-visible");
 	});
 
-	// Close button.
 	closeBtn.addEventListener("click", function() {
-		player.style.display = "none";
-		iframe.src = "about:blank";
-	});
-
-	// Description toggle.
-	descBtn.addEventListener("click", function() {
-		var showing = pDesc.style.display !== "none";
-		pDesc.style.display = showing ? "none" : "block";
-		descBtn.textContent = showing ? "Show Description" : "Hide Description";
+		player.classList.remove("is-visible");
+		descPanel.classList.remove("is-open");
+		descToggle.classList.remove("is-open");
+		setTimeout(function() {
+			iframe.src = "";
+			loader.classList.remove("is-hidden");
+			fpBody.style.height = "175px";
+		}, 350);
 	});
 });
 ';
@@ -918,14 +1219,11 @@ document.addEventListener("DOMContentLoaded", function() {
 	// Admin Page
 	// =========================================================================
 
-	/**
-	 * Render the admin documentation + episode list page.
-	 */
 	public function render_admin_page() {
 		?>
 		<div class="wrap">
 			<h1>amplifi.pods</h1>
-			<p>Podcast carousel and floating player. Display episodes from an Apple Podcasts RSS feed or the built-in custom post type.</p>
+			<p>Podcast carousel and floating player — mirrors the Resources page podcast section. Works as a shortcode you can place anywhere.</p>
 
 			<h2>Shortcode Reference</h2>
 			<table class="widefat fixed" style="max-width:800px;">
@@ -934,73 +1232,83 @@ document.addEventListener("DOMContentLoaded", function() {
 				</thead>
 				<tbody>
 					<tr>
-						<td><code>feed</code></td>
-						<td>Apple Podcasts RSS feed URL. When set, the plugin fetches episodes from the feed instead of the CPT.</td>
-						<td><em>(empty &mdash; uses CPT)</em></td>
-					</tr>
-					<tr>
-						<td><code>category</code></td>
-						<td>Filter CPT episodes by <code>acpods_category</code> taxonomy slug. Only applies in CPT mode.</td>
-						<td><em>(all categories)</em></td>
-					</tr>
-					<tr>
 						<td><code>count</code></td>
-						<td>Maximum number of episodes to display.</td>
-						<td><code>12</code></td>
+						<td>Maximum number of episodes to display. Use <code>-1</code> for all.</td>
+						<td><code>-1</code> (all)</td>
+					</tr>
+					<tr>
+						<td><code>show_filters</code></td>
+						<td>Show Spotify playlist filter pills above the carousel.</td>
+						<td><code>true</code></td>
+					</tr>
+					<tr>
+						<td><code>show_header</code></td>
+						<td>Show the heading, subheading, and description above the carousel.</td>
+						<td><code>true</code></td>
+					</tr>
+					<tr>
+						<td><code>heading</code></td>
+						<td>Main heading text.</td>
+						<td><code>Podcasts</code></td>
+					</tr>
+					<tr>
+						<td><code>subheading</code></td>
+						<td>Small uppercase text above heading.</td>
+						<td><code>Featured Podcasts</code></td>
+					</tr>
+					<tr>
+						<td><code>description</code></td>
+						<td>Paragraph text below the heading.</td>
+						<td><em>(default description)</em></td>
+					</tr>
+					<tr>
+						<td><code>accent_color</code></td>
+						<td>Hex color for accent elements (header, links, CTA).</td>
+						<td><code>#055c5f</code></td>
 					</tr>
 				</tbody>
 			</table>
 
 			<h3>Examples</h3>
-			<pre style="background:#f6f7f7;padding:12px;border-radius:4px;max-width:800px;"><code>[amplifi-pods feed="https://podcasts.apple.com/podcast/id1200361736" count="8"]
-[amplifi-pods]
-[amplifi-pods category="tech" count="6"]</code></pre>
+			<pre style="background:#f6f7f7;padding:12px;border-radius:4px;max-width:800px;"><code>[amplifi-pods]
+[amplifi-pods count="8" show_header="false"]
+[amplifi-pods heading="Our Podcasts" accent_color="#6366f1"]</code></pre>
 
 			<hr>
 
-			<h2>RSS Feed Mode</h2>
-			<p>To use RSS mode, find the podcast's RSS feed URL:</p>
+			<h2>Data Sources</h2>
+			<p>The shortcode merges episodes from two sources, sorted by date:</p>
 			<ol>
-				<li>Visit the podcast on <a href="https://podcasts.apple.com" target="_blank">Apple Podcasts</a></li>
-				<li>The RSS feed URL is typically provided by the podcast host (Buzzsprout, Libsyn, Anchor, etc.)</li>
-				<li>Pass it as the <code>feed</code> attribute. The plugin caches the feed for 1 hour.</li>
+				<li><strong>Podcast CPT</strong> — Create episodes under <strong>Podcasts</strong> in the sidebar. Uses ACF fields (or fallback meta box) for Apple Show ID, Episode ID, artwork, etc.</li>
+				<li><strong>Spotify Playlists</strong> — If the <code>nwr_spotify_get_all_episodes()</code> function is available (from the Norwest Resources plugin), Spotify playlist episodes are automatically included.</li>
 			</ol>
-			<p>The plugin extracts Apple show/episode IDs from the feed to build embed player URLs. If the feed links contain Apple Podcasts URLs (e.g., <code>podcasts.apple.com/...idXXXX?i=YYYY</code>), the floating player will embed the Apple Podcasts player.</p>
 
-			<hr>
-
-			<h2>Custom Post Type Mode</h2>
-			<p>Create episodes under <strong>Podcast Episodes</strong> in the sidebar. Each episode has:</p>
+			<h3>ACF Fields</h3>
+			<p>When ACF Pro is active, the plugin registers these fields on the <code>podcast</code> post type:</p>
 			<ul>
-				<li><strong>Title</strong> &mdash; Episode title</li>
-				<li><strong>Content</strong> &mdash; Episode description (shown in the floating player)</li>
-				<li><strong>Featured Image</strong> &mdash; Used as artwork if no Artwork URL is set in the meta box</li>
-				<li><strong>Episode Details</strong> meta box &mdash; Show Name, Apple Show ID, Apple Episode ID, Artwork URL, Episode Number, Duration</li>
+				<li><strong>Show Name</strong> — e.g. "Planet Money"</li>
+				<li><strong>Apple Podcasts Show ID</strong> — Numeric ID from the URL</li>
+				<li><strong>Apple Podcasts Episode ID</strong> — The <code>?i=</code> parameter</li>
+				<li><strong>Artwork URL</strong> — Apple Podcasts artwork image</li>
+				<li><strong>Episode Label</strong> — e.g. "Episode 42" or "Feb 13, 2026"</li>
+				<li><strong>Duration</strong> — e.g. "45 min"</li>
 			</ul>
-			<p>Use <strong>Episode Categories</strong> to group episodes and filter them with the <code>category</code> shortcode attribute.</p>
 
 			<hr>
 
 			<h2>Styling</h2>
-			<p>Override the default appearance by setting CSS custom properties in your theme:</p>
-			<pre style="background:#f6f7f7;padding:12px;border-radius:4px;max-width:800px;"><code>:root {
-  --acpods-card-bg: #1a1a1a;
-  --acpods-card-border: #333;
-  --acpods-text-primary: #fff;
-  --acpods-text-secondary: #aaa;
-  --acpods-text-muted: #777;
-  --acpods-accent: #ff6b6b;
-  --acpods-player-bg: #1a1a1a;
-  --acpods-player-border: #333;
+			<p>Override the accent color via shortcode attribute or CSS custom property:</p>
+			<pre style="background:#f6f7f7;padding:12px;border-radius:4px;max-width:800px;"><code>.acpods-wrap {
+  --acpods-accent: #6366f1;
 }</code></pre>
-			<p>No font families are set &mdash; the plugin inherits from your theme. No Bootstrap or other framework required.</p>
+			<p>No font families, Bootstrap, or external icon libraries required. All icons are inline SVG.</p>
 
 			<hr>
 
 			<h2>Published Episodes</h2>
 			<?php
 			$episodes = get_posts( array(
-				'post_type'      => 'amplifi-podcasts',
+				'post_type'      => 'podcast',
 				'posts_per_page' => -1,
 				'post_status'    => 'publish',
 				'orderby'        => 'date',
@@ -1009,23 +1317,23 @@ document.addEventListener("DOMContentLoaded", function() {
 
 			if ( ! empty( $episodes ) ) {
 				echo '<table class="widefat fixed striped">';
-				echo '<thead><tr><th>Title</th><th>Show Name</th><th>Ep #</th><th>Duration</th><th>Apple Show ID</th><th>Apple Episode ID</th><th>Date</th></tr></thead>';
+				echo '<thead><tr><th>Title</th><th>Show Name</th><th>Episode Label</th><th>Duration</th><th>Apple Show ID</th><th>Apple Episode ID</th><th>Date</th></tr></thead>';
 				echo '<tbody>';
 				foreach ( $episodes as $ep ) {
 					$edit_link = get_edit_post_link( $ep->ID );
 					echo '<tr>';
 					echo '<td><a href="' . esc_url( $edit_link ) . '">' . esc_html( $ep->post_title ) . '</a></td>';
-					echo '<td>' . esc_html( get_post_meta( $ep->ID, '_acpods_show_name', true ) ) . '</td>';
-					echo '<td>' . esc_html( get_post_meta( $ep->ID, '_acpods_episode_number', true ) ) . '</td>';
-					echo '<td>' . esc_html( get_post_meta( $ep->ID, '_acpods_duration', true ) ) . '</td>';
-					echo '<td>' . esc_html( get_post_meta( $ep->ID, '_acpods_apple_show_id', true ) ) . '</td>';
-					echo '<td>' . esc_html( get_post_meta( $ep->ID, '_acpods_apple_episode_id', true ) ) . '</td>';
+					echo '<td>' . esc_html( $this->get_field_value( 'podcast_show_name', $ep->ID ) ) . '</td>';
+					echo '<td>' . esc_html( $this->get_field_value( 'podcast_episode_number', $ep->ID ) ) . '</td>';
+					echo '<td>' . esc_html( $this->get_field_value( 'podcast_duration', $ep->ID ) ) . '</td>';
+					echo '<td>' . esc_html( $this->get_field_value( 'podcast_apple_show_id', $ep->ID ) ) . '</td>';
+					echo '<td>' . esc_html( $this->get_field_value( 'podcast_apple_episode_id', $ep->ID ) ) . '</td>';
 					echo '<td>' . esc_html( get_the_date( '', $ep ) ) . '</td>';
 					echo '</tr>';
 				}
 				echo '</tbody></table>';
 			} else {
-				echo '<p><em>No episodes published yet.</em> <a href="' . esc_url( admin_url( 'post-new.php?post_type=amplifi-podcasts' ) ) . '">Create your first episode</a></p>';
+				echo '<p><em>No episodes published yet.</em> <a href="' . esc_url( admin_url( 'post-new.php?post_type=podcast' ) ) . '">Create your first episode</a></p>';
 			}
 			?>
 		</div>
@@ -1033,4 +1341,8 @@ document.addEventListener("DOMContentLoaded", function() {
 	}
 }
 
+// Initialize
 new Amplifi_Pods();
+
+// Register ACF fields when ACF is ready
+add_action( 'acf/init', array( 'Amplifi_Pods', 'register_acf_fields' ) );
