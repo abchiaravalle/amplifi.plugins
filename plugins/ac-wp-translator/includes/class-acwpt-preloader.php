@@ -268,6 +268,8 @@ class ACWPT_Preloader {
 	}
 
 	private static function content_hash( $post ) {
-		return md5( $post->post_title . '||' . $post->post_content . '||' . $post->post_excerpt );
+		$settings       = get_option( 'acwpt_settings', array() );
+		$custom_version = isset( $settings['custom_version'] ) ? (int) $settings['custom_version'] : 0;
+		return md5( $post->post_title . '||' . $post->post_content . '||' . $post->post_excerpt . '||v' . $custom_version );
 	}
 }

@@ -250,7 +250,9 @@ class ACWPT_Frontend {
 			return;
 		}
 
-		$content_hash = md5( $post->post_title . '||' . $post->post_content . '||' . $post->post_excerpt );
+		$settings       = get_option( 'acwpt_settings', array() );
+		$custom_version = isset( $settings['custom_version'] ) ? (int) $settings['custom_version'] : 0;
+		$content_hash   = md5( $post->post_title . '||' . $post->post_content . '||' . $post->post_excerpt . '||v' . $custom_version );
 		$cached       = ACWPT_Cache::get( $post->ID, $this->current_language );
 
 		if ( $cached && $cached->content_hash === $content_hash ) {
