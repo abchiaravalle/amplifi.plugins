@@ -53,4 +53,57 @@ class ACWPT_Glossary {
         }
         return preg_replace( '#<x-keep>(.*?)</x-keep>#s', '$1', $text );
     }
+
+    /**
+     * Extract the first complete JSON object from a string, tolerating any
+     * preamble, code fences, or trailing text. Returns the decoded array or
+     * null if no balanced object is found / decoding fails.
+     */
+    public static function extract_first_json_object( $text ) {
+        $len   = strlen( $text );
+        $start = strpos( $text, '{' );
+        if ( $start === false ) {
+            return null;
+        }
+
+        $depth     = 0;
+        $in_str    = false;
+        $escaped   = false;
+        $end       = -1;
+
+        for ( $i = $start; $i < $len; $i++ ) {
+            $ch = $text[ $i ];
+
+            if ( $in_str ) {
+                if ( $escaped ) {
+                    $escaped = false;
+                } elseif ( $ch === '\\' ) {
+                    $escaped = true;
+                } elseif ( $ch === '"' ) {
+                    $in_str = false;
+                }
+                continue;
+            }
+
+            if ( $ch === '"' ) {
+                $in_str = true;
+            } elseif ( $ch === '{' ) {
+                $depth++;
+            } elseif ( $ch === '}' ) {
+                $depth--;
+                if ( $depth === 0 ) {
+                    $end = $i;
+                    break;
+                }
+            }
+        }
+
+        if ( $end === -1 ) {
+            return null;
+        }
+
+        $json    = substr( $text, $start, $end - $start + 1 );
+        $decoded = json_decode( $json, true );
+        return is_array( $decoded ) ? $decoded : null;
+    }
 }
