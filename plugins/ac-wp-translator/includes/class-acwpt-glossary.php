@@ -110,4 +110,85 @@ class ACWPT_Glossary {
         $decoded = json_decode( $json, true );
         return is_array( $decoded ) ? $decoded : null;
     }
+
+    /**
+     * Return glossary rows that have a non-empty source ('en') and a
+     * non-empty translation for the given language code.
+     */
+    public static function entries_for_language( array $glossary, $lang_code ) {
+        $out = array();
+        foreach ( $glossary as $row ) {
+            $src = isset( $row['en'] ) ? trim( (string) $row['en'] ) : '';
+            $tr  = isset( $row[ $lang_code ] ) ? trim( (string) $row[ $lang_code ] ) : '';
+            if ( $src === '' || $tr === '' ) {
+                continue;
+            }
+            $out[] = array( 'en' => $src, 'translation' => $tr );
+        }
+        return $out;
+    }
+
+    /**
+     * Format a prompt block listing mandatory translations for the model.
+     * Returns empty string if no entries.
+     */
+    public static function format_prompt_block( array $entries ) {
+        if ( empty( $entries ) ) {
+            return '';
+        }
+        $lines = array( 'MANDATORY GLOSSARY — translate these source terms EXACTLY as shown:' );
+        foreach ( $entries as $e ) {
+            $lines[] = sprintf( '"%s" → "%s"', $e['en'], $e['translation'] );
+        }
+        return implode( "\n", $lines );
+    }
+
+    /**
+     * Wrap glossary source terms in the input with <x-glossary term="...">
+     * sentinels carrying the mandated translation. Case-sensitive whole-word.
+     *
+     * Note: same Unicode word-boundary caveat as apply_keep_sentinels — for
+     * logographic scripts the term must be flanked by non-letter chars.
+     */
+    public static function apply_glossary_sentinels( $text, array $entries ) {
+        if ( ! is_string( $text ) || $text === '' || empty( $entries ) ) {
+            return (string) $text;
+        }
+
+        // Strip NUL bytes defensively so the placeholder strategy below cannot collide.
+        if ( strpos( $text, "\0" ) !== false ) {
+            $text = str_replace( "\0", '', $text );
+        }
+
+        // Longest-first to avoid partial overlap.
+        usort( $entries, function ( $a, $b ) { return strlen( $b['en'] ) - strlen( $a['en'] ); } );
+
+        $tokens = array();
+        foreach ( $entries as $i => $e ) {
+            $token   = "\0GLOSS_{$i}\0";
+            $pattern = '/(?<![\p{L}\p{N}_])' . preg_quote( $e['en'], '/' ) . '(?![\p{L}\p{N}_])/u';
+            $text    = preg_replace( $pattern, $token, $text );
+            $tokens[ $token ] = sprintf(
+                '<x-glossary term="%s">%s</x-glossary>',
+                str_replace( '"', '&quot;', $e['translation'] ),
+                $e['en']
+            );
+        }
+        return strtr( $text, $tokens );
+    }
+
+    /**
+     * Replace each <x-glossary term="X">...</x-glossary> in $text with X
+     * (the mandated translation), discarding whatever the model put inside.
+     */
+    public static function strip_glossary_sentinels( $text ) {
+        if ( ! is_string( $text ) || $text === '' ) {
+            return (string) $text;
+        }
+        return preg_replace_callback(
+            '#<x-glossary term="([^"]*)">.*?</x-glossary>#s',
+            function ( $m ) { return html_entity_decode( $m[1], ENT_QUOTES, 'UTF-8' ); },
+            $text
+        );
+    }
 }
