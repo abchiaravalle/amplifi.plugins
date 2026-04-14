@@ -426,38 +426,37 @@ class ACWPT_Admin {
 	}
 
 	/**
-	 * AJAX: fetch available models from Anthropic.
+	 * AJAX: fetch available Claude models from the Anthropic API.
 	 */
 	public function ajax_fetch_models() {
 		check_ajax_referer( 'acwpt_admin', 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( 'Unauthorized' );
+			wp_send_json_error( 'Insufficient permissions.' );
 		}
 
-		$api_key = sanitize_text_field( $_POST['api_key'] ?? '' );
+		$api_key = isset( $_POST['api_key'] ) ? sanitize_text_field( wp_unslash( $_POST['api_key'] ) ) : '';
 		if ( empty( $api_key ) ) {
-			// Fall back to saved key.
 			$settings = get_option( 'acwpt_settings', array() );
 			$api_key  = isset( $settings['api_key'] ) ? $settings['api_key'] : '';
 		}
 
 		if ( empty( $api_key ) ) {
-			wp_send_json_error( 'No API key available.' );
+			wp_send_json_error( 'No API key provided.' );
 		}
 
-		// Check transient cache first.
 		$cached = get_transient( 'acwpt_models_list' );
-		if ( $cached !== false ) {
+		if ( is_array( $cached ) && ! empty( $cached ) ) {
 			wp_send_json_success( $cached );
 		}
 
 		$response = wp_remote_get(
-			'https://api.openai.com/v1/models',
+			'https://api.anthropic.com/v1/models?limit=1000',
 			array(
 				'timeout' => 15,
 				'headers' => array(
-					'Authorization' => 'Bearer ' . $api_key,
+					'x-api-key'         => $api_key,
+					'anthropic-version' => '2023-06-01',
 				),
 			)
 		);
@@ -478,44 +477,21 @@ class ACWPT_Admin {
 			wp_send_json_error( 'No models returned.' );
 		}
 
-		// Filter to chat-compatible models only.
-		$chat_prefixes = array( 'gpt-3.5', 'gpt-4', 'gpt-5', 'o1', 'o3', 'o4' );
-		$exclude       = array( 'whisper', 'tts', 'dall-e', 'embedding', 'moderation', 'realtime', 'audio', 'transcribe', 'search', 'image', 'codex', 'instruct' );
-
 		$models = array();
 		foreach ( $body['data'] as $m ) {
+			if ( empty( $m['id'] ) ) {
+				continue;
+			}
 			$id = $m['id'];
-
-			// Skip excluded models.
-			$skip = false;
-			foreach ( $exclude as $ex ) {
-				if ( stripos( $id, $ex ) !== false ) {
-					$skip = true;
-					break;
-				}
-			}
-			if ( $skip ) {
+			// Only Claude chat models.
+			if ( strpos( $id, 'claude-' ) !== 0 ) {
 				continue;
 			}
-
-			// Only include models matching chat prefixes.
-			$match = false;
-			foreach ( $chat_prefixes as $prefix ) {
-				if ( strpos( $id, $prefix ) === 0 ) {
-					$match = true;
-					break;
-				}
-			}
-			if ( ! $match ) {
-				continue;
-			}
-
 			$models[] = $id;
 		}
 
 		sort( $models );
 
-		// Cache for 1 hour.
 		set_transient( 'acwpt_models_list', $models, HOUR_IN_SECONDS );
 
 		wp_send_json_success( $models );
