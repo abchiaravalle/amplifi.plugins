@@ -31,7 +31,13 @@ DIST_DIR="${REPO_ROOT}/dist"
 die() { echo "ERROR: $*" >&2; exit 1; }
 
 validate_version() {
-    [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "Invalid version '$1'. Use semver (e.g. 1.2.0)"
+    # Accepts semver with optional pre-release suffix: 1.2.0 or 1.2.0-beta.1 or 2.0.0-rc.2
+    [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]] || die "Invalid version '$1'. Use semver (e.g. 1.2.0 or 2.0.0-beta.1)"
+}
+
+is_prerelease() {
+    # True if version contains a pre-release suffix (has a hyphen).
+    [[ "$1" == *-* ]]
 }
 
 get_last_tag() {
@@ -72,11 +78,11 @@ bump_plugin_version() {
 
     echo "  Bumping version in ${slug}/${slug}.php to ${version}..."
 
-    # Update "Version: X.X.X" in the plugin file header.
-    perl -i -pe "s/(Version:\s+)[0-9]+\.[0-9]+\.[0-9]+/\${1}${version}/" "$main_file"
+    # Update "Version: X.X.X[-suffix]" in the plugin file header.
+    perl -i -pe "s/(Version:\s+)[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?/\${1}${version}/" "$main_file"
 
-    # Update define( 'AC*_VERSION', 'X.X.X' ) constant.
-    perl -i -pe "s/(define\(\s*'[A-Z_]+VERSION',\s*')[0-9]+\.[0-9]+\.[0-9]+'/\${1}${version}'/" "$main_file"
+    # Update define( 'AC*_VERSION', 'X.X.X[-suffix]' ) constant.
+    perl -i -pe "s/(define\(\s*'[A-Z_]+VERSION',\s*')[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?'/\${1}${version}'/" "$main_file"
 }
 
 build_plugin_zip() {
@@ -183,9 +189,16 @@ for slug in "${PLUGINS[@]}"; do
     ASSET_ARGS+=("${DIST_DIR}/${slug}-v${VERSION}.zip")
 done
 
+PRERELEASE_FLAG=()
+if is_prerelease "$VERSION"; then
+    PRERELEASE_FLAG=(--prerelease)
+    echo "    (marking as prerelease — won't be served to the auto-updater)"
+fi
+
 gh release create "$TAG" \
     --title "amplifi.plugins ${TAG}" \
     --notes-file "${DIST_DIR}/CHANGELOG.md" \
+    "${PRERELEASE_FLAG[@]}" \
     "${ASSET_ARGS[@]}"
 
 echo ""
