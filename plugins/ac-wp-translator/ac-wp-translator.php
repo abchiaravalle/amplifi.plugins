@@ -55,6 +55,16 @@ function acwpt_maybe_upgrade() {
 		update_option( 'acwpt_db_version', '2.0.0' );
 		update_option( 'acwpt_show_v2_notice', 1 );
 	}
+
+	// 2.0.0-beta.3: parse_response() no longer leaks trailing ===EXCERPT===
+	// delimiters into content. Bump custom_version once so any translation
+	// cached by earlier betas is re-generated on next view.
+	if ( ! get_option( 'acwpt_v2b3_migrated' ) ) {
+		$settings = get_option( 'acwpt_settings', array() );
+		$settings['custom_version'] = ( isset( $settings['custom_version'] ) ? (int) $settings['custom_version'] : 0 ) + 1;
+		update_option( 'acwpt_settings', $settings );
+		update_option( 'acwpt_v2b3_migrated', 1 );
+	}
 }
 add_action( 'admin_init', 'acwpt_maybe_upgrade' );
 

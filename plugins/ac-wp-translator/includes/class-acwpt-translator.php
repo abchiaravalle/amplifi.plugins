@@ -310,17 +310,23 @@ class ACWPT_Translator {
 			$result['title'] = trim( $m[1] );
 		}
 
-		if ( $has_excerpt ) {
-			if ( preg_match( '/===CONTENT===\s*(.*?)(?=\s*===EXCERPT===)/s', $text, $m ) ) {
-				$result['content'] = trim( $m[1] );
+		// Always look for EXCERPT delimiter in the response — Claude sometimes
+		// emits it even when the source had no excerpt. Split there if found,
+		// then discard the excerpt if the caller didn't expect one.
+		if ( preg_match( '/===CONTENT===\s*(.*?)(?=\s*===EXCERPT===)/s', $text, $m ) ) {
+			$result['content'] = trim( $m[1] );
+			if ( $has_excerpt && preg_match( '/===EXCERPT===\s*(.*)/s', $text, $em ) ) {
+				$result['excerpt'] = trim( $em[1] );
 			}
-			if ( preg_match( '/===EXCERPT===\s*(.*)/s', $text, $m ) ) {
-				$result['excerpt'] = trim( $m[1] );
-			}
-		} else {
-			if ( preg_match( '/===CONTENT===\s*(.*)/s', $text, $m ) ) {
-				$result['content'] = trim( $m[1] );
-			}
+		} elseif ( preg_match( '/===CONTENT===\s*(.*)/s', $text, $m ) ) {
+			$result['content'] = trim( $m[1] );
+		}
+
+		// Defensive: scrub any stray delimiter tokens that slipped through
+		// (e.g., Claude echoing the section headers verbatim in content).
+		foreach ( array( 'title', 'content', 'excerpt' ) as $k ) {
+			$result[ $k ] = preg_replace( '/={3,}\s*(?:TITLE|CONTENT|EXCERPT)\s*={3,}/', '', $result[ $k ] );
+			$result[ $k ] = trim( $result[ $k ] );
 		}
 
 		if ( empty( $result['title'] ) && empty( $result['content'] ) ) {
