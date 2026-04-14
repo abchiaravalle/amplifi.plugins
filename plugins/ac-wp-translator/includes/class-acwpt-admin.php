@@ -103,6 +103,37 @@ class ACWPT_Admin {
 		}
 		$clean['never_translate'] = $never_arr;
 
+		// glossary: array of rows (en + per-language translations)
+		$glossary_in   = isset( $input['glossary'] ) && is_array( $input['glossary'] ) ? $input['glossary'] : array();
+		$glossary_out  = array();
+		foreach ( $glossary_in as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+			$clean_row = array();
+			foreach ( $row as $k => $v ) {
+				$kk = preg_replace( '/[^a-z0-9_-]/i', '', (string) $k );
+				if ( $kk === '' ) {
+					continue;
+				}
+				$clean_row[ $kk ] = sanitize_text_field( wp_unslash( (string) $v ) );
+			}
+			// Drop entirely-empty rows.
+			if ( implode( '', $clean_row ) === '' ) {
+				continue;
+			}
+			$glossary_out[] = $clean_row;
+		}
+
+		$existing_glossary = isset( $existing['glossary'] ) ? (array) $existing['glossary'] : array();
+		if ( $glossary_out !== $existing_glossary ) {
+			// Bump custom_version if not already bumped by never_translate change.
+			$clean['custom_version'] = isset( $clean['custom_version'] )
+				? max( (int) $clean['custom_version'], ( isset( $existing['custom_version'] ) ? (int) $existing['custom_version'] : 0 ) + 1 )
+				: ( ( isset( $existing['custom_version'] ) ? (int) $existing['custom_version'] : 0 ) + 1 );
+		}
+		$clean['glossary'] = $glossary_out;
+
 		return $clean;
 	}
 
@@ -166,6 +197,85 @@ class ACWPT_Admin {
 								<p class="description">
 									One term per line. Matches are case-sensitive and whole-word. Listed terms are wrapped in protective sentinels before being sent to Claude, so they always appear verbatim in the translation.
 								</p>
+							</td>
+						</tr>
+						<tr>
+							<th><label>Glossary</label></th>
+							<td>
+								<?php
+								$glossary  = isset( $settings['glossary'] ) ? (array) $settings['glossary'] : array();
+								$enabled_g = isset( $settings['enabled_languages'] ) ? (array) $settings['enabled_languages'] : array();
+								$all_g     = ACWPT_Languages::get_all();
+								?>
+								<table class="widefat acwpt-glossary-table" id="acwpt-glossary-table">
+									<thead>
+										<tr>
+											<th style="width:30%;">English term</th>
+											<?php foreach ( $enabled_g as $code ) :
+												$name = isset( $all_g[ $code ]['name'] ) ? $all_g[ $code ]['name'] : $code;
+												?>
+												<th><?php echo esc_html( $name ); ?> <code>(<?php echo esc_html( $code ); ?>)</code></th>
+											<?php endforeach; ?>
+											<th style="width:60px;"></th>
+										</tr>
+									</thead>
+									<tbody>
+										<?php
+										// Always render at least one empty row at the end for adding new entries.
+										$rows = $glossary;
+										$rows[] = array(); // sentinel empty
+										foreach ( $rows as $i => $row ) :
+											?>
+											<tr>
+												<td>
+													<input type="text" name="acwpt_settings[glossary][<?php echo (int) $i; ?>][en]" value="<?php echo esc_attr( isset( $row['en'] ) ? $row['en'] : '' ); ?>" class="widefat" placeholder="e.g. Contact us" />
+												</td>
+												<?php foreach ( $enabled_g as $code ) : ?>
+													<td>
+														<input type="text" name="acwpt_settings[glossary][<?php echo (int) $i; ?>][<?php echo esc_attr( $code ); ?>]" value="<?php echo esc_attr( isset( $row[ $code ] ) ? $row[ $code ] : '' ); ?>" class="widefat" />
+													</td>
+												<?php endforeach; ?>
+												<td>
+													<button type="button" class="button button-small acwpt-glossary-remove" aria-label="Remove row">×</button>
+												</td>
+											</tr>
+										<?php endforeach; ?>
+									</tbody>
+								</table>
+								<p>
+									<button type="button" class="button" id="acwpt-glossary-add-row">+ Add row</button>
+								</p>
+								<p class="description">
+									Mandatory translations for specific terms. Empty cells let Claude decide. Source terms are wrapped before sending so the model can't paraphrase them.
+								</p>
+								<script>
+								(function() {
+									var addBtn = document.getElementById('acwpt-glossary-add-row');
+									var table  = document.getElementById('acwpt-glossary-table');
+									if ( ! addBtn || ! table ) return;
+									addBtn.addEventListener('click', function() {
+										var tbody = table.querySelector('tbody');
+										var lastRow = tbody.querySelector('tr:last-child');
+										var newRow = lastRow.cloneNode(true);
+										var idx = tbody.querySelectorAll('tr').length;
+										newRow.querySelectorAll('input').forEach(function(inp) {
+											inp.value = '';
+											inp.name = inp.name.replace(/glossary\]\[\d+\]/, 'glossary][' + idx + ']');
+										});
+										tbody.appendChild(newRow);
+									});
+									table.addEventListener('click', function(e) {
+										if ( e.target.classList.contains('acwpt-glossary-remove') ) {
+											var row = e.target.closest('tr');
+											if ( table.querySelectorAll('tbody tr').length > 1 ) {
+												row.parentNode.removeChild(row);
+											} else {
+												row.querySelectorAll('input').forEach(function(inp) { inp.value = ''; });
+											}
+										}
+									});
+								})();
+								</script>
 							</td>
 						</tr>
 					</table>
