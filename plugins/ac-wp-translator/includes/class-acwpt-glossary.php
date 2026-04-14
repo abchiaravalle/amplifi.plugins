@@ -9,10 +9,21 @@ class ACWPT_Glossary {
      * Wrap each term in $never_list with <x-keep>...</x-keep> in $text.
      * Case-sensitive, whole-word match. Longest terms wrapped first to avoid
      * double-wrapping shorter terms that are substrings of longer ones.
+     *
+     * Note: word-boundary detection uses Unicode letter/number lookarounds, so
+     * for logographic scripts (CJK) terms only match when surrounded by spaces,
+     * punctuation, or string boundaries — terms embedded in a run of CJK
+     * characters without separators will pass through untouched (fail-safe).
      */
     public static function apply_keep_sentinels( $text, array $never_list ) {
-        if ( $text === '' || empty( $never_list ) ) {
-            return $text;
+        if ( ! is_string( $text ) || $text === '' || empty( $never_list ) ) {
+            return (string) $text;
+        }
+
+        // Defensive: NUL bytes should never appear in WP post content. Strip
+        // them so our placeholder-token strategy below cannot collide.
+        if ( strpos( $text, "\0" ) !== false ) {
+            $text = str_replace( "\0", '', $text );
         }
 
         // Dedupe + sort longest-first so "Acme Cloud" wraps before "Acme".
@@ -37,6 +48,9 @@ class ACWPT_Glossary {
      * Strip <x-keep>...</x-keep> wrappers, preserving inner content.
      */
     public static function strip_keep_sentinels( $text ) {
+        if ( ! is_string( $text ) || $text === '' ) {
+            return (string) $text;
+        }
         return preg_replace( '#<x-keep>(.*?)</x-keep>#s', '$1', $text );
     }
 }

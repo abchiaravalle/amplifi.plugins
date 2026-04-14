@@ -41,4 +41,38 @@ t_equals( 'Try Acme Cloud today!', $out, 'strips wrapper' );
 $out = ACWPT_Glossary::strip_keep_sentinels( 'plain text' );
 t_equals( 'plain text', $out, 'no-op when no sentinels' );
 
+t_section( 'apply_keep_sentinels: regex-special chars in term' );
+$out = ACWPT_Glossary::apply_keep_sentinels(
+    'We use C++ and (Ltd.) in our copy.',
+    array( 'C++', '(Ltd.)' )
+);
+t_equals(
+    'We use <x-keep>C++</x-keep> and <x-keep>(Ltd.)</x-keep> in our copy.',
+    $out,
+    'preg_quote handles + . ( ) special chars'
+);
+
+t_section( 'apply_keep_sentinels: term appears multiple times' );
+$out = ACWPT_Glossary::apply_keep_sentinels(
+    'Acme is great. Try Acme today. Why Acme?',
+    array( 'Acme' )
+);
+t_equals(
+    '<x-keep>Acme</x-keep> is great. Try <x-keep>Acme</x-keep> today. Why <x-keep>Acme</x-keep>?',
+    $out,
+    'wraps every occurrence'
+);
+
+t_section( 'apply_keep_sentinels: NUL byte in source is stripped' );
+$out = ACWPT_Glossary::apply_keep_sentinels( "before\0after Acme end", array( 'Acme' ) );
+t_equals(
+    'beforeafter <x-keep>Acme</x-keep> end',
+    $out,
+    'NUL bytes scrubbed before placeholder strategy runs'
+);
+
+t_section( 'apply_keep_sentinels / strip_keep_sentinels: null input' );
+t_equals( '', ACWPT_Glossary::apply_keep_sentinels( null, array( 'X' ) ), 'null text returns empty string' );
+t_equals( '', ACWPT_Glossary::strip_keep_sentinels( null ), 'null text returns empty string for strip too' );
+
 echo "\nALL PASS\n";
