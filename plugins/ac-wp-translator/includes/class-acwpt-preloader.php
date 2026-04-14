@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * Builds a queue of post×language pairs that are not yet cached, then
  * processes them in small batches via WP-Cron so visitors never trigger
- * a live OpenAI call on first load.
+ * a live Claude call on first load.
  *
  * Queue:   wp_option acwpt_preload_queue  — array of {post_id, language}
  * Status:  wp_option acwpt_preload_status — progress counters + timestamps

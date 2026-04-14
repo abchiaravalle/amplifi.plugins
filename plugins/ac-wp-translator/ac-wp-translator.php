@@ -97,7 +97,7 @@ require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-frontend.php';
 amplifi_register_plugin(
 	'ac-wp-translator',
 	'Translate',
-	'AI-powered real-time translation using OpenAI with URL-based language prefixes and smart caching.',
+	'AI-powered real-time translation using Anthropic Claude with URL-based language prefixes, native-speaker B2B prompts, custom glossary, and smart caching.',
 	ACWPT_VERSION,
 	__FILE__,
 	array( ACWPT_Admin::instance(), 'render_page' )
@@ -136,7 +136,7 @@ function acwpt_activate() {
 		'enabled_languages'  => array(),
 		'show_flags'         => true,
 		'show_suggestion'    => true,
-		'model'              => 'gpt-4o-mini',
+		'model'              => '',
 		'preload_auto'       => false,
 	);
 

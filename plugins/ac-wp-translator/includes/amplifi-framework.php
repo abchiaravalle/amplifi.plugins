@@ -285,7 +285,7 @@ if ( ! defined( 'AMPLIFI_FRAMEWORK_LOADED' ) ) {
 			$catalog = array(
 				'ac-wp-translator' => array(
 					'name'        => 'Translate',
-					'description' => 'AI-powered real-time translation using OpenAI with URL-based language prefixes and smart caching.',
+					'description' => 'AI-powered real-time translation using Anthropic Claude with URL-based language prefixes, native-speaker B2B prompts, custom glossary, and smart caching.',
 					'icon'        => 'dashicons-translation',
 				),
 				'ac-bulk-meta' => array(
