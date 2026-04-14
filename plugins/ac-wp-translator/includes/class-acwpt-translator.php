@@ -329,24 +329,25 @@ class ACWPT_Translator {
 	}
 
 	/**
-	 * Test the API key by making a minimal request.
+	 * Test the API key by making a minimal Messages call.
 	 */
 	public static function test_api_key( $api_key ) {
 		$response = wp_remote_post(
-			'https://api.openai.com/v1/chat/completions',
+			'https://api.anthropic.com/v1/messages',
 			array(
 				'timeout' => 15,
 				'headers' => array(
-					'Authorization' => 'Bearer ' . $api_key,
-					'Content-Type'  => 'application/json',
+					'x-api-key'         => $api_key,
+					'anthropic-version' => '2023-06-01',
+					'content-type'      => 'application/json',
 				),
 				'body'    => wp_json_encode(
 					array(
-						'model'      => 'gpt-4o-mini',
+						'model'      => self::$default_model,
+						'max_tokens' => 16,
 						'messages'   => array(
-							array( 'role' => 'user', 'content' => 'Say "ok"' ),
+							array( 'role' => 'user', 'content' => 'Reply with the single word: ok' ),
 						),
-						'max_tokens' => 5,
 					)
 				),
 			)
