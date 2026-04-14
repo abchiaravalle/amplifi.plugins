@@ -51,7 +51,9 @@ class ACWPT_Glossary {
         if ( ! is_string( $text ) || $text === '' ) {
             return (string) $text;
         }
-        return preg_replace( '#<x-keep>(.*?)</x-keep>#s', '$1', $text );
+        $out = preg_replace( '#<x-keep>(.*?)</x-keep>#s', '$1', $text );
+        // PCRE can return null on backtrack/recursion limits with very large input.
+        return $out !== null ? $out : $text;
     }
 
     /**
@@ -185,10 +187,12 @@ class ACWPT_Glossary {
         if ( ! is_string( $text ) || $text === '' ) {
             return (string) $text;
         }
-        return preg_replace_callback(
+        $out = preg_replace_callback(
             '#<x-glossary term="([^"]*)">.*?</x-glossary>#s',
             function ( $m ) { return html_entity_decode( $m[1], ENT_QUOTES, 'UTF-8' ); },
             $text
         );
+        // PCRE can return null on backtrack/recursion limits with very large input.
+        return $out !== null ? $out : $text;
     }
 }
