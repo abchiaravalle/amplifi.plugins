@@ -77,4 +77,17 @@ t_section( 'parse_response: fallback when no delimiters at all' );
 $out = call_parse( 'Just some plain text response', false );
 t_equals( 'Just some plain text response', $out['content'], 'falls back to full text in content' );
 
+t_section( 'parse_response: &nbsp; entities normalise to U+00A0' );
+$nbsp = "\xC2\xA0";
+$out = call_parse(
+    "===TITLE===\nSerwis i&nbsp;wsparcie\n\n===CONTENT===\n<p>Économisez jusqu'à 40&NBSP;% dès aujourd&#39;hui.</p>",
+    false
+);
+t_assert( strpos( $out['title'],   '&nbsp;' ) === false, 'no &nbsp; in title' );
+t_assert( strpos( $out['title'],   '&NBSP;' ) === false, 'no &NBSP; in title' );
+t_assert( strpos( $out['title'],   $nbsp )    !== false, 'U+00A0 present in title' );
+t_assert( strpos( $out['content'], '&nbsp;' ) === false, 'no &nbsp; in content' );
+t_assert( strpos( $out['content'], '&NBSP;' ) === false, 'no &NBSP; in content' );
+t_assert( strpos( $out['content'], $nbsp )    !== false, 'U+00A0 present in content' );
+
 echo "\nALL PASS\n";

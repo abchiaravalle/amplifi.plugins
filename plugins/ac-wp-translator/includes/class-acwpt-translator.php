@@ -324,8 +324,13 @@ class ACWPT_Translator {
 
 		// Defensive: scrub any stray delimiter tokens that slipped through
 		// (e.g., Claude echoing the section headers verbatim in content).
+		// Also normalise any &nbsp; / &NBSP; HTML entities to actual U+00A0
+		// characters — some themes escape titles via esc_html() which would
+		// turn &nbsp; into &amp;nbsp; and render it as literal text.
+		$nbsp = "\xC2\xA0"; // UTF-8 encoding of U+00A0
 		foreach ( array( 'title', 'content', 'excerpt' ) as $k ) {
 			$result[ $k ] = preg_replace( '/={3,}\s*(?:TITLE|CONTENT|EXCERPT)\s*={3,}/', '', $result[ $k ] );
+			$result[ $k ] = preg_replace( '/&nbsp;/i', $nbsp, $result[ $k ] );
 			$result[ $k ] = trim( $result[ $k ] );
 		}
 

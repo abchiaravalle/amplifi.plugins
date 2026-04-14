@@ -23,12 +23,12 @@ return array(
         'free trial'   => 'essai gratuit',
     ),
     'nuances' => array(
-        'Use a non-breaking space (&nbsp; in HTML) before : ; ! ? » and after «. This is a hard typography rule in French.',
+        'Use a non-breaking space before : ; ! ? » and after «. This is a hard typography rule in French. Emit the actual Unicode non-breaking space character (U+00A0) — do NOT emit the HTML entity &nbsp; or &NBSP;, because some WordPress contexts double-escape it and it renders as literal text on the page.',
         'Use French guillemets « … » with non-breaking spaces inside, not English "…".',
         'Sentence case in headlines and titles — capitalize only the first word and proper nouns.',
         'Months and days are lowercase (janvier, lundi).',
         'Decimal separator is comma: 1,5 million.',
-        'Thousands separator is non-breaking space: 10&nbsp;000.',
+        'Thousands separator is a Unicode non-breaking space (U+00A0) between every three digits: 10 000, 1 500 000. Never use the HTML entity form.',
         'Currency: "1 500 €" with non-breaking space and € after the number.',
         'Date format is DD/MM/YYYY (14/04/2026).',
         'Use 24-hour time format with "h" separator: 14h30.',
@@ -73,6 +73,6 @@ return array(
         array( 'en' => 'No credit card required.',          'translation' => 'Sans carte bancaire' ),
         array( 'en' => 'Cancel anytime.',                   'translation' => 'Annulez à tout moment' ),
         array( 'en' => 'Built for growing teams.',          'translation' => 'Conçu pour les équipes en pleine croissance' ),
-        array( 'en' => 'Save up to 40% with annual billing.', 'translation' => 'Économisez jusqu\'à 40&nbsp;% avec la facturation annuelle' ),
+        array( 'en' => 'Save up to 40% with annual billing.', 'translation' => "Économisez jusqu'à 40\u{00A0}% avec la facturation annuelle" ),
     ),
 );

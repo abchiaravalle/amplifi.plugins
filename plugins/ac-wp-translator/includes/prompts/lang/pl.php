@@ -26,7 +26,7 @@ return array(
         'Use Polish quotation marks „…" not English "…".',
         'Capitalize only the first word of headlines and sentences. Never carry over English title case.',
         'Capitalize months and days only at the start of a sentence (not mid-sentence).',
-        'Use a non-breaking space after single-letter prepositions (w, z, o, i, a, u) to prevent them from ending a line. In HTML output use &nbsp;.',
+        'Use a non-breaking space after single-letter prepositions (w, z, o, i, a, u) to prevent them from ending a line. Emit the actual Unicode non-breaking space character (U+00A0) — do NOT emit the HTML entity &nbsp; or &NBSP;, because some WordPress contexts double-escape it and it renders as literal text on the page.',
         'Decline company-name dependents correctly: "z firmą Acme" (instrumental), not "z firma Acme".',
         'Translate "Learn more" as "Dowiedz się więcej", never "Naucz się więcej".',
         'Translate "Get started" as "Rozpocznij" or "Zacznij" depending on context — never "Otrzymaj rozpoczęty".',

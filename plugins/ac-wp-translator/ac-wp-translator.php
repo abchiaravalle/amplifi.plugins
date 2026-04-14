@@ -65,6 +65,17 @@ function acwpt_maybe_upgrade() {
 		update_option( 'acwpt_settings', $settings );
 		update_option( 'acwpt_v2b3_migrated', 1 );
 	}
+
+	// 2.0.0-beta.5: &nbsp; entities in translated output could double-escape
+	// in some themes and render as "&NBSP;" inside uppercased headings.
+	// Language packs now request Unicode U+00A0 directly, and parse_response
+	// normalises any residual entity. Invalidate cache once.
+	if ( ! get_option( 'acwpt_v2b5_migrated' ) ) {
+		$settings = get_option( 'acwpt_settings', array() );
+		$settings['custom_version'] = ( isset( $settings['custom_version'] ) ? (int) $settings['custom_version'] : 0 ) + 1;
+		update_option( 'acwpt_settings', $settings );
+		update_option( 'acwpt_v2b5_migrated', 1 );
+	}
 }
 add_action( 'admin_init', 'acwpt_maybe_upgrade' );
 
