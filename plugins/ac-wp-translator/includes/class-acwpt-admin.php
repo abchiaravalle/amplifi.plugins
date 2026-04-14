@@ -52,7 +52,7 @@ class ACWPT_Admin {
 
 		$clean['api_key']         = sanitize_text_field( $input['api_key'] ?? '' );
 		$clean['source_language'] = sanitize_text_field( $input['source_language'] ?? 'en' );
-		$clean['model']           = sanitize_text_field( $input['model'] ?? 'gpt-4o-mini' );
+		$clean['model']           = sanitize_text_field( $input['model'] ?? '' );
 		$clean['show_flags']      = ! empty( $input['show_flags'] );
 		$clean['show_suggestion'] = ! empty( $input['show_suggestion'] );
 		$clean['preload_auto']    = ! empty( $input['preload_auto'] );
@@ -100,7 +100,7 @@ class ACWPT_Admin {
 		$show_flags    = isset( $settings['show_flags'] ) ? (bool) $settings['show_flags'] : true;
 		$show_sugg     = isset( $settings['show_suggestion'] ) ? (bool) $settings['show_suggestion'] : true;
 		$api_key       = isset( $settings['api_key'] ) ? $settings['api_key'] : '';
-		$model         = isset( $settings['model'] ) ? $settings['model'] : 'gpt-4o-mini';
+		$model         = isset( $settings['model'] ) ? $settings['model'] : '';
 		$preload_auto  = isset( $settings['preload_auto'] ) ? (bool) $settings['preload_auto'] : false;
 		$cache_stats   = ACWPT_Cache::stats();
 		$current_usage = ACWPT_Translator::get_current_month_usage();
