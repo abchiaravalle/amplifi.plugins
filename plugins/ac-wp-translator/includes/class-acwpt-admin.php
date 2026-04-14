@@ -118,7 +118,7 @@ class ACWPT_Admin {
 					<h2>API Settings</h2>
 					<table class="form-table">
 						<tr>
-							<th><label for="acwpt_api_key">OpenAI API Key</label></th>
+							<th><label for="acwpt_api_key">Anthropic API Key</label></th>
 							<td>
 								<input type="password" id="acwpt_api_key" name="acwpt_settings[api_key]"
 									value="<?php echo esc_attr( $api_key ); ?>" class="regular-text" autocomplete="off" />
@@ -127,13 +127,13 @@ class ACWPT_Admin {
 							</td>
 						</tr>
 						<tr>
-							<th><label for="acwpt_model">OpenAI Model</label></th>
+							<th><label for="acwpt_model">Claude Model</label></th>
 							<td>
 								<select id="acwpt_model" name="acwpt_settings[model]">
 									<option value="<?php echo esc_attr( $model ); ?>" selected><?php echo esc_html( $model ); ?></option>
 								</select>
 								<span id="acwpt-model-status"></span>
-								<p class="description">gpt-4o-mini is recommended for cost-effective translation. Models are fetched from your OpenAI account.</p>
+								<p class="description">claude-haiku-4-5 is recommended for cost-effective translation. Models are fetched from your Anthropic account.</p>
 							</td>
 						</tr>
 					</table>
@@ -287,7 +287,7 @@ class ACWPT_Admin {
 					<button type="button" id="acwpt-preload-stop" class="button button-secondary" style="display:none;">Stop</button>
 					<span id="acwpt-preload-status" style="margin-left:8px;"></span>
 				</p>
-				<p class="description">Each page is translated per language via OpenAI and stored in the cache table. Only pages that are not yet cached (or whose content has changed) will be translated.</p>
+				<p class="description">Each page is translated per language via Claude and stored in the cache table. Only pages that are not yet cached (or whose content has changed) will be translated.</p>
 			</div>
 
 			<!-- API Usage & Cost -->
@@ -380,8 +380,8 @@ class ACWPT_Admin {
 				<?php endif; ?>
 
 				<p class="description" style="margin-top: 12px;">
-					Cost estimates based on OpenAI published pricing: GPT-4o Mini ($0.15/$0.60 per 1M tokens in/out), GPT-4o ($2.50/$10.00 per 1M tokens in/out).
-					Actual charges may vary slightly. Check your <a href="https://platform.openai.com/usage" target="_blank">OpenAI dashboard</a> for exact billing.
+					Cost estimates based on Anthropic published pricing: Claude Haiku 4.5 ($1/$5 per 1M tokens in/out), Claude Sonnet 4.5 ($3/$15 per 1M tokens in/out), Claude Opus 4.5 ($15/$75 per 1M tokens in/out).
+					Actual charges may vary slightly. Check your <a href="https://console.anthropic.com/settings/usage" target="_blank">Anthropic console</a> for exact billing.
 				</p>
 			</div>
 		</div>
@@ -426,7 +426,7 @@ class ACWPT_Admin {
 	}
 
 	/**
-	 * AJAX: fetch available models from OpenAI.
+	 * AJAX: fetch available models from Anthropic.
 	 */
 	public function ajax_fetch_models() {
 		check_ajax_referer( 'acwpt_admin', 'nonce' );
