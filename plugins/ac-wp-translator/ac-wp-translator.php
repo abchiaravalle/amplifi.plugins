@@ -40,6 +40,8 @@ require_once ACWPT_PLUGIN_DIR . 'includes/amplifi-framework.php';
 
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-languages.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-cache.php';
+require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-glossary.php';
+require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-prompts.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-translator.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-preloader.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-admin.php';

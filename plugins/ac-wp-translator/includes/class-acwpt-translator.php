@@ -21,83 +21,59 @@ class ACWPT_Translator {
 	private static $default_model = 'claude-haiku-4-5';
 
 	/**
-	 * Translate a post's title, content, and excerpt via OpenAI.
+	 * Translate a post's title, content, and excerpt via Anthropic Claude.
 	 */
 	public static function translate( $title, $content, $excerpt, $language ) {
 		$settings = get_option( 'acwpt_settings', array() );
 		$api_key  = isset( $settings['api_key'] ) ? $settings['api_key'] : '';
-		$model    = isset( $settings['model'] ) ? $settings['model'] : 'gpt-4o-mini';
+		$model    = isset( $settings['model'] ) && $settings['model'] !== '' ? $settings['model'] : self::$default_model;
 
 		if ( empty( $api_key ) ) {
-			return new WP_Error( 'no_api_key', 'OpenAI API key is not configured.' );
+			return new WP_Error( 'no_api_key', 'Anthropic API key is not configured.' );
 		}
 
-		$lang_info   = ACWPT_Languages::get( $language );
-		$target_name = $lang_info ? $lang_info['name'] : $language;
+		$custom = array(
+			'never_translate' => isset( $settings['never_translate'] ) ? (array) $settings['never_translate'] : array(),
+			'glossary'        => isset( $settings['glossary'] )        ? (array) $settings['glossary']        : array(),
+		);
 
-		$system_prompt = "You are a professional translator. Translate the provided content to {$target_name}.\n\n"
-			. "RULES:\n"
-			. "- Preserve ALL HTML tags exactly as they are.\n"
-			. "- Preserve ALL WordPress shortcodes (anything inside [ ] brackets) exactly as they are.\n"
-			. "- Preserve ALL WordPress block comments (<!-- wp:... --> and <!-- /wp:... -->) exactly.\n"
-			. "- Only translate the human-readable text.\n"
-			. "- Maintain the exact same formatting and structure.\n"
-			. "- Do not add or remove any HTML tags, shortcodes, or block comments.\n"
-			. "- Translate naturally and fluently, not word-for-word.\n\n"
-			. "Return your translation using the EXACT same delimiter format as the input.";
+		// Apply sentinels to the source text before assembling the user message.
+		$glossary_entries = ACWPT_Glossary::entries_for_language( $custom['glossary'], $language );
 
-		$has_excerpt = ! empty( trim( $excerpt ) );
+		$title   = ACWPT_Glossary::apply_keep_sentinels( $title,   $custom['never_translate'] );
+		$content = ACWPT_Glossary::apply_keep_sentinels( $content, $custom['never_translate'] );
+		$excerpt = ACWPT_Glossary::apply_keep_sentinels( $excerpt, $custom['never_translate'] );
 
+		$title   = ACWPT_Glossary::apply_glossary_sentinels( $title,   $glossary_entries );
+		$content = ACWPT_Glossary::apply_glossary_sentinels( $content, $glossary_entries );
+		$excerpt = ACWPT_Glossary::apply_glossary_sentinels( $excerpt, $glossary_entries );
+
+		$system_prompt = ACWPT_Prompts::build_content_prompt( $language, $custom );
+
+		$has_excerpt  = ! empty( trim( $excerpt ) );
 		$user_message = "===TITLE===\n{$title}\n\n===CONTENT===\n{$content}";
 		if ( $has_excerpt ) {
 			$user_message .= "\n\n===EXCERPT===\n{$excerpt}";
 		}
 
-		$response = wp_remote_post(
-			'https://api.openai.com/v1/chat/completions',
-			array(
-				'timeout' => 30,
-				'headers' => array(
-					'Authorization' => 'Bearer ' . $api_key,
-					'Content-Type'  => 'application/json',
-				),
-				'body'    => wp_json_encode(
-					array(
-						'model'       => $model,
-						'messages'    => array(
-							array( 'role' => 'system', 'content' => $system_prompt ),
-							array( 'role' => 'user',   'content' => $user_message ),
-						),
-						'temperature' => 0.3,
-						'max_tokens'  => 16000,
-					)
-				),
-			)
-		);
-
-		if ( is_wp_error( $response ) ) {
-			return $response;
+		$data = self::call_anthropic( $api_key, $model, $system_prompt, $user_message, 16000, 60 );
+		if ( is_wp_error( $data ) ) {
+			return $data;
 		}
 
-		$code = wp_remote_retrieve_response_code( $response );
-		$body = wp_remote_retrieve_body( $response );
-		$data = json_decode( $body, true );
-
-		if ( $code !== 200 ) {
-			$error_msg = isset( $data['error']['message'] ) ? $data['error']['message'] : "HTTP {$code}";
-			return new WP_Error( 'openai_error', 'OpenAI API error: ' . $error_msg );
-		}
-
-		if ( empty( $data['choices'][0]['message']['content'] ) ) {
-			return new WP_Error( 'empty_response', 'OpenAI returned an empty response.' );
-		}
-
-		// Record usage.
 		self::record_usage( $data, $model, 'content' );
 
-		$translated_text = $data['choices'][0]['message']['content'];
+		$translated_text = $data['content'][0]['text'];
 
-		return self::parse_response( $translated_text, $has_excerpt );
+		$parsed = self::parse_response( $translated_text, $has_excerpt );
+
+		// Strip glossary wrappers (replace with mandated translation), then strip never-translate wrappers.
+		foreach ( array( 'title', 'content', 'excerpt' ) as $k ) {
+			$parsed[ $k ] = ACWPT_Glossary::strip_glossary_sentinels( $parsed[ $k ] );
+			$parsed[ $k ] = ACWPT_Glossary::strip_keep_sentinels( $parsed[ $k ] );
+		}
+
+		return $parsed;
 	}
 
 	/**
