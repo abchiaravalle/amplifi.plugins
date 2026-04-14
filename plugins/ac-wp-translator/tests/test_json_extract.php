@@ -43,4 +43,15 @@ t_section( 'extract_first_json_object: no object' );
 t_equals( null, ACWPT_Glossary::extract_first_json_object( 'no json here' ), 'no braces' );
 t_equals( null, ACWPT_Glossary::extract_first_json_object( '{not valid json' ), 'unbalanced' );
 
+t_section( 'extract_first_json_object: double-backslash before quote' );
+t_equals(
+    array( 's' => 'ends with backslash\\' ),
+    ACWPT_Glossary::extract_first_json_object( '{"s":"ends with backslash\\\\"}' ),
+    'escaped backslash does not consume following quote'
+);
+
+t_section( 'extract_first_json_object: null / non-string input' );
+t_equals( null, ACWPT_Glossary::extract_first_json_object( null ), 'null returns null' );
+t_equals( null, ACWPT_Glossary::extract_first_json_object( '' ), 'empty string returns null' );
+
 echo "\nALL PASS\n";

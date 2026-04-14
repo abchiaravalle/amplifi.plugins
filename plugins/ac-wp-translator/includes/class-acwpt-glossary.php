@@ -60,6 +60,10 @@ class ACWPT_Glossary {
      * null if no balanced object is found / decoding fails.
      */
     public static function extract_first_json_object( $text ) {
+        if ( ! is_string( $text ) || $text === '' ) {
+            return null;
+        }
+
         $len   = strlen( $text );
         $start = strpos( $text, '{' );
         if ( $start === false ) {
