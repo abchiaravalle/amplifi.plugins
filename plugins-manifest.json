@@ -3,7 +3,7 @@
   "plugins": {
     "ac-wp-translator": {
       "name": "Translate",
-      "description": "AI-powered real-time translation using OpenAI with URL-based language prefixes and smart caching.",
+      "description": "AI-powered real-time translation using Anthropic Claude. URL-based language prefixes (/es/, /fr/, etc.), native-speaker B2B prompts per language, custom never-translate list and glossary, and smart caching.",
       "icon": "dashicons-translation"
     },
     "ac-bulk-meta": {
