@@ -124,12 +124,19 @@ class ACWPT_Preloader {
 	// =========================================================================
 
 	/**
-	 * Process one batch of translations. Called by WP-Cron.
+	 * Process one batch of translations. Called by WP-Cron (or a tick request).
+	 *
+	 * @param int $max How many items to process this call. Defaults to BATCH_SIZE.
+	 * @return array Status after processing.
 	 */
-	public static function process_batch() {
+	public static function process_batch( $max = null ) {
+		if ( $max === null ) {
+			$max = self::BATCH_SIZE;
+		}
+
 		// Prevent concurrent batches.
 		if ( get_transient( self::LOCK_KEY ) ) {
-			return;
+			return self::get_status() ?: array();
 		}
 		set_transient( self::LOCK_KEY, 1, 90 );
 
@@ -142,43 +149,54 @@ class ACWPT_Preloader {
 				update_option( self::STATUS_OPTION, $status, false );
 			}
 			delete_transient( self::LOCK_KEY );
-			return;
+			return $status ?: array();
 		}
 
-		$batch = array_splice( $queue, 0, self::BATCH_SIZE );
-		update_option( self::QUEUE_OPTION, $queue, false );
+		for ( $i = 0; $i < $max; $i++ ) {
+			if ( empty( $queue ) ) {
+				break;
+			}
+			$item = array_shift( $queue );
 
-		foreach ( $batch as $item ) {
-			$post = get_post( $item['post_id'] );
-			if ( ! $post ) {
+			// Per-item try/catch — one bad translate must not nuke the run.
+			try {
+				$post = get_post( $item['post_id'] );
+				if ( ! $post ) {
+					$status['failed'] = ( $status['failed'] ?? 0 ) + 1;
+				} else {
+					$result = ACWPT_Translator::translate(
+						$post->post_title,
+						$post->post_content,
+						$post->post_excerpt,
+						$item['language']
+					);
+
+					if ( is_wp_error( $result ) ) {
+						error_log( 'ACWPT Preloader: error translating post ' . $post->ID . ' → ' . $item['language'] . ': ' . $result->get_error_message() );
+						$status['failed'] = ( $status['failed'] ?? 0 ) + 1;
+					} else {
+						ACWPT_Cache::set(
+							$post->ID,
+							$item['language'],
+							$result['title'],
+							$result['content'],
+							$result['excerpt'],
+							self::content_hash( $post )
+						);
+						$status['completed'] = ( $status['completed'] ?? 0 ) + 1;
+					}
+				}
+			} catch ( \Throwable $e ) {
+				error_log( 'ACWPT Preloader: exception translating post ' . ( $item['post_id'] ?? '?' ) . ' → ' . ( $item['language'] ?? '?' ) . ': ' . $e->getMessage() );
 				$status['failed'] = ( $status['failed'] ?? 0 ) + 1;
-				continue;
 			}
 
-			$result = ACWPT_Translator::translate(
-				$post->post_title,
-				$post->post_content,
-				$post->post_excerpt,
-				$item['language']
-			);
-
-			if ( is_wp_error( $result ) ) {
-				error_log( 'ACWPT Preloader: error translating post ' . $post->ID . ' → ' . $item['language'] . ': ' . $result->get_error_message() );
-				$status['failed'] = ( $status['failed'] ?? 0 ) + 1;
-			} else {
-				ACWPT_Cache::set(
-					$post->ID,
-					$item['language'],
-					$result['title'],
-					$result['content'],
-					$result['excerpt'],
-					self::content_hash( $post )
-				);
-				$status['completed'] = ( $status['completed'] ?? 0 ) + 1;
-			}
+			// Persist queue + status after EACH item so a subsequent fatal
+			// can't lose items we've already processed or still have pending.
+			update_option( self::QUEUE_OPTION, $queue, false );
+			update_option( self::STATUS_OPTION, $status, false );
 		}
 
-		update_option( self::STATUS_OPTION, $status, false );
 		delete_transient( self::LOCK_KEY );
 
 		if ( ! empty( $queue ) ) {
@@ -187,6 +205,8 @@ class ACWPT_Preloader {
 			$status['finished_at'] = time();
 			update_option( self::STATUS_OPTION, $status, false );
 		}
+
+		return $status;
 	}
 
 	// =========================================================================
@@ -205,6 +225,20 @@ class ACWPT_Preloader {
 	public static function is_running() {
 		$s = self::get_status();
 		return $s && empty( $s['finished_at'] );
+	}
+
+	/**
+	 * Drive one small unit of progress synchronously. Intended for browser-driven
+	 * polling from the admin UI so the preloader isn't dependent on WP-Cron
+	 * firing reliably (DISABLE_WP_CRON sites, blocked self-HTTP, etc.).
+	 *
+	 * @return array Current status.
+	 */
+	public static function tick() {
+		if ( ! self::is_running() ) {
+			return self::get_status() ?: array();
+		}
+		return self::process_batch( 1 );
 	}
 
 	/**

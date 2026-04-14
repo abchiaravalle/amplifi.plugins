@@ -22,6 +22,7 @@ class ACWPT_Admin {
 		add_action( 'wp_ajax_acwpt_fetch_models', array( $this, 'ajax_fetch_models' ) );
 		add_action( 'wp_ajax_acwpt_preload_start', array( $this, 'ajax_preload_start' ) );
 		add_action( 'wp_ajax_acwpt_preload_status', array( $this, 'ajax_preload_status' ) );
+		add_action( 'wp_ajax_acwpt_preload_tick', array( $this, 'ajax_preload_tick' ) );
 		add_action( 'wp_ajax_acwpt_preload_stop', array( $this, 'ajax_preload_stop' ) );
 
 		// Nav menu meta box for adding Language Switcher to menus.
@@ -729,6 +730,33 @@ class ACWPT_Admin {
 		$running = empty( $status['finished_at'] );
 		wp_send_json_success( array(
 			'running'     => $running,
+			'total'       => (int) ( $status['total'] ?? 0 ),
+			'completed'   => (int) ( $status['completed'] ?? 0 ),
+			'failed'      => (int) ( $status['failed'] ?? 0 ),
+			'started_at'  => $status['started_at'] ?? null,
+			'finished_at' => $status['finished_at'] ?? null,
+		) );
+	}
+
+	/**
+	 * Browser-driven tick. Each call synchronously processes one queue item
+	 * and returns the resulting status. Ensures progress even when WP-Cron
+	 * is disabled or the self-HTTP spawn is blocked.
+	 */
+	public function ajax_preload_tick() {
+		check_ajax_referer( 'acwpt_admin', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Unauthorized' );
+		}
+
+		// Raise execution time for this call — one translate can take several
+		// seconds. Fall back silently if the host forbids ini_set.
+		@set_time_limit( 60 );
+
+		$status  = ACWPT_Preloader::tick();
+		$running = $status && empty( $status['finished_at'] ) && ! empty( $status['total'] );
+		wp_send_json_success( array(
+			'running'     => (bool) $running,
 			'total'       => (int) ( $status['total'] ?? 0 ),
 			'completed'   => (int) ( $status['completed'] ?? 0 ),
 			'failed'      => (int) ( $status['failed'] ?? 0 ),

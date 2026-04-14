@@ -159,9 +159,25 @@
 
 	function startPreloadPoll() {
 		if ( preloadPollTimer ) { return; }
+		var inFlight = false;
 		preloadPollTimer = setInterval( function() {
-			$.post( acwptAdmin.ajaxurl, { action: 'acwpt_preload_status', nonce: acwptAdmin.nonce }, function( r ) {
-				if ( r.success ) { preloadUpdateUI( r.data ); }
+			// Skip this tick if the previous one is still in flight — one
+			// translate call can take several seconds and we don't want to
+			// stack requests. This naturally throttles traffic too.
+			if ( inFlight ) { return; }
+			inFlight = true;
+
+			// Use the tick endpoint: each poll SYNCHRONOUSLY processes one
+			// queue item, so progress advances even when WP-Cron isn't firing.
+			$.ajax({
+				url: acwptAdmin.ajaxurl,
+				method: 'POST',
+				data: { action: 'acwpt_preload_tick', nonce: acwptAdmin.nonce },
+				timeout: 60000
+			}).done(function( r ) {
+				if ( r && r.success ) { preloadUpdateUI( r.data ); }
+			}).always(function() {
+				inFlight = false;
 			});
 		}, 2500 );
 	}
