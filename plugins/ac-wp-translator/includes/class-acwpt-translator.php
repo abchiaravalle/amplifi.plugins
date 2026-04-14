@@ -33,8 +33,9 @@ class ACWPT_Translator {
 		}
 
 		$custom = array(
-			'never_translate' => isset( $settings['never_translate'] ) ? (array) $settings['never_translate'] : array(),
-			'glossary'        => isset( $settings['glossary'] )        ? (array) $settings['glossary']        : array(),
+			'never_translate'     => isset( $settings['never_translate'] )     ? (array) $settings['never_translate'] : array(),
+			'glossary'            => isset( $settings['glossary'] )            ? (array) $settings['glossary']        : array(),
+			'custom_instructions' => isset( $settings['custom_instructions'] ) ? (array) $settings['custom_instructions'] : array(),
 		);
 
 		// Apply sentinels to the source text before assembling the user message.
@@ -92,8 +93,9 @@ class ACWPT_Translator {
 		}
 
 		$custom = array(
-			'never_translate' => isset( $settings['never_translate'] ) ? (array) $settings['never_translate'] : array(),
-			'glossary'        => isset( $settings['glossary'] )        ? (array) $settings['glossary']        : array(),
+			'never_translate'     => isset( $settings['never_translate'] )     ? (array) $settings['never_translate'] : array(),
+			'glossary'            => isset( $settings['glossary'] )            ? (array) $settings['glossary']        : array(),
+			'custom_instructions' => isset( $settings['custom_instructions'] ) ? (array) $settings['custom_instructions'] : array(),
 		);
 		$glossary_entries = ACWPT_Glossary::entries_for_language( $custom['glossary'], $language );
 

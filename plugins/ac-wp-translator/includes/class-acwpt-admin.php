@@ -134,6 +134,30 @@ class ACWPT_Admin {
 		}
 		$clean['glossary'] = $glossary_out;
 
+		// custom_instructions: free-form textarea per language
+		$ci_in  = isset( $input['custom_instructions'] ) && is_array( $input['custom_instructions'] ) ? $input['custom_instructions'] : array();
+		$ci_out = array();
+		foreach ( $ci_in as $code => $text ) {
+			$code = preg_replace( '/[^a-z0-9_-]/i', '', (string) $code );
+			if ( $code === '' ) {
+				continue;
+			}
+			$text = sanitize_textarea_field( wp_unslash( (string) $text ) );
+			$text = trim( $text );
+			if ( $text === '' ) {
+				continue;
+			}
+			$ci_out[ $code ] = $text;
+		}
+
+		$existing_ci = isset( $existing['custom_instructions'] ) ? (array) $existing['custom_instructions'] : array();
+		if ( $ci_out !== $existing_ci ) {
+			$clean['custom_version'] = isset( $clean['custom_version'] )
+				? max( (int) $clean['custom_version'], ( isset( $existing['custom_version'] ) ? (int) $existing['custom_version'] : 0 ) + 1 )
+				: ( ( isset( $existing['custom_version'] ) ? (int) $existing['custom_version'] : 0 ) + 1 );
+		}
+		$clean['custom_instructions'] = $ci_out;
+
 		return $clean;
 	}
 
@@ -276,6 +300,44 @@ class ACWPT_Admin {
 									});
 								})();
 								</script>
+							</td>
+						</tr>
+						<tr>
+							<th><label>Custom instructions per language</label></th>
+							<td>
+								<?php
+								$ci        = isset( $settings['custom_instructions'] ) ? (array) $settings['custom_instructions'] : array();
+								$enabled_c = isset( $settings['enabled_languages'] ) ? (array) $settings['enabled_languages'] : array();
+								$all_c     = ACWPT_Languages::get_all();
+								?>
+								<?php if ( empty( $enabled_c ) ) : ?>
+									<p class="description">Enable one or more languages below to add per-language instructions.</p>
+								<?php else : ?>
+									<div class="acwpt-ci-list">
+										<?php foreach ( $enabled_c as $code ) :
+											$name = isset( $all_c[ $code ]['name'] )   ? $all_c[ $code ]['name']   : $code;
+											$flag = isset( $all_c[ $code ]['flag'] )   ? $all_c[ $code ]['flag']   : '';
+											$val  = isset( $ci[ $code ] )              ? (string) $ci[ $code ]     : '';
+											?>
+											<p style="margin-top:12px;">
+												<label for="acwpt_ci_<?php echo esc_attr( $code ); ?>">
+													<strong><?php echo esc_html( trim( $flag . ' ' . $name ) ); ?></strong>
+													<code>(<?php echo esc_html( $code ); ?>)</code>
+												</label>
+											</p>
+											<textarea
+												id="acwpt_ci_<?php echo esc_attr( $code ); ?>"
+												name="acwpt_settings[custom_instructions][<?php echo esc_attr( $code ); ?>]"
+												rows="4"
+												class="large-text"
+												placeholder="Free-form instructions Claude should follow when translating into <?php echo esc_attr( $name ); ?>. Example: &quot;Use European Spanish spellings. Prefer formal tone. Our target audience is law-firm partners.&quot;"
+											><?php echo esc_textarea( $val ); ?></textarea>
+										<?php endforeach; ?>
+									</div>
+									<p class="description">
+										These instructions are added to the system prompt <em>only for the matching target language</em>. Keep them concise — they're sent on every cache miss for that language.
+									</p>
+								<?php endif; ?>
 							</td>
 						</tr>
 					</table>

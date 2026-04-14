@@ -119,6 +119,11 @@ class ACWPT_Prompts {
             }
         }
 
+        $ci = isset( $custom['custom_instructions'] ) ? (array) $custom['custom_instructions'] : array();
+        if ( isset( $ci[ $lang_code ] ) && trim( (string) $ci[ $lang_code ] ) !== '' ) {
+            $parts[] = "CUSTOM INSTRUCTIONS FOR THIS LANGUAGE (follow these above all other guidance when they conflict, except the ABSOLUTE STRUCTURAL RULES and LOCKED CONTENT rules which always win):\n" . trim( (string) $ci[ $lang_code ] );
+        }
+
         return implode( "\n\n", $parts );
     }
 

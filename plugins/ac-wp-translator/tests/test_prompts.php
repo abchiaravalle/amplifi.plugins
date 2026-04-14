@@ -43,4 +43,35 @@ $p = ACWPT_Prompts::build_strings_prompt( 'xx', array( 'never_translate' => arra
 t_assert( strpos( $p, 'JSON' ) !== false, 'JSON contract present' );
 t_assert( strpos( $p, 'first character of your response must be `{`' ) !== false, 'strict opening rule present' );
 
+t_section( 'custom_instructions: injected only for the target language' );
+$custom = array(
+    'never_translate'     => array(),
+    'glossary'            => array(),
+    'custom_instructions' => array(
+        'xx' => 'Use formal voice. Our audience is law-firm partners.',
+        'yy' => 'This should NOT appear.',
+    ),
+);
+$p = ACWPT_Prompts::build_content_prompt( 'xx', $custom );
+t_assert( strpos( $p, 'CUSTOM INSTRUCTIONS FOR THIS LANGUAGE' )       !== false, 'custom instructions header present' );
+t_assert( strpos( $p, 'law-firm partners' )                           !== false, 'xx instructions present' );
+t_assert( strpos( $p, 'This should NOT appear.' )                     === false, 'yy instructions absent' );
+
+t_section( 'custom_instructions: whitespace-only or missing = no block' );
+$p = ACWPT_Prompts::build_content_prompt( 'xx', array(
+    'never_translate'     => array(),
+    'glossary'            => array(),
+    'custom_instructions' => array( 'xx' => "   \n  \t  " ),
+) );
+t_assert( strpos( $p, 'CUSTOM INSTRUCTIONS FOR THIS LANGUAGE' ) === false, 'no block for whitespace-only instructions' );
+
+$p = ACWPT_Prompts::build_content_prompt( 'xx', array(
+    'never_translate' => array(), 'glossary' => array(),
+) );
+t_assert( strpos( $p, 'CUSTOM INSTRUCTIONS FOR THIS LANGUAGE' ) === false, 'no block when key is missing' );
+
+t_section( 'custom_instructions: build_strings_prompt also injects' );
+$p = ACWPT_Prompts::build_strings_prompt( 'xx', $custom );
+t_assert( strpos( $p, 'law-firm partners' ) !== false, 'strings prompt also includes custom instructions' );
+
 echo "\nALL PASS\n";
