@@ -6,18 +6,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 class ACWPT_Translator {
 
 	/**
-	 * Model pricing per token (as of 2025).
-	 * Unknown models fall back to gpt-4o-mini pricing.
+	 * Model pricing per token. Verify against Anthropic's published rates
+	 * before each release (https://www.anthropic.com/pricing).
+	 * Unknown models fall back to Sonnet pricing.
 	 */
 	private static $pricing = array(
-		'gpt-4o-mini'    => array( 'input' => 0.00000015,  'output' => 0.0000006 ),
-		'gpt-4o'         => array( 'input' => 0.0000025,   'output' => 0.00001 ),
-		'gpt-4.1'        => array( 'input' => 0.000002,    'output' => 0.000008 ),
-		'gpt-4.1-mini'   => array( 'input' => 0.0000004,   'output' => 0.0000016 ),
-		'gpt-4.1-nano'   => array( 'input' => 0.0000001,   'output' => 0.0000004 ),
-		'o3-mini'        => array( 'input' => 0.0000011,   'output' => 0.0000044 ),
-		'o4-mini'        => array( 'input' => 0.0000011,   'output' => 0.0000044 ),
+		'claude-haiku-4-5'  => array( 'input' => 0.000001,  'output' => 0.000005 ),
+		'claude-sonnet-4-5' => array( 'input' => 0.000003,  'output' => 0.000015 ),
+		'claude-sonnet-4-6' => array( 'input' => 0.000003,  'output' => 0.000015 ),
+		'claude-opus-4-5'   => array( 'input' => 0.000015,  'output' => 0.000075 ),
+		'claude-opus-4-6'   => array( 'input' => 0.000015,  'output' => 0.000075 ),
 	);
+
+	private static $default_model = 'claude-haiku-4-5';
 
 	/**
 	 * Translate a post's title, content, and excerpt via OpenAI.
@@ -184,6 +185,67 @@ class ACWPT_Translator {
 	}
 
 	// =========================================================================
+	// Anthropic API
+	// =========================================================================
+
+	/**
+	 * Make a Messages API call to Anthropic. Returns array on success,
+	 * WP_Error on failure. Caller is responsible for prompt assembly and
+	 * response parsing.
+	 *
+	 * @param string $api_key
+	 * @param string $model
+	 * @param string $system      Top-level system prompt.
+	 * @param string $user        User message body.
+	 * @param int    $max_tokens
+	 * @param int    $timeout
+	 * @return array|WP_Error     Decoded response body on success.
+	 */
+	private static function call_anthropic( $api_key, $model, $system, $user, $max_tokens = 8192, $timeout = 30 ) {
+		$response = wp_remote_post(
+			'https://api.anthropic.com/v1/messages',
+			array(
+				'timeout' => $timeout,
+				'headers' => array(
+					'x-api-key'         => $api_key,
+					'anthropic-version' => '2023-06-01',
+					'content-type'      => 'application/json',
+				),
+				'body'    => wp_json_encode(
+					array(
+						'model'       => $model,
+						'max_tokens'  => $max_tokens,
+						'temperature' => 0.3,
+						'system'      => $system,
+						'messages'    => array(
+							array( 'role' => 'user', 'content' => $user ),
+						),
+					)
+				),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		$body = wp_remote_retrieve_body( $response );
+		$data = json_decode( $body, true );
+
+		if ( $code !== 200 ) {
+			$msg = isset( $data['error']['message'] ) ? $data['error']['message'] : "HTTP {$code}";
+			return new WP_Error( 'anthropic_error', 'Anthropic API error: ' . $msg );
+		}
+
+		if ( empty( $data['content'][0]['text'] ) ) {
+			return new WP_Error( 'empty_response', 'Anthropic returned an empty response.' );
+		}
+
+		return $data;
+	}
+
+	// =========================================================================
 	// Usage Tracking
 	// =========================================================================
 
@@ -199,11 +261,11 @@ class ACWPT_Translator {
 			return;
 		}
 
-		$prompt_tokens     = (int) ( $data['usage']['prompt_tokens'] ?? 0 );
-		$completion_tokens = (int) ( $data['usage']['completion_tokens'] ?? 0 );
+		$input_tokens  = (int) ( $data['usage']['input_tokens']  ?? 0 );
+		$output_tokens = (int) ( $data['usage']['output_tokens'] ?? 0 );
 
-		$pricing = isset( self::$pricing[ $model ] ) ? self::$pricing[ $model ] : self::$pricing['gpt-4o-mini'];
-		$cost    = ( $prompt_tokens * $pricing['input'] ) + ( $completion_tokens * $pricing['output'] );
+		$pricing = isset( self::$pricing[ $model ] ) ? self::$pricing[ $model ] : self::$pricing['claude-sonnet-4-5'];
+		$cost    = ( $input_tokens * $pricing['input'] ) + ( $output_tokens * $pricing['output'] );
 
 		$month = gmdate( 'Y-m' );
 		$usage = get_option( 'acwpt_usage', array() );
@@ -221,9 +283,9 @@ class ACWPT_Translator {
 		}
 
 		$usage[ $month ]['requests']          += 1;
-		$usage[ $month ]['prompt_tokens']     += $prompt_tokens;
-		$usage[ $month ]['completion_tokens'] += $completion_tokens;
-		$usage[ $month ]['total_tokens']      += $prompt_tokens + $completion_tokens;
+		$usage[ $month ]['prompt_tokens']     += $input_tokens;   // schema kept for back-compat
+		$usage[ $month ]['completion_tokens'] += $output_tokens;
+		$usage[ $month ]['total_tokens']      += $input_tokens + $output_tokens;
 		$usage[ $month ]['estimated_cost']    += $cost;
 
 		if ( $type === 'content' ) {
