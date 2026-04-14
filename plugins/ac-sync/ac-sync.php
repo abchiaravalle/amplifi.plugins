@@ -3,7 +3,7 @@
 Plugin Name: amplifi.sync
 Plugin URI: https://github.com/abchiaravalle/amplifi.plugins
 Description: WordPress environment sync — REST API endpoints for file, database, and media operations between production and staging.
-Version: 2.0.0-beta.3
+Version: 2.0.0-beta.4
 Author: amplifi.studio
 Author URI: https://amplifi.studio
 License: MIT
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'ACSYNC_VERSION', '2.0.0-beta.3' );
+define( 'ACSYNC_VERSION', '2.0.0-beta.4' );
 define( 'ACSYNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACSYNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACSYNC_PLUGIN_FILE', __FILE__ );
