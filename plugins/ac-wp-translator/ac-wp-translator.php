@@ -2,8 +2,8 @@
 /**
  * Plugin Name: amplifi.translate
  * Plugin URI: https://github.com/abchiaravalle/amplifi.plugins
- * Description: AI-powered real-time translation using OpenAI. Translates pages and posts with URL-based language prefixes (/es/, /fr/, etc.) and smart caching. By amplifi.studio.
- * Version: 1.2.7
+ * Description: AI-powered real-time translation using Anthropic Claude. Translates pages and posts with URL-based language prefixes (/es/, /fr/, etc.), native-speaker B2B prompts per language, custom never-translate list and glossary, smart caching. By amplifi.studio.
+ * Version: 2.0.0
  * Author: amplifi.studio
  * Author URI: https://amplifi.studio
  * License: MIT
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'ACWPT_VERSION', '1.2.7' );
+define( 'ACWPT_VERSION', '2.0.0' );
 define( 'ACWPT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACWPT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACWPT_PLUGIN_FILE', __FILE__ );
@@ -34,6 +34,29 @@ function acwpt_asset_version( $relative_path ) {
 	}
 	return ACWPT_VERSION;
 }
+
+/**
+ * One-shot upgrade routine. Runs when stored db version is older than current.
+ * v2.0.0: provider switched from OpenAI to Anthropic. Clear stale model
+ * selection and the cached models list so the user re-picks a Claude model.
+ */
+function acwpt_maybe_upgrade() {
+	$stored = get_option( 'acwpt_db_version', '1.0' );
+	if ( version_compare( $stored, '2.0.0', '<' ) ) {
+		$settings = get_option( 'acwpt_settings', array() );
+		if ( isset( $settings['model'] ) ) {
+			$settings['model'] = '';
+		}
+		if ( ! isset( $settings['custom_version'] ) ) {
+			$settings['custom_version'] = 0;
+		}
+		update_option( 'acwpt_settings', $settings );
+		delete_transient( 'acwpt_models_list' );
+		update_option( 'acwpt_db_version', '2.0.0' );
+		update_option( 'acwpt_show_v2_notice', 1 );
+	}
+}
+add_action( 'admin_init', 'acwpt_maybe_upgrade' );
 
 // Load amplifi.studio shared framework.
 require_once ACWPT_PLUGIN_DIR . 'includes/amplifi-framework.php';
