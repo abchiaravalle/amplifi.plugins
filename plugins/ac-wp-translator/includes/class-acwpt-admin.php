@@ -89,6 +89,20 @@ class ACWPT_Admin {
 			delete_transient( 'acwpt_models_list' );
 		}
 
+		// never_translate: textarea, one term per line
+		$never_in  = isset( $input['never_translate'] ) ? (string) $input['never_translate'] : '';
+		$never_arr = array_filter( array_map( 'trim', preg_split( '/\r?\n/', $never_in ) ), 'strlen' );
+		$never_arr = array_values( array_unique( $never_arr ) );
+
+		$existing       = get_option( 'acwpt_settings', array() );
+		$existing_never = isset( $existing['never_translate'] ) ? (array) $existing['never_translate'] : array();
+		if ( $never_arr !== $existing_never ) {
+			$clean['custom_version'] = ( isset( $existing['custom_version'] ) ? (int) $existing['custom_version'] : 0 ) + 1;
+		} elseif ( isset( $existing['custom_version'] ) ) {
+			$clean['custom_version'] = (int) $existing['custom_version'];
+		}
+		$clean['never_translate'] = $never_arr;
+
 		return $clean;
 	}
 
@@ -134,6 +148,24 @@ class ACWPT_Admin {
 								</select>
 								<span id="acwpt-model-status"></span>
 								<p class="description">claude-haiku-4-5 is recommended for cost-effective translation. Models are fetched from your Anthropic account.</p>
+							</td>
+						</tr>
+						<tr>
+							<th><label for="acwpt_never_translate">Never translate</label></th>
+							<td>
+								<?php
+								$never = isset( $settings['never_translate'] ) ? (array) $settings['never_translate'] : array();
+								?>
+								<textarea
+									id="acwpt_never_translate"
+									name="acwpt_settings[never_translate]"
+									rows="6"
+									class="large-text code"
+									placeholder="One term per line. Examples:&#10;Acme Cloud&#10;PageSpeed Insights&#10;CEO"
+								><?php echo esc_textarea( implode( "\n", $never ) ); ?></textarea>
+								<p class="description">
+									One term per line. Matches are case-sensitive and whole-word. Listed terms are wrapped in protective sentinels before being sent to Claude, so they always appear verbatim in the translation.
+								</p>
 							</td>
 						</tr>
 					</table>
