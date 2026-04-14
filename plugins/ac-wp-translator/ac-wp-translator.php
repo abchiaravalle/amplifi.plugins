@@ -58,6 +58,29 @@ function acwpt_maybe_upgrade() {
 }
 add_action( 'admin_init', 'acwpt_maybe_upgrade' );
 
+/**
+ * One-time admin notice after upgrading to v2.0.0.
+ */
+function acwpt_v2_admin_notice() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+	if ( ! get_option( 'acwpt_show_v2_notice' ) ) {
+		return;
+	}
+	$url = admin_url( 'admin.php?page=amplifi-ac-wp-translator' );
+	?>
+	<div class="notice notice-warning is-dismissible">
+		<p>
+			<strong>amplifi.translate v2.0.0:</strong> This release switches from OpenAI to <strong>Anthropic Claude</strong>.
+			Your existing OpenAI key will not work. Please <a href="<?php echo esc_url( $url ); ?>">enter your Anthropic API key and pick a Claude model</a> to resume translations.
+		</p>
+	</div>
+	<?php
+	delete_option( 'acwpt_show_v2_notice' );
+}
+add_action( 'admin_notices', 'acwpt_v2_admin_notice' );
+
 // Load amplifi.studio shared framework.
 require_once ACWPT_PLUGIN_DIR . 'includes/amplifi-framework.php';
 
