@@ -235,6 +235,59 @@ Hook suffix: `amplifi-studio_page_amplifi-ac-sync`
 - `acsync_db_token` (transient, 5min) — Write confirmation token
 - Backup files in `wp-content/uploads/acsync-backups/`
 
+## Plugin: amplifi.security (`plugins/amplifi-security/`)
+WordPress security with an AI brain. Local scanners surface findings; Claude triages them with the user's own Anthropic API key; alerts fire only on `confirmed`/`likely` verdicts.
+
+### Architecture
+- **Multi-file plugin** with PSR-style autoloader (`includes/class-autoloader.php`) under namespace `Amplifi\Security\*`. PHP 8.1+ / WP 6.4+ gated in the bootstrap before any 8.1-only code loads.
+- **Scanners (WP-Cron, every 4h by default)**: shell/backdoor, file integrity (core + plugins + themes), critical file (.htaccess, wp-config, mu-plugins, dropins), DB anomaly, auth anomaly, vuln (Wordfence Intelligence), cron, REST/XML-RPC, hardening.
+- **Triage**: `Triage_Engine` batches findings, calls Anthropic Messages API with tool-use forced for strict JSON output, caches benign verdicts 7 days in a custom table, tracks per-day USD spend with caps.
+- **Alert routing**: Category × verdict matrix → SMTP2Go email, Textbelt SMS (3/day cap), daily digest, or audit log only. Confirmed malware cannot be muted (hardcoded floor).
+- **Self-defense**: `Self_Integrity` baseline of plugin's own files, `Tamper_Detector` HMAC stamps on critical config + cron re-arm + liveness check, `Canary` health URL for external uptime monitors, `Stealth_Mode` to hide from non-installer admins.
+- **Audit log**: HMAC hash-chained event journal in custom table, daily prune retention.
+- **Onboarding wizard**: 4 steps (API keys → recipients → log sources → first scan), reachable at `?wizard=1` on the Settings page until `amplifi_security_onboarding_complete` is set.
+- **WP-CLI**: `wp amplifi-security scan|findings|verify|canary|stealth`.
+
+### Key Files
+- `amplifi-security.php` - Bootstrap with PHP/WP/OpenSSL gates, version constants, framework + autoloader registration
+- `includes/amplifi-framework.php` - Shared framework (copied from `shared/`)
+- `includes/class-autoloader.php` - Namespace → file resolver
+- `includes/class-plugin.php` - Single bootstrap entry: subsystem registration + cron hooks
+- `includes/class-installer.php` - dbDelta source of truth for nine `wp_amplifi_security_*` tables
+- `includes/class-activator.php` / `class-deactivator.php` - Activation/pre-deactivation hooks
+- `includes/admin/class-admin.php` - Framework integration + Findings/Audit/Settings submenus
+- `includes/admin/class-onboarding-wizard.php` - 4-step wizard UI + completion handlers
+- `includes/scanners/*.php` - Nine scanners + interface + Scan_Runner orchestrator
+- `includes/triage/*.php` - Anthropic_Client, Prompt_Builder, Spend_Tracker, Verdict_Cache, Triage_Engine
+- `includes/alerts/*.php` - Alert_Router, Smtp2Go_Client, Textbelt_Client
+- `includes/audit/*.php` - Audit_Logger + hash-chained Audit_Chain
+- `includes/crypto/class-secret-store.php` - AES-256-GCM with HKDF-SHA256 key from WP `AUTH_KEY` family
+- `includes/self-defense/*.php` - Self_Integrity, Tamper_Detector
+- `includes/canary/`, `includes/honeypot/`, `includes/stealth/`, `includes/log-sources/`, `includes/data/`, `includes/signatures/`, `includes/cli/` - Subsystems
+
+### Admin Menu
+Four pages under the **amplifi.studio** menu:
+1. **Security** (Health dashboard, main) — registered via `amplifi_register_plugin()` → slug: `amplifi-security`
+2. **Security: Findings** — manual submenu → slug: `amplifi-security-findings`
+3. **Security: Audit Log** — manual submenu → slug: `amplifi-security-audit`
+4. **Security: Settings** — manual submenu → slug: `amplifi-security-settings`
+
+The framework's slug-prefix guard (in `shared/amplifi-framework.php`) keeps the URL as `?page=amplifi-security` instead of doubling to `amplifi-amplifi-security`. Hook suffixes: `amplifi-studio_page_amplifi-security[-X]`.
+
+### Stealth Mode
+When enabled and viewed by a non-installer, Stealth filters: the Plugins list (`all_plugins`), update transients, plugin action links, and the amplifi.studio hub catalog (via the `amplifi_hub_catalog` filter — registered by this plugin). The `amplifi-studio` top-level menu remains visible because it's owned by other plugins; only the Security submenus are hidden. Recovery: define `AMPLIFI_SECURITY_INSTALLER_ID` in wp-config, or visit `?amplifi_unhide=<token>` once.
+
+### Settings (in `wp_options`)
+- `amplifi_security_settings` (JSON blob) — `scan_interval`, `enabled_scanners`, `model`, `sensitivity`, `daily_spend_cap_usd`, `monthly_spend_cap_usd`, `notification_recipients`, `digest_hour_utc`, `quiet_hours`, `routing_matrix`, `file_exclusions`, `ip_allowlist`
+- Encrypted secrets via `Secret_Store` — Anthropic key, SMTP2Go key+sender, Wordfence Intelligence token, AbuseIPDB key, Textbelt key+phone
+- `amplifi_security_onboarding_complete`, `amplifi_security_stealth_enabled`, `amplifi_security_unhide_token`, `amplifi_security_canary_secret`, `amplifi_security_installer_id`, `amplifi_security_db_version`, `amplifi_security_last_scan_*`
+
+### Database Tables (`wp_amplifi_security_*`)
+`findings`, `baseline`, `auth_log`, `audit`, `scans`, `verdict_cache`, `log_sources`, `vuln_feed`, `spend`. Schema source-of-truth in `Installer::install()`. `dbDelta` re-runs on version-bump page loads via `Installer::maybe_upgrade()`.
+
+### API Key Security
+Document to users: scope your Anthropic key to Messages API only, set spend caps in the Anthropic console, and rotate if compromised. All keys are encrypted at rest (`Secret_Store`, AES-256-GCM) and only sent to their respective vendor APIs.
+
 ## Go TUI: amplifi.sync (`tools/sync-tui/`)
 Terminal UI orchestrator for syncing between WordPress environments.
 
@@ -294,6 +347,9 @@ docker-compose up -d    # WordPress on :8090, MySQL on :3316
 
 cd plugins/ac-sync
 docker-compose up -d    # WordPress on :8091, MySQL on :3317
+
+cd plugins/amplifi-security
+docker-compose up -d    # WordPress on :8092, MySQL on :3318
 ```
 Plugin dirs are volume-mounted so edits are live.
 

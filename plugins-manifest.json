@@ -30,6 +30,11 @@
       "name": "Sync",
       "description": "WordPress environment sync with REST API for file, database, and media operations between production and staging.",
       "icon": "dashicons-update"
+    },
+    "amplifi-security": {
+      "name": "Security",
+      "description": "WordPress security with an AI brain. Local scans, Claude triage with your own API key, and alerts only on confirmed or likely findings.",
+      "icon": "dashicons-shield-alt"
     }
   }
 }
