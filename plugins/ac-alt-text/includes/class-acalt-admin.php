@@ -62,6 +62,7 @@ class ACALT_Admin {
 			'report_enabled'      => true,
 			'prompt_style'        => 'concise',
 			'language'            => get_locale(),
+			'site_context'        => '',
 		);
 		return array_merge( $defaults, is_array( $s ) ? $s : array() );
 	}
@@ -493,6 +494,16 @@ class ACALT_Admin {
 							<p class="description">Locale code (e.g. <code>en_US</code>, <code>es_ES</code>). Alt text will be generated in this language.</p>
 						</td>
 					</tr>
+					<tr>
+						<th><label for="acalt_site_context">Site context</label></th>
+						<td>
+							<textarea id="acalt_site_context" name="site_context" rows="4" class="large-text" placeholder="e.g. We manufacture industrial balancing machines for automotive and manufacturing applications — hard-bearing, soft-bearing, vertical, and turbocharger balancers. Images include machines, rotors, control panels, and factory installations."><?php echo esc_textarea( $s['site_context'] ); ?></textarea>
+							<p class="description">
+								Optional. 1&ndash;3 sentences describing what your site is about, what your products/services are, and what your images typically show. This gives the model the right vocabulary and prevents it from reaching for generic words.
+								<br><strong>What it does NOT do:</strong> it does not give the model permission to invent specifics. The model is still told never to make up product names, model numbers, or specs &mdash; this just frames the description.
+							</p>
+						</td>
+					</tr>
 				</table>
 				<?php submit_button( 'Save settings' ); ?>
 			</form>
@@ -548,6 +559,13 @@ class ACALT_Admin {
 		$current['report_enabled']      = ! empty( $_POST['report_enabled'] );
 		$current['prompt_style']        = ( isset( $_POST['prompt_style'] ) && $_POST['prompt_style'] === 'descriptive' ) ? 'descriptive' : 'concise';
 		$current['language']            = isset( $_POST['language'] )      ? sanitize_text_field( wp_unslash( $_POST['language'] ) ) : 'en_US';
+		// site_context is free-form prose; use sanitize_textarea_field to strip tags but keep newlines.
+		// Cap at 2000 chars defensively so it doesn't blow up the OpenAI prompt.
+		$ctx = isset( $_POST['site_context'] ) ? sanitize_textarea_field( wp_unslash( $_POST['site_context'] ) ) : '';
+		if ( mb_strlen( $ctx ) > 2000 ) {
+			$ctx = mb_substr( $ctx, 0, 2000 );
+		}
+		$current['site_context']        = $ctx;
 
 		update_option( 'acalt_settings', $current );
 

@@ -66,6 +66,7 @@ function acalt_activate() {
 		'report_enabled'      => true,
 		'prompt_style'        => 'concise',
 		'language'            => get_locale(),
+		'site_context'        => '',
 	);
 
 	if ( ! get_option( 'acalt_settings' ) ) {

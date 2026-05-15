@@ -86,7 +86,8 @@ class ACALT_Generator {
 		}
 
 		// Call OpenAI.
-		$response = self::call_openai( $api_key, $model, $image_payload, $prompt_style, $language );
+		$site_context = isset( $settings['site_context'] ) ? trim( (string) $settings['site_context'] ) : '';
+		$response = self::call_openai( $api_key, $model, $image_payload, $prompt_style, $language, $site_context );
 		if ( is_wp_error( $response ) ) {
 			$code     = $response->get_error_code();
 			$message  = $response->get_error_message();
@@ -222,19 +223,28 @@ class ACALT_Generator {
 		return '';
 	}
 
-	private static function call_openai( $api_key, $model, $image_url, $prompt_style, $language ) {
+	private static function call_openai( $api_key, $model, $image_url, $prompt_style, $language, $site_context = '' ) {
 		$style_instruction = ( $prompt_style === 'descriptive' )
 			? 'Be moderately descriptive (around 100 characters). Capture the subject, key context, and any text visible in the image.'
 			: 'Be concise (under 80 characters when possible). Focus on the primary subject and one or two key details.';
 
-		$system = "You write WCAG-compliant alt text for website images.\n"
+		$context_block = '';
+		if ( $site_context !== '' ) {
+			$context_block = "Site context (use vocabulary and framing appropriate to this domain — do NOT copy these sentences into the alt text):\n"
+				. trim( $site_context ) . "\n\n";
+		}
+
+		$system = $context_block
+			. "You write WCAG-compliant alt text for website images.\n"
 			. "Rules:\n"
 			. "- Keep it under 125 characters.\n"
-			. "- Be factual, not interpretive. Do not speculate about emotions, intent, or off-frame context.\n"
+			. "- Be factual, not interpretive. Do not speculate about emotions, intent, function, or off-frame context.\n"
 			. "- Do NOT begin with 'image of', 'picture of', 'photo of', 'graphic showing', or similar.\n"
 			. "- Do NOT include a trailing period unless the alt is a full sentence.\n"
-			. "- If text is visible and important (logo, headline, sign), include it verbatim in quotes.\n"
-			. "- If the image is purely decorative (e.g. divider, ornament, pattern with no informational value), set \"decorative\": true and \"alt\": \"\".\n"
+			. "- Never invent product names, model numbers, brand names, technical specifications, dates, or measurements. If you cannot identify a specific product, machine, or part with certainty, describe its general category and observable features (configuration, components, color, mount style, materials).\n"
+			. "- Do not assume use-case or function (e.g. 'used for X') unless the image clearly shows it in use.\n"
+			. "- If text or a label is visibly printed on the subject (logo, model plate, signage, headline), include it verbatim in quotes. This is the ONLY place you should write specific names or numbers.\n"
+			. "- If the image is purely decorative (divider, ornament, pattern, flag icon used as UI element, generic background with no informational value), set \"decorative\": true and \"alt\": \"\".\n"
 			. "- " . $style_instruction . "\n"
 			. "- Output language: " . $language . ".\n"
 			. "Respond with strict JSON only: {\"alt\": string, \"decorative\": boolean}.";
