@@ -3,7 +3,7 @@
 Plugin Name: amplifi.magic
 Plugin URI: https://github.com/abchiaravalle/amplifi.plugins
 Description: One-click magic links for password-protected pages. Generate tokens that auto-set WP password cookies with usage logging and IP geolocation.
-Version: 2.0.0-beta.8
+Version: 2.0.0-beta.9
 Author: amplifi.studio
 Author URI: https://amplifi.studio
 License: MIT
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'ACML_VERSION', '2.0.0-beta.8' );
+define( 'ACML_VERSION', '2.0.0-beta.9' );
 define( 'ACML_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACML_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACML_PLUGIN_FILE', __FILE__ );

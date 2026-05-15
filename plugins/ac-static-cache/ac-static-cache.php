@@ -3,7 +3,7 @@
 Plugin Name: amplifi.lockcache
 Plugin URI: https://github.com/abchiaravalle/amplifi.plugins
 Description: Static HTML cache for password-protected posts. Caches unlocked content for non-admin visitors, denies direct cache access, provides admin panel for cache management and debug logs.
-Version: 2.0.0-beta.8
+Version: 2.0.0-beta.9
 Author: amplifi.studio
 Author URI: https://amplifi.studio
 License: MIT
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'ACSC_VERSION', '2.0.0-beta.8' );
+define( 'ACSC_VERSION', '2.0.0-beta.9' );
 define( 'ACSC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACSC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACSC_PLUGIN_FILE', __FILE__ );
