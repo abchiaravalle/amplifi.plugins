@@ -3,7 +3,7 @@
  * Plugin Name:       amplifi.security
  * Plugin URI:        https://amplifi.studio/security
  * Description:       WordPress security with an AI brain. Less noise, more signal.
- * Version:           2.0.0-beta.7
+ * Version:           2.0.0-beta.8
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Amplifi Studio
@@ -30,7 +30,7 @@ if ( defined( 'AMPLIFI_SECURITY_VERSION' ) ) {
 	return;
 }
 
-define( 'AMPLIFI_SECURITY_VERSION', '2.0.0-beta.7' );
+define( 'AMPLIFI_SECURITY_VERSION', '2.0.0-beta.8' );
 define( 'AMPLIFI_SECURITY_DB_VERSION', '1' );
 define( 'AMPLIFI_SECURITY_FILE', __FILE__ );
 define( 'AMPLIFI_SECURITY_PATH', plugin_dir_path( __FILE__ ) );
