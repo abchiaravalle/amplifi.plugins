@@ -56,10 +56,14 @@ class ACALT_Generator {
 			return self::result_skip( 'no image URL resolvable' );
 		}
 
-		// If the URL points to a host OpenAI cannot reach (localhost, private
-		// IPs, .local, .test, .internal), inline the image as a base64 data
-		// URL instead. Covers staging sites behind auth and local docker dev.
-		$image_payload = self::is_locally_reachable_only( $url )
+		// Decide whether to send a URL or inline base64. Three signals:
+		//   1. Local-only host (localhost / .local / RFC1918) — always inline.
+		//   2. acalt_reachability mode === 'base64' (probe found CF/auth wall) — always inline.
+		//   3. Otherwise — send URL.
+		$reach_mode = ACALT_Reachability::current_mode();
+		$force_inline = ( $reach_mode === 'base64' ) || self::is_locally_reachable_only( $url );
+
+		$image_payload = $force_inline
 			? self::file_as_data_url( $attachment_id )
 			: $url;
 		if ( ! $image_payload ) {
@@ -84,10 +88,36 @@ class ACALT_Generator {
 		// Call OpenAI.
 		$response = self::call_openai( $api_key, $model, $image_payload, $prompt_style, $language );
 		if ( is_wp_error( $response ) ) {
+			$code     = $response->get_error_code();
+			$message  = $response->get_error_message();
+			$http_code = (int) ( $response->get_error_data() ?: 0 );
+
+			// 429 rate limit: park, no retry consumed. Tells the cron loop to
+			// stop the rest of the batch so we don't burn 10 retries in 10s.
+			if ( $http_code === 429 || strpos( $code, '_429' ) !== false ) {
+				return array(
+					'ok'        => false,
+					'park'      => true,
+					'rate_limit' => true,
+					'reason'    => 'rate limited (HTTP 429): ' . $message,
+				);
+			}
+
+			// 401/403: kill switch. Pause the whole queue and alert once.
+			// Otherwise 17k jobs × 3 attempts = 51k pointless calls.
+			if ( $http_code === 401 || $http_code === 403 ) {
+				self::pause_queue( 'auth_fail', sprintf( 'OpenAI returned HTTP %d: %s', $http_code, $message ) );
+				return array(
+					'ok'     => false,
+					'park'   => true,
+					'reason' => sprintf( 'auth failure (HTTP %d) — queue paused: %s', $http_code, $message ),
+				);
+			}
+
 			return array(
 				'ok'     => false,
 				'park'   => false,
-				'reason' => 'api error: ' . $response->get_error_message(),
+				'reason' => 'api error: ' . $message,
 			);
 		}
 
@@ -245,7 +275,8 @@ class ACALT_Generator {
 		$raw  = wp_remote_retrieve_body( $response );
 		if ( $code !== 200 ) {
 			$message = self::extract_error( $raw, $code );
-			return new WP_Error( 'openai_http_' . $code, $message );
+			// Store HTTP code as error data so callers can distinguish 429 / 401 / 403 / 5xx.
+			return new WP_Error( 'openai_http_' . $code, $message, $code );
 		}
 
 		$data = json_decode( $raw, true );
@@ -339,5 +370,54 @@ class ACALT_Generator {
 			'skip'   => true,
 			'reason' => $reason,
 		);
+	}
+
+	/**
+	 * Pause the whole queue. Used on auth failure so we don't burn thousands
+	 * of doomed API calls. Sends a single admin email; subsequent calls are
+	 * no-ops until the queue is resumed.
+	 */
+	public static function pause_queue( $reason_code, $message ) {
+		$current = get_option( 'acalt_paused', array() );
+		if ( ! is_array( $current ) ) {
+			$current = array();
+		}
+		if ( ! empty( $current['paused'] ) ) {
+			return; // already paused
+		}
+		update_option(
+			'acalt_paused',
+			array(
+				'paused'      => true,
+				'reason_code' => $reason_code,
+				'message'     => $message,
+				'paused_at'   => time(),
+			)
+		);
+
+		$settings = get_option( 'acalt_settings', array() );
+		$to = isset( $settings['report_email'] ) ? sanitize_email( $settings['report_email'] ) : '';
+		if ( $to ) {
+			$site = get_bloginfo( 'name' );
+			wp_mail(
+				$to,
+				sprintf( '[amplifi.alt] Queue paused on %s — %s', $site, $reason_code ),
+				sprintf( "The amplifi.alt queue was paused automatically.\n\nReason: %s\nDetail: %s\n\nResume it from Tools → Alt once the issue is resolved.", $reason_code, $message )
+			);
+		}
+	}
+
+	public static function is_paused() {
+		$p = get_option( 'acalt_paused', array() );
+		return is_array( $p ) && ! empty( $p['paused'] );
+	}
+
+	public static function paused_info() {
+		$p = get_option( 'acalt_paused', array() );
+		return is_array( $p ) ? $p : array();
+	}
+
+	public static function resume_queue() {
+		delete_option( 'acalt_paused' );
 	}
 }

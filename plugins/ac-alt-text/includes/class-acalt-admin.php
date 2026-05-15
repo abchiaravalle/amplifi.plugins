@@ -25,6 +25,11 @@ class ACALT_Admin {
 		add_action( 'wp_ajax_acalt_start_bulk', array( $this, 'ajax_start_bulk' ) );
 		add_action( 'wp_ajax_acalt_run_drain_now', array( $this, 'ajax_run_drain_now' ) );
 		add_action( 'wp_ajax_acalt_send_test_report', array( $this, 'ajax_send_test_report' ) );
+		add_action( 'wp_ajax_acalt_preflight', array( $this, 'ajax_preflight' ) );
+		add_action( 'wp_ajax_acalt_status', array( $this, 'ajax_status' ) );
+		add_action( 'wp_ajax_acalt_pause', array( $this, 'ajax_pause' ) );
+		add_action( 'wp_ajax_acalt_resume', array( $this, 'ajax_resume' ) );
+		add_action( 'wp_ajax_acalt_probe', array( $this, 'ajax_probe' ) );
 	}
 
 	public function register_submenus() {
@@ -75,6 +80,9 @@ class ACALT_Admin {
 		$cap_pct  = $cap > 0 ? min( 100, ( $spent / $cap ) * 100 ) : 0;
 		$recent   = ACALT_Queue::recent( 20 );
 		$nonce    = wp_create_nonce( 'acalt_bulk' );
+		$health   = $this->health_checks();
+		$paused_info = ACALT_Generator::paused_info();
+		$reach    = ACALT_Reachability::info();
 		?>
 		<div class="wrap">
 			<h1>amplifi.alt</h1>
@@ -87,15 +95,31 @@ class ACALT_Admin {
 				</p></div>
 			<?php endif; ?>
 
+			<?php foreach ( $health as $issue ) : ?>
+				<div class="notice notice-<?php echo esc_attr( $issue['level'] ); ?>" style="margin:8px 0;">
+					<p><strong><?php echo esc_html( $issue['title'] ); ?>:</strong> <?php echo wp_kses_post( $issue['message'] ); ?></p>
+				</div>
+			<?php endforeach; ?>
+
+			<?php if ( ! empty( $paused_info['paused'] ) ) : ?>
+				<div class="notice notice-error" style="margin:8px 0;">
+					<p>
+						<strong>Queue paused</strong> at <?php echo esc_html( gmdate( 'Y-m-d H:i', (int) ( $paused_info['paused_at'] ?? 0 ) ) ); ?> UTC.
+						Reason: <code><?php echo esc_html( $paused_info['reason_code'] ?? 'unknown' ); ?></code> &mdash; <?php echo esc_html( $paused_info['message'] ?? '' ); ?>
+						<button type="button" class="button button-primary acalt-resume-btn" data-nonce="<?php echo esc_attr( $nonce ); ?>" style="margin-left:8px;">Resume queue</button>
+					</p>
+				</div>
+			<?php endif; ?>
+
 			<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:16px;margin:16px 0;">
 				<div style="background:#fff;border:1px solid #c3c4c7;padding:16px;border-radius:4px;">
 					<div style="color:#666;font-size:12px;text-transform:uppercase;">Today</div>
-					<div style="font-size:24px;font-weight:600;"><?php echo (int) $today_st['generated']; ?> generated</div>
-					<div style="color:#666;"><?php echo (int) $today_st['failed']; ?> failed · <?php echo (int) $today_st['skipped']; ?> skipped</div>
+					<div class="acalt-card-today-gen" style="font-size:24px;font-weight:600;"><?php echo (int) $today_st['generated']; ?> generated</div>
+					<div class="acalt-card-today-sub" style="color:#666;"><?php echo (int) $today_st['failed']; ?> failed · <?php echo (int) $today_st['skipped']; ?> skipped</div>
 				</div>
 				<div style="background:#fff;border:1px solid #c3c4c7;padding:16px;border-radius:4px;">
 					<div style="color:#666;font-size:12px;text-transform:uppercase;">Today's Spend</div>
-					<div style="font-size:24px;font-weight:600;">$<?php echo number_format( $spent, 4 ); ?></div>
+					<div class="acalt-card-today-spend" style="font-size:24px;font-weight:600;">$<?php echo number_format( $spent, 4 ); ?></div>
 					<div style="background:#eee;height:6px;border-radius:3px;margin-top:6px;overflow:hidden;">
 						<div style="background:<?php echo $cap_pct >= 100 ? '#a00' : '#2271b1'; ?>;height:100%;width:<?php echo esc_attr( $cap_pct ); ?>%;"></div>
 					</div>
@@ -103,22 +127,55 @@ class ACALT_Admin {
 				</div>
 				<div style="background:#fff;border:1px solid #c3c4c7;padding:16px;border-radius:4px;">
 					<div style="color:#666;font-size:12px;text-transform:uppercase;">Queue</div>
-					<div style="font-size:24px;font-weight:600;"><?php echo (int) $counts['pending']; ?> pending</div>
-					<div style="color:#666;"><?php echo (int) $counts['processing']; ?> processing · <?php echo (int) $counts['done']; ?> done · <?php echo (int) $counts['failed']; ?> failed</div>
+					<div class="acalt-card-pending" style="font-size:24px;font-weight:600;"><?php echo (int) $counts['pending']; ?> pending</div>
+					<div class="acalt-card-processing" style="color:#666;"><?php echo (int) $counts['processing']; ?> processing · <?php echo (int) $counts['done']; ?> done · <?php echo (int) $counts['failed']; ?> failed</div>
 				</div>
 			</div>
 
 			<div style="background:#fff;border:1px solid #c3c4c7;padding:16px;border-radius:4px;margin-bottom:16px;">
 				<h2 style="margin-top:0;">Bulk: existing images</h2>
 				<p>Scans your media library for images with no alt text and queues them for generation. Already-set alt text is preserved.</p>
-				<button id="acalt-start-bulk" class="button button-primary" data-nonce="<?php echo esc_attr( $nonce ); ?>">Generate for all existing images</button>
+				<button id="acalt-preflight" class="button button-primary" data-nonce="<?php echo esc_attr( $nonce ); ?>">Generate for all existing images</button>
 				<button id="acalt-run-now" class="button" data-nonce="<?php echo esc_attr( $nonce ); ?>" style="margin-left:8px;">Process queue now</button>
+				<button id="acalt-pause" class="button" data-nonce="<?php echo esc_attr( $nonce ); ?>" style="margin-left:8px;">Pause queue</button>
 				<span id="acalt-bulk-status" style="margin-left:12px;color:#666;"></span>
+			</div>
+
+			<div id="acalt-preflight-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99999;align-items:center;justify-content:center;">
+				<div style="background:#fff;border-radius:6px;max-width:560px;padding:24px;box-shadow:0 20px 50px rgba(0,0,0,.2);">
+					<h2 style="margin-top:0;">Bulk generation estimate</h2>
+					<div id="acalt-preflight-body">Calculating…</div>
+					<div style="margin-top:16px;text-align:right;">
+						<button type="button" class="button" id="acalt-preflight-cancel">Cancel</button>
+						<button type="button" class="button button-primary" id="acalt-preflight-confirm" disabled style="margin-left:8px;">Start generation</button>
+					</div>
+				</div>
+			</div>
+
+			<div style="background:#fff;border:1px solid #c3c4c7;padding:16px;border-radius:4px;margin-bottom:16px;">
+				<h2 style="margin-top:0;">Reachability</h2>
+				<p style="margin-bottom:8px;">
+					<?php if ( ! empty( $reach['mode'] ) ) :
+						$mode = $reach['mode']; ?>
+						Mode: <strong><?php echo esc_html( $mode === 'url' ? 'public URL (cheap)' : ( $mode === 'base64' ? 'base64 inline (publicly unreachable)' : 'unknown' ) ); ?></strong>.
+						<span style="color:#666;"><?php echo esc_html( $reach['reason'] ?? '' ); ?></span>
+						<?php if ( ! empty( $reach['probed_at'] ) ) : ?>
+							<span style="color:#999;"> &mdash; probed <?php echo esc_html( human_time_diff( (int) $reach['probed_at'] ) ); ?> ago</span>
+						<?php endif; ?>
+					<?php else : ?>
+						<span style="color:#666;">Not yet probed.</span>
+					<?php endif; ?>
+				</p>
+				<button type="button" id="acalt-probe-btn" class="button" data-nonce="<?php echo esc_attr( $nonce ); ?>">Re-test reachability</button>
+				<span id="acalt-probe-status" style="margin-left:8px;color:#666;"></span>
+				<p style="color:#666;font-size:12px;margin-top:8px;">
+					If your site is behind Cloudflare Bot Fight or similar, OpenAI may not be able to fetch image URLs directly. The plugin then inlines images as base64 (larger payload, same correctness).
+				</p>
 			</div>
 
 			<div style="background:#fff;border:1px solid #c3c4c7;padding:16px;border-radius:4px;margin-bottom:16px;">
 				<h2 style="margin-top:0;">Recent activity</h2>
-				<table class="widefat striped">
+				<table class="widefat striped acalt-recent">
 					<thead><tr>
 						<th>Attachment</th><th>Status</th><th>Source</th><th>Alt</th><th>Cost</th><th>Updated</th>
 					</tr></thead>
@@ -143,41 +200,158 @@ class ACALT_Admin {
 
 			<script>
 			(function() {
-				var bulkBtn = document.getElementById('acalt-start-bulk');
-				var runBtn  = document.getElementById('acalt-run-now');
-				var status  = document.getElementById('acalt-bulk-status');
-				var nonce   = bulkBtn.dataset.nonce;
+				var preflightBtn = document.getElementById('acalt-preflight');
+				var runBtn       = document.getElementById('acalt-run-now');
+				var pauseBtn     = document.getElementById('acalt-pause');
+				var probeBtn     = document.getElementById('acalt-probe-btn');
+				var status       = document.getElementById('acalt-bulk-status');
+				var nonce        = preflightBtn.dataset.nonce;
+				var modal        = document.getElementById('acalt-preflight-modal');
+				var modalBody    = document.getElementById('acalt-preflight-body');
+				var modalCancel  = document.getElementById('acalt-preflight-cancel');
+				var modalConfirm = document.getElementById('acalt-preflight-confirm');
 
-				function postAction(action, btn, busyText, done) {
-					btn.disabled = true;
-					status.textContent = busyText;
+				function post(action, fields, opts) {
 					var fd = new FormData();
 					fd.append('action', action);
 					fd.append('_wpnonce', nonce);
-					fetch(ajaxurl, { method: 'POST', body: fd, credentials: 'same-origin' })
-						.then(function(r) { return r.json(); })
-						.then(function(j) {
-							btn.disabled = false;
-							if (j.success) {
-								status.textContent = done(j.data);
-							} else {
-								status.textContent = 'Error: ' + (j.data || 'unknown');
-							}
-						})
-						.catch(function(e) {
-							btn.disabled = false;
-							status.textContent = 'Request failed: ' + e.message;
-						});
+					Object.keys(fields || {}).forEach(function(k){ fd.append(k, fields[k]); });
+					return fetch(ajaxurl, { method: 'POST', body: fd, credentials: 'same-origin' }).then(function(r){ return r.json(); });
 				}
 
-				bulkBtn.addEventListener('click', function() {
-					postAction('acalt_start_bulk', bulkBtn, 'Scanning media library...',
-						function(d) { return 'Enqueued ' + d.enqueued + ' image(s). Workers will process them — refresh in a minute.'; });
+				function openModal() { modal.style.display = 'flex'; }
+				function closeModal() { modal.style.display = 'none'; }
+
+				preflightBtn.addEventListener('click', function() {
+					openModal();
+					modalBody.innerHTML = 'Calculating…';
+					modalConfirm.disabled = true;
+					post('acalt_preflight').then(function(j) {
+						if (!j.success) {
+							modalBody.innerHTML = '<p style="color:#a00;">Error: ' + (j.data && j.data.message || 'unknown') + '</p>';
+							return;
+						}
+						var d = j.data;
+						modalBody.innerHTML =
+							'<p><strong>' + d.candidate_count.toLocaleString() + '</strong> image(s) need alt text.</p>' +
+							'<p>Estimated cost: <strong>$' + d.estimate.cost_low.toFixed(2) + ' &ndash; $' + d.estimate.cost_high.toFixed(2) + '</strong> (model: ' + d.model + ').</p>' +
+							(d.daily_cap > 0
+								? '<p>Daily cap is <strong>$' + d.daily_cap.toFixed(2) + '</strong>. At this rate, the run will take <strong>' + d.estimate.days_to_finish + '</strong> day(s) if the cap is hit.</p>'
+								: '<p><em>No daily cap set. Generation will run flat-out.</em></p>') +
+							'<p style="color:#666;font-size:12px;">Rate-limit / pre-flight is an estimate. Real cost depends on image complexity. The queue can be paused at any time.</p>';
+						modalConfirm.disabled = false;
+					}).catch(function(e) {
+						modalBody.innerHTML = '<p style="color:#a00;">Request failed: ' + e.message + '</p>';
+					});
 				});
+
+				modalCancel.addEventListener('click', closeModal);
+				modalConfirm.addEventListener('click', function() {
+					modalConfirm.disabled = true;
+					modalBody.innerHTML += '<p><em>Enqueuing…</em></p>';
+					post('acalt_start_bulk').then(function(j) {
+						closeModal();
+						if (j.success) {
+							status.textContent = 'Enqueued ' + j.data.enqueued + ' image(s). Workers are processing them — this page auto-refreshes.';
+							startPolling();
+						} else {
+							status.textContent = 'Error: ' + (j.data || 'unknown');
+						}
+					});
+				});
+
 				runBtn.addEventListener('click', function() {
-					postAction('acalt_run_drain_now', runBtn, 'Processing one batch...',
-						function(d) { return 'Processed ' + d.processed + ' job(s). Refresh to see results.'; });
+					runBtn.disabled = true;
+					status.textContent = 'Processing one batch…';
+					post('acalt_run_drain_now').then(function(j) {
+						runBtn.disabled = false;
+						if (j.success) {
+							status.textContent = 'Processed ' + j.data.processed + ' job(s).';
+							startPolling();
+						} else {
+							status.textContent = 'Error: ' + (j.data || 'unknown');
+						}
+					});
 				});
+
+				pauseBtn.addEventListener('click', function() {
+					pauseBtn.disabled = true;
+					post('acalt_pause').then(function(j) {
+						pauseBtn.disabled = false;
+						if (j.success) location.reload();
+						else status.textContent = 'Pause failed: ' + (j.data || 'unknown');
+					});
+				});
+
+				document.querySelectorAll('.acalt-resume-btn').forEach(function(b) {
+					b.addEventListener('click', function() {
+						b.disabled = true;
+						post('acalt_resume').then(function(j) {
+							if (j.success) location.reload();
+							else { b.disabled = false; alert('Resume failed: ' + (j.data || 'unknown')); }
+						});
+					});
+				});
+
+				probeBtn.addEventListener('click', function() {
+					probeBtn.disabled = true;
+					var ps = document.getElementById('acalt-probe-status');
+					ps.textContent = 'Probing…';
+					post('acalt_probe').then(function(j) {
+						probeBtn.disabled = false;
+						if (j.success) { ps.textContent = 'Mode: ' + j.data.mode; setTimeout(function(){ location.reload(); }, 600); }
+						else ps.textContent = 'Error: ' + (j.data || 'unknown');
+					});
+				});
+
+				// ----- live polling -----
+				var pollTimer = null;
+				function startPolling() {
+					if (pollTimer) return;
+					pollTimer = setInterval(refreshStatus, 3000);
+					refreshStatus();
+				}
+				function stopPolling() {
+					if (!pollTimer) return;
+					clearInterval(pollTimer);
+					pollTimer = null;
+				}
+				function refreshStatus() {
+					post('acalt_status').then(function(j) {
+						if (!j.success) return;
+						var d = j.data;
+						// Update counter cards.
+						var $ = function(s) { return document.querySelector(s); };
+						var c = d.counts;
+						var t = d.today;
+						var pendingEl = document.querySelector('.acalt-card-pending');
+						if (pendingEl) pendingEl.textContent = c.pending + ' pending';
+						var processingEl = document.querySelector('.acalt-card-processing');
+						if (processingEl) processingEl.textContent = c.processing + ' processing · ' + c.done + ' done · ' + c.failed + ' failed';
+						var todayGenEl = document.querySelector('.acalt-card-today-gen');
+						if (todayGenEl) todayGenEl.textContent = t.generated + ' generated';
+						var todaySubEl = document.querySelector('.acalt-card-today-sub');
+						if (todaySubEl) todaySubEl.textContent = t.failed + ' failed · ' + t.skipped + ' skipped';
+						var todaySpendEl = document.querySelector('.acalt-card-today-spend');
+						if (todaySpendEl) todaySpendEl.textContent = '$' + parseFloat(t.cost_usd).toFixed(4);
+
+						// Replace recent activity table.
+						if (d.recent_html) {
+							var tbody = document.querySelector('.acalt-recent tbody');
+							if (tbody) tbody.innerHTML = d.recent_html;
+						}
+
+						// Stop polling when queue is drained.
+						if (c.pending === 0 && c.processing === 0) {
+							stopPolling();
+						}
+					});
+				}
+
+				// Auto-start polling if there's work in flight.
+				<?php if ( ( $counts['pending'] + $counts['processing'] ) > 0 ) : ?>
+					startPolling();
+				<?php endif; ?>
 			})();
 			</script>
 		</div>
@@ -427,5 +601,165 @@ class ACALT_Admin {
 
 		ACALT_Report::send();
 		wp_send_json_success();
+	}
+
+	// =================================================================
+	// New endpoints (beta.8): preflight, status polling, pause/resume, probe
+	// =================================================================
+
+	public function ajax_preflight() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => 'Forbidden' ), 403 );
+		}
+		check_ajax_referer( 'acalt_bulk' );
+
+		global $wpdb;
+		$count = (int) $wpdb->get_var(
+			"SELECT COUNT(*) FROM {$wpdb->posts} p
+			 LEFT JOIN {$wpdb->postmeta} m ON m.post_id = p.ID AND m.meta_key = '_wp_attachment_image_alt'
+			 WHERE p.post_type = 'attachment' AND p.post_mime_type LIKE 'image/%'
+			   AND (m.meta_value IS NULL OR m.meta_value = '')"
+		);
+
+		$settings = $this->settings();
+		$model    = $settings['model'];
+		$cap      = (float) $settings['daily_spend_cap_usd'];
+
+		// Empirical rates from gpt-4o-mini test runs: ~8.7K tokens_in, ~22 tokens_out per image.
+		// Tokens_in dominates because we may inline images as base64.
+		$est_in  = 8700;
+		$est_out = 22;
+		$per_image_low  = ACALT_Generator::price( $model, (int) ( $est_in * 0.5 ),  $est_out ); // small/decorative
+		$per_image_high = ACALT_Generator::price( $model, (int) ( $est_in * 1.2 ),  (int) ( $est_out * 1.5 ) );
+
+		$cost_low  = $per_image_low  * $count;
+		$cost_high = $per_image_high * $count;
+
+		$days_to_finish = ( $cap > 0 && $cost_high > $cap ) ? (int) ceil( $cost_high / $cap ) : 1;
+
+		wp_send_json_success( array(
+			'candidate_count' => $count,
+			'model'           => $model,
+			'daily_cap'       => $cap,
+			'estimate'        => array(
+				'cost_low'       => $cost_low,
+				'cost_high'      => $cost_high,
+				'days_to_finish' => $days_to_finish,
+			),
+		) );
+	}
+
+	public function ajax_status() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+		}
+		check_ajax_referer( 'acalt_bulk' );
+
+		$counts = ACALT_Queue::counts();
+		$today  = ACALT_Generator::today_key();
+		$stats  = get_option( 'acalt_daily_stats', array() );
+		$t      = $stats[ $today ] ?? array( 'generated' => 0, 'failed' => 0, 'skipped' => 0, 'cost_usd' => 0 );
+
+		// Render recent activity rows.
+		$recent = ACALT_Queue::recent( 20 );
+		ob_start();
+		if ( empty( $recent ) ) {
+			echo '<tr><td colspan="6"><em>No jobs yet.</em></td></tr>';
+		} else {
+			foreach ( $recent as $r ) {
+				printf(
+					'<tr><td><a href="%s">#%d</a></td><td><span style="text-transform:uppercase;font-size:11px;font-weight:600;color:%s;">%s</span></td><td>%s</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">%s</td><td>$%s</td><td>%s</td></tr>',
+					esc_url( admin_url( 'post.php?post=' . (int) $r->attachment_id . '&action=edit' ) ),
+					(int) $r->attachment_id,
+					esc_attr( $this->status_color( $r->status ) ),
+					esc_html( $r->status ),
+					esc_html( $r->source ),
+					esc_html( (string) $r->alt_generated ),
+					esc_html( number_format( (float) $r->cost_usd, 6 ) ),
+					esc_html( $r->updated_at )
+				);
+			}
+		}
+		$recent_html = ob_get_clean();
+
+		wp_send_json_success( array(
+			'counts'      => $counts,
+			'today'       => $t,
+			'recent_html' => $recent_html,
+			'paused'      => ACALT_Generator::is_paused(),
+		) );
+	}
+
+	public function ajax_pause() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+		}
+		check_ajax_referer( 'acalt_bulk' );
+
+		ACALT_Generator::pause_queue( 'manual', 'paused from admin dashboard' );
+		wp_send_json_success();
+	}
+
+	public function ajax_resume() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+		}
+		check_ajax_referer( 'acalt_bulk' );
+
+		ACALT_Generator::resume_queue();
+		wp_send_json_success();
+	}
+
+	public function ajax_probe() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Forbidden', 403 );
+		}
+		check_ajax_referer( 'acalt_bulk' );
+
+		$state = ACALT_Reachability::probe();
+		wp_send_json_success( $state );
+	}
+
+	/**
+	 * Compute health-panel issues. Each issue is shown as a notice on the
+	 * dashboard. Returning an empty array means "all green."
+	 */
+	private function health_checks() {
+		$issues = array();
+
+		// WP-Cron disabled?
+		if ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) {
+			$issues[] = array(
+				'level'   => 'warning',
+				'title'   => 'WP-Cron disabled',
+				'message' => 'This site has <code>DISABLE_WP_CRON</code> defined. The queue will not drain on its own. Set up a real cron job that hits <code>wp-cron.php</code> or use WP-CLI: <code>wp cron event run acalt_cron_drain</code>.',
+			);
+		}
+
+		// Cron worker recently ran?
+		$last = ACALT_Cron::last_drain_at();
+		$counts = ACALT_Queue::counts();
+		if ( ( $counts['pending'] + $counts['processing'] ) > 0 && $last > 0 && ( time() - $last ) > 300 ) {
+			$issues[] = array(
+				'level'   => 'warning',
+				'title'   => 'Cron worker stale',
+				'message' => sprintf(
+					'Queue has work but the worker has not ticked in %s. Low-traffic sites can trigger this — visit the front-end or set up a real cron job that hits <code>wp-cron.php</code> regularly.',
+					human_time_diff( $last )
+				),
+			);
+		}
+
+		// Reachability unknown?
+		$reach_mode = ACALT_Reachability::current_mode();
+		if ( $reach_mode === 'unknown' ) {
+			$issues[] = array(
+				'level'   => 'info',
+				'title'   => 'Reachability not yet probed',
+				'message' => 'Run the reachability test below before starting a bulk run so the plugin picks the cheapest send mode.',
+			);
+		}
+
+		return $issues;
 	}
 }

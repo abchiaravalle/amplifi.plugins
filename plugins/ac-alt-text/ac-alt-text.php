@@ -23,11 +23,13 @@ define( 'ACALT_PLUGIN_FILE', __FILE__ );
 
 require_once ACALT_PLUGIN_DIR . 'includes/amplifi-framework.php';
 require_once ACALT_PLUGIN_DIR . 'includes/class-acalt-queue.php';
+require_once ACALT_PLUGIN_DIR . 'includes/class-acalt-reachability.php';
 require_once ACALT_PLUGIN_DIR . 'includes/class-acalt-generator.php';
 require_once ACALT_PLUGIN_DIR . 'includes/class-acalt-cron.php';
 require_once ACALT_PLUGIN_DIR . 'includes/class-acalt-uploader-hook.php';
 require_once ACALT_PLUGIN_DIR . 'includes/class-acalt-report.php';
 require_once ACALT_PLUGIN_DIR . 'includes/class-acalt-admin.php';
+require_once ACALT_PLUGIN_DIR . 'includes/class-acalt-media-ui.php';
 
 amplifi_register_plugin(
 	'ac-alt-text',
@@ -43,6 +45,7 @@ add_action( 'plugins_loaded', 'acalt_init', 1 );
 function acalt_init() {
 	ACALT_Cron::register();
 	ACALT_Uploader_Hook::register();
+	ACALT_Media_UI::register();
 
 	if ( is_admin() ) {
 		ACALT_Admin::instance()->init();
