@@ -3,7 +3,7 @@
  * Plugin Name: amplifi.translate
  * Plugin URI: https://github.com/abchiaravalle/amplifi.plugins
  * Description: AI-powered real-time translation using Anthropic Claude. Translates pages and posts with URL-based language prefixes (/es/, /fr/, etc.), native-speaker B2B prompts per language, custom never-translate list and glossary, smart caching. By amplifi.studio.
- * Version: 2.0.0-beta.6
+ * Version: 2.0.0-beta.7
  * Author: amplifi.studio
  * Author URI: https://amplifi.studio
  * License: MIT
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'ACWPT_VERSION', '2.0.0-beta.6' );
+define( 'ACWPT_VERSION', '2.0.0-beta.7' );
 define( 'ACWPT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACWPT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACWPT_PLUGIN_FILE', __FILE__ );

@@ -3,7 +3,7 @@
  * Plugin Name: amplifi.alt
  * Plugin URI: https://github.com/abchiaravalle/amplifi.plugins
  * Description: AI-powered alt text generation for WordPress images. Bulk-generates alt text for the existing media library and auto-generates on upload using OpenAI vision models. Daily email reports, spend caps, and an audit trail. By amplifi.studio.
- * Version: 2.0.0-beta.6
+ * Version: 2.0.0-beta.7
  * Author: amplifi.studio
  * Author URI: https://amplifi.studio
  * License: MIT
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'ACALT_VERSION', '2.0.0-beta.6' );
+define( 'ACALT_VERSION', '2.0.0-beta.7' );
 define( 'ACALT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACALT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACALT_PLUGIN_FILE', __FILE__ );
