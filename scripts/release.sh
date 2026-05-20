@@ -198,7 +198,7 @@ fi
 gh release create "$TAG" \
     --title "amplifi.plugins ${TAG}" \
     --notes-file "${DIST_DIR}/CHANGELOG.md" \
-    "${PRERELEASE_FLAG[@]}" \
+    ${PRERELEASE_FLAG[@]+"${PRERELEASE_FLAG[@]}"} \
     "${ASSET_ARGS[@]}"
 
 echo ""
