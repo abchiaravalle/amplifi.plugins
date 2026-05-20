@@ -2,7 +2,7 @@
 /*
 Plugin Name: amplifi.magic
 Plugin URI: https://github.com/abchiaravalle/amplifi.plugins
-Description: One-click magic links for password-protected pages. Generate tokens that auto-set WP password cookies with usage logging and IP geolocation.
+Description: One-click magic links for password-protected posts of any type. Generate tokens that auto-set WP password cookies with usage logging and IP geolocation.
 Version: 2.0.0-beta.9
 Author: amplifi.studio
 Author URI: https://amplifi.studio
@@ -28,7 +28,7 @@ class Amplifi_Magic_Links {
 		amplifi_register_plugin(
 			'ac-magic-links',
 			'Magic',
-			'One-click magic links for password-protected pages with usage logging and IP geolocation.',
+			'One-click magic links for password-protected posts of any type, with usage logging and IP geolocation.',
 			ACML_VERSION,
 			ACML_PLUGIN_FILE,
 			array( $this, 'ocml_admin_page' )
@@ -36,6 +36,39 @@ class Amplifi_Magic_Links {
 
 		// Front-end token handling — runs on every page load.
 		add_action( 'template_redirect', array( $this, 'ocml_handle_magic_token' ), 1 );
+	}
+
+	/**
+	 * Returns the list of post types magic links should operate on.
+	 *
+	 * Defaults to every registered public post type (minus attachments). Other
+	 * code can narrow or extend the list via the `amplifi_magic_post_types`
+	 * filter — useful for opting in private/internal CPTs.
+	 */
+	private function ocml_get_supported_post_types() {
+		$types = get_post_types( array( 'public' => true ), 'names' );
+		unset( $types['attachment'] );
+		$types = array_values( $types );
+
+		/**
+		 * Filter the post types eligible for magic links.
+		 *
+		 * @param string[] $types Array of post type slugs.
+		 */
+		$types = apply_filters( 'amplifi_magic_post_types', $types );
+
+		return array_values( array_unique( array_filter( (array) $types ) ) );
+	}
+
+	/**
+	 * Human-readable label for a post type slug.
+	 */
+	private function ocml_post_type_label( $post_type ) {
+		$obj = get_post_type_object( $post_type );
+		if ( $obj && isset( $obj->labels->singular_name ) && $obj->labels->singular_name !== '' ) {
+			return $obj->labels->singular_name;
+		}
+		return $post_type;
 	}
 
 	/**
@@ -58,9 +91,9 @@ class Amplifi_Magic_Links {
 			echo '<div class="notice notice-success"><p>Token revoked!</p></div>';
 		}
 
-		// Retrieve all password protected posts (all post types)
+		// Retrieve all password protected posts across every supported post type.
 		$args = array(
-			'post_type'      => 'any',
+			'post_type'      => $this->ocml_get_supported_post_types(),
 			'posts_per_page' => -1,
 			'post_status'    => 'publish',
 			'has_password'   => true,
@@ -69,11 +102,11 @@ class Amplifi_Magic_Links {
 
 		echo '<div class="wrap">';
 		echo '<h1>amplifi.magic</h1>';
-		echo '<p>Generate one-click links that set hashed password cookies, name them, revoke them, and view usage logs below.</p>';
+		echo '<p>Generate one-click links that set hashed password cookies, name them, revoke them, and view usage logs below. Works with any password-protected post type.</p>';
 
 		if ( ! empty($protected_pages) ) {
 			echo '<table class="widefat fixed">';
-			echo '<thead><tr><th>Page</th><th>Active Tokens (and Logs)</th><th>Create Token</th></tr></thead>';
+			echo '<thead><tr><th>Post</th><th>Type</th><th>Active Tokens (and Logs)</th><th>Create Token</th></tr></thead>';
 			echo '<tbody>';
 
 			foreach ( $protected_pages as $page ) {
@@ -82,13 +115,16 @@ class Amplifi_Magic_Links {
 					$tokens = array();
 				}
 
-				// Show page info
+				// Show post info
 				echo '<tr>';
 				echo '<td>';
 				echo '<strong>' . esc_html($page->post_title) . '</strong><br>';
 				echo 'ID: ' . $page->ID . '<br>';
 				echo 'Permalink: <a href="' . get_permalink($page->ID) . '" target="_blank">' . get_permalink($page->ID) . '</a>';
 				echo '</td>';
+
+				// Post type column
+				echo '<td>' . esc_html( $this->ocml_post_type_label( $page->post_type ) ) . '</td>';
 
 				// Active tokens & logs
 				echo '<td>';
@@ -162,7 +198,7 @@ class Amplifi_Magic_Links {
 				$revoked_tokens = array_filter($tokens, function($t){ return empty($t['active']); });
 				if ( ! empty($revoked_tokens) ) {
 					echo '<tr>';
-					echo '<td colspan="3" style="background:#f9f9f9;">';
+					echo '<td colspan="4" style="background:#f9f9f9;">';
 					echo '<strong>Revoked Tokens:</strong>';
 					echo '<ul>';
 					foreach ( $revoked_tokens as $rt ) {
@@ -213,6 +249,7 @@ class Amplifi_Magic_Links {
 		// Build sets of unique values for dropdowns
 		$page_ids     = array();
 		$page_titles  = array();
+		$post_types   = array();
 		$tokens       = array();
 		$token_names  = array();
 		$ips          = array();
@@ -222,6 +259,7 @@ class Amplifi_Magic_Links {
 		foreach ( $all_logs as $log ) {
 			$page_ids[]    = $log['page_id'];
 			$page_titles[] = $log['page_title'];
+			$post_types[]  = isset( $log['post_type'] ) ? $log['post_type'] : '';
 			$tokens[]      = $log['token'];
 			$token_names[] = $log['token_name'];
 			$ips[]         = $log['ip'];
@@ -237,6 +275,7 @@ class Amplifi_Magic_Links {
 		// Unique and sorted
 		$page_ids     = array_unique($page_ids);
 		$page_titles  = array_unique($page_titles);
+		$post_types   = array_unique(array_filter($post_types));
 		$tokens       = array_unique($tokens);
 		$token_names  = array_unique($token_names);
 		$ips          = array_unique($ips);
@@ -245,6 +284,7 @@ class Amplifi_Magic_Links {
 
 		sort($page_ids);
 		sort($page_titles);
+		sort($post_types);
 		sort($tokens);
 		sort($token_names);
 		sort($ips);
@@ -254,6 +294,7 @@ class Amplifi_Magic_Links {
 		// Current filter selections
 		$filter_page_id     = isset($_POST['ocml_filter_page_id']) ? sanitize_text_field($_POST['ocml_filter_page_id']) : '';
 		$filter_page_title  = isset($_POST['ocml_filter_page_title']) ? sanitize_text_field($_POST['ocml_filter_page_title']) : '';
+		$filter_post_type   = isset($_POST['ocml_filter_post_type']) ? sanitize_text_field($_POST['ocml_filter_post_type']) : '';
 		$filter_token       = isset($_POST['ocml_filter_token']) ? sanitize_text_field($_POST['ocml_filter_token']) : '';
 		$filter_token_name  = isset($_POST['ocml_filter_token_name']) ? sanitize_text_field($_POST['ocml_filter_token_name']) : '';
 		$filter_ip          = isset($_POST['ocml_filter_ip']) ? sanitize_text_field($_POST['ocml_filter_ip']) : '';
@@ -266,21 +307,30 @@ class Amplifi_Magic_Links {
 		echo '<p>Use these dropdowns to filter the consolidated usage logs below.</p>';
 		echo '<form method="post" style="margin-bottom:20px;">';
 
-		// Page ID
+		// Post ID
 		echo '<select name="ocml_filter_page_id" style="margin-right:1%;">';
-		echo '<option value="">All Page IDs</option>';
+		echo '<option value="">All Post IDs</option>';
 		foreach ( $page_ids as $pid ) {
 			$selected = ( $filter_page_id == $pid ) ? 'selected' : '';
 			echo '<option value="' . esc_attr($pid) . '" ' . $selected . '>' . esc_html($pid) . '</option>';
 		}
 		echo '</select>';
 
-		// Page Title
+		// Post Title
 		echo '<select name="ocml_filter_page_title" style="margin-right:1%;">';
-		echo '<option value="">All Page Titles</option>';
+		echo '<option value="">All Post Titles</option>';
 		foreach ( $page_titles as $pt ) {
 			$selected = ( $filter_page_title == $pt ) ? 'selected' : '';
 			echo '<option value="' . esc_attr($pt) . '" ' . $selected . '>' . esc_html($pt) . '</option>';
+		}
+		echo '</select>';
+
+		// Post Type
+		echo '<select name="ocml_filter_post_type" style="margin-right:1%;">';
+		echo '<option value="">All Types</option>';
+		foreach ( $post_types as $pty ) {
+			$selected = ( $filter_post_type == $pty ) ? 'selected' : '';
+			echo '<option value="' . esc_attr($pty) . '" ' . $selected . '>' . esc_html( $this->ocml_post_type_label( $pty ) ) . '</option>';
 		}
 		echo '</select>';
 
@@ -349,6 +399,7 @@ class Amplifi_Magic_Links {
 		$filtered_logs = array_filter($all_logs, function($log) use (
 			$filter_page_id,
 			$filter_page_title,
+			$filter_post_type,
 			$filter_token,
 			$filter_token_name,
 			$filter_ip,
@@ -360,6 +411,9 @@ class Amplifi_Magic_Links {
 				return false;
 			}
 			if ( $filter_page_title !== '' && $log['page_title'] !== $filter_page_title ) {
+				return false;
+			}
+			if ( $filter_post_type !== '' && ( ! isset($log['post_type']) || $log['post_type'] !== $filter_post_type ) ) {
 				return false;
 			}
 			if ( $filter_token !== '' && $log['token'] !== $filter_token ) {
@@ -391,8 +445,9 @@ class Amplifi_Magic_Links {
 			echo '<table class="widefat fixed" style="margin-top:10px;">';
 			echo '<thead><tr>';
 			echo '<th>Date/Time (Local)</th>';
-			echo '<th>Page ID</th>';
-			echo '<th>Page Title</th>';
+			echo '<th>Post ID</th>';
+			echo '<th>Post Title</th>';
+			echo '<th>Type</th>';
 			echo '<th>Token</th>';
 			echo '<th>Token Name</th>';
 			echo '<th>IP</th>';
@@ -401,10 +456,12 @@ class Amplifi_Magic_Links {
 			echo '<tbody>';
 
 			foreach ( $filtered_logs as $fl ) {
+				$row_pt = isset($fl['post_type']) && $fl['post_type'] !== '' ? $fl['post_type'] : '';
 				echo '<tr>';
 				echo '<td>' . esc_html($fl['datetime']) . '</td>';
 				echo '<td>' . esc_html($fl['page_id']) . '</td>';
 				echo '<td>' . esc_html($fl['page_title']) . '</td>';
+				echo '<td>' . esc_html( $row_pt !== '' ? $this->ocml_post_type_label( $row_pt ) : '' ) . '</td>';
 				echo '<td><code>' . esc_html($fl['token']) . '</code></td>';
 				echo '<td>' . esc_html($fl['token_name']) . '</td>';
 				echo '<td>' . esc_html($fl['ip']) . '</td>';
@@ -497,7 +554,7 @@ class Amplifi_Magic_Links {
 	 */
 	private function ocml_find_page_by_token($token) {
 		$args = array(
-			'post_type'      => 'any',
+			'post_type'      => $this->ocml_get_supported_post_types(),
 			'posts_per_page' => -1,
 			'meta_query'     => array(
 				array(
@@ -550,6 +607,7 @@ class Amplifi_Magic_Links {
 		$usage_entry = array(
 			'token'      => $token,
 			'token_name' => $token_name,
+			'post_type'  => get_post_type( $page_id ),
 			'ip'         => $ip,
 			'location'   => $location,
 			'datetime'   => current_time('mysql'),
@@ -582,7 +640,7 @@ class Amplifi_Magic_Links {
 	 */
 	private function ocml_get_all_usage_logs() {
 		$args = array(
-			'post_type'      => 'any',
+			'post_type'      => $this->ocml_get_supported_post_types(),
 			'posts_per_page' => -1,
 		);
 		$pages = get_posts($args);
@@ -594,6 +652,9 @@ class Amplifi_Magic_Links {
 				foreach ( $usage_data as $ud ) {
 					$ud['page_id']    = $page->ID;
 					$ud['page_title'] = $page->post_title;
+					if ( empty( $ud['post_type'] ) ) {
+						$ud['post_type'] = $page->post_type;
+					}
 					$all_logs[] = $ud;
 				}
 			}
