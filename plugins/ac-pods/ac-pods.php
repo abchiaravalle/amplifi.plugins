@@ -3,7 +3,7 @@
 Plugin Name: amplifi.pods
 Plugin URI: https://github.com/abchiaravalle/amplifi.plugins
 Description: Podcast carousel and floating player via shortcode — mirrors the Resources page podcast player with Apple Podcasts CPT + Spotify playlist support.
-Version: 2.0.0-beta.10
+Version: 2.0.0
 Author: amplifi.studio
 Author URI: https://amplifi.studio
 License: MIT
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'ACPODS_VERSION', '2.0.0-beta.10' );
+define( 'ACPODS_VERSION', '2.0.0' );
 define( 'ACPODS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACPODS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACPODS_PLUGIN_FILE', __FILE__ );
