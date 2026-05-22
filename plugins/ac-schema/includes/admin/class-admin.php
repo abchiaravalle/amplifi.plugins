@@ -14,6 +14,7 @@ final class Admin {
 		add_action( 'init', [ $this, 'register_with_framework' ], 5 );
 		add_action( 'admin_menu', [ $this, 'register_extra_submenus' ], 20 );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+		add_action( 'admin_notices', [ $this, 'maybe_render_import_notice' ] );
 		( new Post_Editor() )->register();
 	}
 
@@ -55,5 +56,50 @@ final class Admin {
 			'restUrl'  => esc_url_raw( rest_url( 'amplifi-schema/v1/' ) ),
 			'nonce'    => wp_create_nonce( 'wp_rest' ),
 		] );
+	}
+
+	public function maybe_render_import_notice(): void {
+		if ( ! current_user_can( 'manage_options' ) ) { return; }
+		if ( get_option( 'ac_schema_meta_import_status', '' ) !== 'pending' ) { return; }
+		global $wpdb;
+		$count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key = '_ac_jsonld_data'" ); // phpcs:ignore
+		if ( $count === 0 ) {
+			// Nothing to import; auto-complete and silence.
+			update_option( 'ac_schema_meta_import_status', 'done' );
+			return;
+		}
+		$rest_url = esc_url_raw( rest_url( 'amplifi-schema/v1/migrate-from-meta' ) );
+		$nonce    = wp_create_nonce( 'wp_rest' );
+		?>
+		<div class="notice notice-info is-dismissible" id="ac-schema-import-notice">
+			<p>
+				<strong>amplifi.schema:</strong> Detected <?php echo esc_html( (string) $count ); ?> posts with JSON-LD from amplifi.meta.
+				<button type="button" class="button button-primary" data-action="import">Import to amplifi.schema</button>
+				<button type="button" class="button" data-action="skip">Skip</button>
+				<span class="ac-status" style="margin-left:10px;"></span>
+			</p>
+		</div>
+		<script>
+		(function(){
+			const notice = document.getElementById('ac-schema-import-notice');
+			notice.querySelectorAll('button[data-action]').forEach(function(btn){
+				btn.addEventListener('click', async function(){
+					const action = btn.dataset.action;
+					const status = notice.querySelector('.ac-status');
+					status.textContent = action === 'skip' ? 'Skipping…' : 'Importing…';
+					const r = await fetch(<?php echo wp_json_encode( $rest_url ); ?>, {
+						method: 'POST',
+						credentials: 'same-origin',
+						headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': <?php echo wp_json_encode( $nonce ); ?> },
+						body: JSON.stringify({ action: action }),
+					});
+					const data = await r.json();
+					status.textContent = r.ok ? ('Done — imported ' + (data.imported || 0)) : 'Error';
+					if (r.ok) setTimeout(() => location.reload(), 1200);
+				});
+			});
+		})();
+		</script>
+		<?php
 	}
 }

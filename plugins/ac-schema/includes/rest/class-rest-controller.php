@@ -643,10 +643,13 @@ final class Rest_Controller {
 	// -------------------------------------------------------------------------
 
 	public function migrate_from_meta( WP_REST_Request $req ): WP_REST_Response {
-		return $this->ok( [
-			'status'  => 'pending',
-			'message' => 'Implementation in Task 11.1',
-		] );
+		$action = (string) $req->get_param( 'action' );
+		if ( $action === 'skip' ) {
+			\Amplifi\Schema\Migration\Meta_Importer::skip();
+			return new WP_REST_Response( [ 'status' => 'skipped' ] );
+		}
+		$result = \Amplifi\Schema\Migration\Meta_Importer::import_all();
+		return new WP_REST_Response( [ 'status' => 'done' ] + $result );
 	}
 
 	// -------------------------------------------------------------------------
