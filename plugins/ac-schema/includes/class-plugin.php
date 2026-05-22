@@ -10,5 +10,6 @@ final class Plugin {
 		( new Frontend\Head_Output() )->register();
 		( new Frontend\Foreign_Suppressor() )->register();
 		( new Rest\Rest_Controller() )->register();
+		( new Queue\Bulk_Job() )->register();
 	}
 }
