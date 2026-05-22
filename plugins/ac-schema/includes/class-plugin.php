@@ -8,5 +8,6 @@ final class Plugin {
 		Installer::maybe_upgrade();
 		( new Admin\Admin() )->register();
 		( new Frontend\Head_Output() )->register();
+		( new Frontend\Foreign_Suppressor() )->register();
 	}
 }
