@@ -40,6 +40,11 @@
       "name": "Alt",
       "description": "AI-powered alt text for WordPress images. Bulk-generate for the existing media library and auto-generate on upload, with cost caps and daily email reports.",
       "icon": "dashicons-format-image"
+    },
+    "ac-schema": {
+      "name": "Schema",
+      "description": "AI-generated schema.org JSON-LD with bulk generation, per-post editor, foreign-source detection (Yoast, Rank Math, SEOPress, AIOSEO), URL rules, and single @graph output.",
+      "icon": "dashicons-editor-code"
     }
   }
 }
