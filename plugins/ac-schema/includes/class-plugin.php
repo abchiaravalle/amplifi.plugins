@@ -6,6 +6,6 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 final class Plugin {
 	public function boot(): void {
 		Installer::maybe_upgrade();
-		// Subsystems are wired in later phases.
+		( new Admin\Admin() )->register();
 	}
 }
