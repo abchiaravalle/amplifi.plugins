@@ -9,5 +9,6 @@ final class Plugin {
 		( new Admin\Admin() )->register();
 		( new Frontend\Head_Output() )->register();
 		( new Frontend\Foreign_Suppressor() )->register();
+		( new Rest\Rest_Controller() )->register();
 	}
 }
