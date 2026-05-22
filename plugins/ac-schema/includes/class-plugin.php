@@ -7,5 +7,6 @@ final class Plugin {
 	public function boot(): void {
 		Installer::maybe_upgrade();
 		( new Admin\Admin() )->register();
+		( new Frontend\Head_Output() )->register();
 	}
 }
