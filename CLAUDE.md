@@ -288,6 +288,94 @@ When enabled and viewed by a non-installer, Stealth filters: the Plugins list (`
 ### API Key Security
 Document to users: scope your Anthropic key to Messages API only, set spend caps in the Anthropic console, and rotate if compromised. All keys are encrypted at rest (`Secret_Store`, AES-256-GCM) and only sent to their respective vendor APIs.
 
+## Plugin: amplifi.schema (`plugins/ac-schema/`)
+AI-powered schema.org JSON-LD generation, editing, validation, and deployment via Claude.
+
+### Architecture
+- **Multi-file plugin** under namespace `Amplifi\Schema\*` with PSR-style autoloader. PHP 8.1+ / WP 6.4+ gated in the bootstrap.
+- **Registry + Validator**: bundled `schema-org-types.json` index (~900 types, refreshed by `scripts/build-schema-index.php` fetching schema.org's published vocabulary). Validator checks JSON syntax, @context, @type, property names per type, and required-for-rich-results allowlist (Article, Product, FAQPage, Event, Recipe, HowTo, LocalBusiness, Course, BreadcrumbList, VideoObject, Person).
+- **AI integration**: `Anthropic_Client` uses Messages API with tool-use forced JSON output. Default model Claude Haiku 4.5; switchable to Sonnet 4.6 / Opus 4.7. `Spend_Tracker` enforces daily + monthly USD caps with per-model pricing.
+- **Bulk queue**: `Bulk_Job` runs on WP-Cron, 5 posts per tick re-armed every 30s, pauses on spend cap, resumable via REST.
+- **Graph_Builder + Head_Output**: merges global (Organization / WebSite / LocalBusiness) + URL-rule + per-post entries into one `<script type="application/ld+json" id="amplifi-schema">` block in `<head>` with a single `@graph` array.
+- **Detector + Foreign_Suppressor**: scans rendered `<head>` for foreign schema (Yoast / Rank Math / SEOPress / AIOSEO / amplifi.meta), surfaces per-source banner in editor with Import / Override / Ignore actions. Override uses filter hooks per source (`wpseo_schema_graph`, `rank_math/json_ld`, `seopress_pro_schemas_json`, `aioseo_schema_output`) to drop matching `@type`s.
+- **Per-post metabox**: vanilla PHP + inline JS on every public post type's edit screen. Multi-entry: paste raw JSON-LD, validate on save, AI-generate, Test in Google Rich Results external link.
+- **REST API**: `amplifi-schema/v1/*` namespace covering entries CRUD, validation, AI generation, global editors, URL rules, jobs, spend, post overrides, settings, migration.
+- **Migration from amplifi.meta**: one-time admin notice on activation when `_ac_jsonld_data` post meta is detected. `Meta_Importer` imports each post's JSON-LD (expanding `@graph` arrays into individual entities) and the org-level `ac_jsonld_settings` into amplifi.schema's global Organization. After migration, amplifi.meta's wp_head JSON-LD output defers via `AMPLIFI_SCHEMA_ACTIVE` sentinel.
+
+### Key Files
+- `ac-schema.php` — bootstrap with PHP/WP/OpenSSL gates, version constants, framework + autoloader registration. Defines `AMPLIFI_SCHEMA_ACTIVE` sentinel.
+- `includes/amplifi-framework.php` — copied from `shared/`
+- `includes/class-autoloader.php` — PSR-style namespace → file resolver
+- `includes/class-plugin.php` — single bootstrap entry: subsystem registration
+- `includes/class-installer.php` — dbDelta for 3 tables (`ac_schema_entries`, `ac_schema_bulk_jobs`, `ac_schema_spend`)
+- `includes/admin/class-admin.php` — framework integration + 4 submenus + import notice
+- `includes/admin/class-dashboard-page.php` — spend cards, entries-by-type, recent jobs, settings form
+- `includes/admin/class-global-page.php`, `class-rules-page.php`, `class-bulk-page.php` — UI for global schema, URL rules, bulk generation
+- `includes/admin/class-post-editor.php` — per-post metabox
+- `includes/ai/class-anthropic-client.php`, `class-prompt-builder.php`, `class-spend-tracker.php`
+- `includes/schema/class-registry.php`, `class-validator.php`, `class-detector.php`, `class-graph-builder.php`
+- `includes/schema/data/schema-org-types.json` — bundled type/property index (~1.5MB)
+- `includes/queue/class-bulk-job.php`, `class-job-store.php`
+- `includes/data/class-entry-store.php`
+- `includes/rest/class-rest-controller.php` — all REST endpoints
+- `includes/frontend/class-head-output.php`, `class-foreign-suppressor.php`
+- `includes/migration/class-meta-importer.php`
+- `includes/crypto/class-secret-store.php` — AES-256-GCM via WP AUTH_KEY family
+- `scripts/build-schema-index.php` — refreshes bundled type index from schema.org
+
+### Admin Menu
+Four pages under the **amplifi.studio** menu:
+1. **Schema** (main dashboard) — slug `amplifi-ac-schema`
+2. **Schema: Global** — slug `amplifi-ac-schema-global`
+3. **Schema: URL Rules** — slug `amplifi-ac-schema-rules`
+4. **Schema: Bulk** — slug `amplifi-ac-schema-bulk`
+
+Plus a metabox on every public post type's edit screen.
+
+### Database Tables (`wp_ac_schema_*`)
+- `entries` — `(scope_type, scope_id, schema_type)` unique upsert, with `source` (`ai`/`manual`/`imported`/`raw`), `json_ld`, `hash`, `updated_at`. `scope_type` ∈ `post` | `url_rule` | `global`.
+- `bulk_jobs` — status, scope JSON, total/processed/failed counts, model, started_at/finished_at, cost_usd.
+- `spend` — daily rollup (day, input_tokens, output_tokens, cost_usd) for spend cap enforcement.
+
+### Settings (in `wp_options`)
+- `ac_schema_settings` (JSON) — `default_model`, `daily_spend_cap_usd` (default 5), `monthly_spend_cap_usd` (default 50), `output_priority`, `suppress_amplifi_meta_jsonld`
+- `ac_schema_global_organization`, `ac_schema_global_website`, `ac_schema_global_localbusiness` — per-key JSON-LD objects
+- `ac_schema_url_rules` — array of `{id, pattern, match_type: glob|regex}`
+- `ac_schema_db_version`, `ac_schema_onboarding_complete`, `ac_schema_meta_import_status` (`pending`/`done`/`skipped`)
+- Encrypted Anthropic API key under `ac_schema_secret_anthropic_api_key`
+
+### Post Meta
+- `_ac_schema_overrides` — array of schema type strings whose foreign sources should be suppressed for this post
+- `_ac_schema_detected_cache` — last detected foreign schema for this post URL (1h transient mirror)
+
+### REST API (`amplifi-schema/v1`)
+| Method | Route | Purpose |
+|--------|-------|---------|
+| GET/POST | `/entries` | List by scope, create with validation |
+| GET/PUT/DELETE | `/entries/{id}` | Single entry CRUD |
+| POST | `/entries/validate` | Validate without persisting |
+| POST | `/entries/generate` | AI generate for a post or freeform |
+| GET | `/detect` | Foreign schema detection for a URL |
+| GET/PUT | `/global/{key}` | Get/set Organization / WebSite / LocalBusiness |
+| POST | `/global/{key}/ai-prefill` | AI prefill from site context |
+| GET/POST | `/rules` | List / create URL rules |
+| PUT/DELETE | `/rules/{id}` | Update / delete rule |
+| POST | `/rules/test` | Test pattern against URL |
+| GET/POST | `/jobs` | List / create bulk job |
+| GET | `/jobs/{id}` | Job status |
+| POST | `/jobs/{id}/{pause\|resume\|cancel}` | Control |
+| POST | `/jobs/preview-cost` | Estimate cost for scope |
+| GET | `/spend` | Today / month USD + caps |
+| PUT | `/post-overrides/{id}` | Add/remove suppressed schema types per post |
+| GET/PUT | `/settings` | Get / set settings (api_key never returned in clear text) |
+| POST | `/migrate-from-meta` | Trigger or skip amplifi.meta import |
+
+### API Key Security
+Same as amplifi.security: scope key to Messages API only, set spend caps in the Anthropic console, rotate if compromised. Stored encrypted via `Secret_Store` and only sent to `api.anthropic.com`.
+
+### Relationship to amplifi.meta
+This plugin supersedes amplifi.meta's JSON-LD subsystem. When `AMPLIFI_SCHEMA_ACTIVE` is defined (always true when this plugin is loaded), amplifi.meta's `output_jsonld()` early-returns and its JSON-LD admin page shows a deprecation banner linking here. Existing data is imported via the one-time admin notice on activation. amplifi.meta's other features (SEO meta editor, FAQ generator) are unaffected.
+
 ## Go TUI: amplifi.sync (`tools/sync-tui/`)
 Terminal UI orchestrator for syncing between WordPress environments.
 
@@ -350,6 +438,9 @@ docker-compose up -d    # WordPress on :8091, MySQL on :3317
 
 cd plugins/amplifi-security
 docker-compose up -d    # WordPress on :8092, MySQL on :3318
+
+cd plugins/ac-schema
+docker-compose up -d    # WordPress on :8093, MySQL on :3319
 ```
 Plugin dirs are volume-mounted so edits are live.
 

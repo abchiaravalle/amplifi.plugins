@@ -6671,6 +6671,7 @@ A2: [Answer]
     }
     
     public function output_jsonld() {
+        if ( defined( 'AMPLIFI_SCHEMA_ACTIVE' ) ) { return; }
         // Only output on singular posts/pages
         if (!is_singular()) {
             return;
@@ -7793,6 +7794,9 @@ A2: [Answer]
         
         ?>
         <div class="wrap ac-jsonld-wrap">
+            <?php if ( defined( 'AMPLIFI_SCHEMA_ACTIVE' ) ) : ?>
+                <div class="notice notice-info" style="margin-top:20px;"><p><strong>JSON-LD is now managed by <a href="<?php echo esc_url( admin_url( 'admin.php?page=amplifi-ac-schema' ) ); ?>">amplifi.schema</a>.</strong> This page remains read-only for reference.</p></div>
+            <?php endif; ?>
             <h1>amplifi.meta &mdash; JSON-LD Generator</h1>
             
             <div class="ac-instructions" style="background: #f0f6fc; border-left: 4px solid #2271b1; padding: 15px 20px; margin: 20px 0; border-radius: 4px;">
