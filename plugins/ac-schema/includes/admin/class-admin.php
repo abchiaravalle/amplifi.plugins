@@ -14,6 +14,7 @@ final class Admin {
 		add_action( 'init', [ $this, 'register_with_framework' ], 5 );
 		add_action( 'admin_menu', [ $this, 'register_extra_submenus' ], 20 );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+		( new Post_Editor() )->register();
 	}
 
 	public function register_with_framework(): void {

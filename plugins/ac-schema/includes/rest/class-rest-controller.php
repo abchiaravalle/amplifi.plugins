@@ -94,6 +94,10 @@ final class Rest_Controller {
 			[ 'methods' => 'GET', 'callback' => [ $this, 'get_settings' ], 'permission_callback' => $perm ],
 			[ 'methods' => 'PUT', 'callback' => [ $this, 'put_settings' ], 'permission_callback' => $perm ],
 		] );
+
+		register_rest_route( self::NS, '/post-overrides/(?P<id>\d+)', [
+			[ 'methods' => 'PUT', 'callback' => [ $this, 'put_post_overrides' ], 'permission_callback' => $perm ],
+		] );
 	}
 
 	// -------------------------------------------------------------------------
@@ -695,5 +699,29 @@ final class Rest_Controller {
 		$settings['api_key_set'] = (bool) Secret_Store::get( 'anthropic_api_key' );
 
 		return $this->ok( $settings );
+	}
+
+	// -------------------------------------------------------------------------
+	// Post-level override handlers
+	// -------------------------------------------------------------------------
+
+	public function put_post_overrides( WP_REST_Request $req ): WP_REST_Response {
+		$post_id = (int) $req['id'];
+		if ( ! get_post( $post_id ) ) {
+			return new WP_REST_Response( [ 'message' => 'Post not found' ], 404 );
+		}
+		$body = $req->get_json_params();
+		$list = get_post_meta( $post_id, '_ac_schema_overrides', true );
+		$list = is_array( $list ) ? $list : [];
+		if ( ! empty( $body['add'] ) && is_string( $body['add'] ) ) {
+			if ( ! in_array( $body['add'], $list, true ) ) {
+				$list[] = $body['add'];
+			}
+		}
+		if ( ! empty( $body['remove'] ) && is_string( $body['remove'] ) ) {
+			$list = array_values( array_filter( $list, fn( $t ) => $t !== $body['remove'] ) );
+		}
+		update_post_meta( $post_id, '_ac_schema_overrides', $list );
+		return new WP_REST_Response( [ 'overrides' => $list ] );
 	}
 }
