@@ -350,6 +350,9 @@ docker-compose up -d    # WordPress on :8091, MySQL on :3317
 
 cd plugins/amplifi-security
 docker-compose up -d    # WordPress on :8092, MySQL on :3318
+
+cd plugins/ac-schema
+docker-compose up -d    # WordPress on :8093, MySQL on :3319
 ```
 Plugin dirs are volume-mounted so edits are live.
 
