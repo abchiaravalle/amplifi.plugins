@@ -113,6 +113,22 @@ final class Entry_Store {
 	}
 
 	/**
+	 * Return the full row for a given primary key id, or null.
+	 *
+	 * @return array<string,mixed>|null
+	 */
+	public function find_by_id( int $id ): ?array {
+		global $wpdb;
+
+		$row = $wpdb->get_row( $wpdb->prepare(
+			"SELECT * FROM {$this->table} WHERE id = %d",
+			$id
+		), ARRAY_A ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+
+		return $row ?: null;
+	}
+
+	/**
 	 * Delete a row by primary key id.
 	 */
 	public function delete( int $id ): bool {
