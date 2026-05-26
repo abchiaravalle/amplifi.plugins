@@ -3,7 +3,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AMPLIFI_OPTIMIZE_VERSION', '1.0.0' );
+define( 'AMPLIFI_OPTIMIZE_VERSION', '3.0.0' );
 define( 'AMPLIFI_OPTIMIZE_FILE', __FILE__ );
 define( 'AMPLIFI_OPTIMIZE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AMPLIFI_OPTIMIZE_URL', plugin_dir_url( __FILE__ ) );

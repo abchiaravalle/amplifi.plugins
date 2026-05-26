@@ -3,7 +3,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'ACML_VERSION', '2.0.0' );
+define( 'ACML_VERSION', '3.0.0' );
 define( 'ACML_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACML_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACML_PLUGIN_FILE', __FILE__ );
