@@ -68,7 +68,7 @@ function as_array($v): array {
 }
 
 function build_index(array $graph): array {
-    $types = [];        // [name => ['parent' => ?string]]
+    $types = [];        // [name => ['parents' => string[]]]
     $type_props = [];   // [type_name => [prop_name, ...]]
 
     foreach ($graph as $node) {
@@ -77,12 +77,12 @@ function build_index(array $graph): array {
         if (!$id || !$atype) continue;
 
         $name = short_id($id);
-        if ($name === null) continue; // skip external vocab nodes
+        if ($name === null) continue;
 
         $atypes = is_array($atype) ? $atype : [$atype];
 
         if (in_array('rdfs:Class', $atypes, true)) {
-            $parent = null;
+            $parents = [];
             if (isset($node['rdfs:subClassOf'])) {
                 $sub = is_array($node['rdfs:subClassOf']) && isset($node['rdfs:subClassOf']['@id'])
                     ? [$node['rdfs:subClassOf']]
@@ -92,12 +92,12 @@ function build_index(array $graph): array {
                         $pid = is_array($p) ? ($p['@id'] ?? null) : null;
                         if ($pid) {
                             $pname = short_id($pid);
-                            if ($pname !== null) { $parent = $pname; break; }
+                            if ($pname !== null) { $parents[] = $pname; }
                         }
                     }
                 }
             }
-            $types[$name] = ['parent' => $parent];
+            $types[$name] = ['parents' => $parents];
         }
 
         if (in_array('rdf:Property', $atypes, true)) {
@@ -114,20 +114,25 @@ function build_index(array $graph): array {
         }
     }
 
-    // Walk parents to flatten properties.
+    // Walk ALL parent chains (BFS) to flatten properties.
     $result = [];
     foreach ($types as $name => $meta) {
         $props = [];
-        $cursor = $name;
-        $guard = 0;
-        while ($cursor !== null && $guard++ < 100) {
+        $queue = [$name];
+        $visited = [];
+        while ($queue) {
+            $cursor = array_shift($queue);
+            if (isset($visited[$cursor])) continue;
+            $visited[$cursor] = true;
             foreach ($type_props[$cursor] ?? [] as $p) {
                 $props[$p] = true;
             }
-            $cursor = $types[$cursor]['parent'] ?? null;
+            foreach ($types[$cursor]['parents'] ?? [] as $par) {
+                if (!isset($visited[$par])) { $queue[] = $par; }
+            }
         }
         $result[$name] = [
-            'parent' => $meta['parent'],
+            'parent' => $meta['parents'][0] ?? null,
             'properties' => array_keys($props),
             'required_for_rich_results' => REQUIRED_FOR_RICH_RESULTS[$name] ?? [],
         ];
