@@ -16,6 +16,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( defined( 'ACMETA_VERSION' ) ) {
+	return;
+}
 define( 'ACMETA_VERSION', '3.0.0' );
 define( 'ACMETA_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACMETA_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

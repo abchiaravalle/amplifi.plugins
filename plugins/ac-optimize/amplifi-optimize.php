@@ -20,6 +20,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( defined( 'AMPLIFI_OPTIMIZE_VERSION' ) ) {
+	return;
+}
 define( 'AMPLIFI_OPTIMIZE_VERSION', '1.0.0' );
 define( 'AMPLIFI_OPTIMIZE_FILE', __FILE__ );
 define( 'AMPLIFI_OPTIMIZE_DIR', plugin_dir_path( __FILE__ ) );

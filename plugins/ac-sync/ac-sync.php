@@ -13,6 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( defined( 'ACSYNC_VERSION' ) ) {
+	return;
+}
 define( 'ACSYNC_VERSION', '3.0.0' );
 define( 'ACSYNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACSYNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
