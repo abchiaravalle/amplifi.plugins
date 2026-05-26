@@ -1,0 +1,5 @@
+node_modules/
+includes/admin/assets/dist/
+*.log
+vendor/
+composer.lock
