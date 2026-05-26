@@ -114,9 +114,13 @@ final class Rest_Controller {
 	 * @return string|\WP_Error
 	 */
 	private function api_key_or_error(): string|\WP_Error {
-		$key = Secret_Store::get( 'anthropic_api_key' );
+		try {
+			$key = Secret_Store::get( 'anthropic_api_key' );
+		} catch ( \Throwable $e ) {
+			return new \WP_Error( 'key_error', 'Failed to load API key: ' . $e->getMessage(), [ 'status' => 500 ] );
+		}
 		if ( ! is_string( $key ) || $key === '' ) {
-			return new \WP_Error( 'no_api_key', 'No Anthropic API key configured.', [ 'status' => 400 ] );
+			return new \WP_Error( 'no_api_key', 'No Anthropic API key configured. Go to Schema dashboard → Settings to add it.', [ 'status' => 400 ] );
 		}
 		return $key;
 	}
@@ -256,68 +260,75 @@ final class Rest_Controller {
 	}
 
 	public function generate_entry( WP_REST_Request $req ): WP_REST_Response|\WP_Error {
-		$key = $this->api_key_or_error();
-		if ( is_wp_error( $key ) ) {
-			return $key;
-		}
-
-		$body     = (array) $req->get_json_params();
-		$settings = get_option( 'ac_schema_settings', [] );
-		$model    = (string) ( $body['model'] ?? $settings['default_model'] ?? 'claude-sonnet-4-6' );
-
-		// Build context — either from post_id or from raw fields.
-		if ( isset( $body['post_id'] ) ) {
-			$post_id = (int) $body['post_id'];
-			$post    = get_post( $post_id );
-			if ( ! $post ) {
-				return new \WP_Error( 'not_found', 'Post not found.', [ 'status' => 404 ] );
+		try {
+			$key = $this->api_key_or_error();
+			if ( is_wp_error( $key ) ) {
+				return $key;
 			}
-			$ctx = [
-				'title'     => get_the_title( $post ),
-				'url'       => (string) get_permalink( $post ),
-				'post_type' => $post->post_type,
-				'content'   => wp_strip_all_tags( (string) apply_filters( 'the_content', $post->post_content ) ),
-				'existing'  => null,
-			];
-		} else {
-			$ctx = [
-				'title'     => (string) ( $body['title']     ?? '' ),
-				'url'       => (string) ( $body['url']       ?? '' ),
-				'post_type' => (string) ( $body['post_type'] ?? 'page' ),
-				'content'   => (string) ( $body['content']   ?? '' ),
-				'existing'  => null,
-			];
-		}
 
-		if ( ! Spend_Tracker::can_spend( 0.05 ) ) {
+			$body     = (array) $req->get_json_params();
+			$settings = get_option( 'ac_schema_settings', [] );
+			$model    = (string) ( $body['model'] ?? $settings['default_model'] ?? 'claude-sonnet-4-6' );
+
+			if ( isset( $body['post_id'] ) ) {
+				$post_id = (int) $body['post_id'];
+				$post    = get_post( $post_id );
+				if ( ! $post ) {
+					return new \WP_Error( 'not_found', 'Post not found.', [ 'status' => 404 ] );
+				}
+				$ctx = [
+					'title'     => get_the_title( $post ),
+					'url'       => (string) get_permalink( $post ),
+					'post_type' => $post->post_type,
+					'content'   => wp_strip_all_tags( (string) apply_filters( 'the_content', $post->post_content ) ),
+					'existing'  => null,
+				];
+			} else {
+				$ctx = [
+					'title'     => (string) ( $body['title']     ?? '' ),
+					'url'       => (string) ( $body['url']       ?? '' ),
+					'post_type' => (string) ( $body['post_type'] ?? 'page' ),
+					'content'   => (string) ( $body['content']   ?? '' ),
+					'existing'  => null,
+				];
+			}
+
+			if ( ! Spend_Tracker::can_spend( 0.05 ) ) {
+				return new \WP_Error(
+					'spend_cap_reached',
+					'Spend cap reached. Adjust limits in amplifi.schema settings.',
+					[ 'status' => 429 ]
+				);
+			}
+
+			$prompt = Prompt_Builder::build_for_post( $ctx );
+			$client = new Anthropic_Client( $key, $model );
+			$r      = $client->generate_jsonld( $prompt['system'], $prompt['user'] );
+
+			if ( isset( $r['error'] ) ) {
+				return new \WP_Error( 'ai_error', (string) $r['error'], [ 'status' => 502 ] );
+			}
+
+			Spend_Tracker::record( $model, $r['input_tokens'], $r['output_tokens'] );
+
+			$json_ld   = (string) wp_json_encode( $r['jsonld'] );
+			$validated = $this->make_validator()->validate( $json_ld );
+			$cost_usd  = Spend_Tracker::estimate_cost( $model, $r['input_tokens'], $r['output_tokens'] );
+
+			return $this->ok( [
+				'jsonld'        => $r['jsonld'],
+				'errors'        => $validated['errors'],
+				'cost_usd'      => $cost_usd,
+				'input_tokens'  => $r['input_tokens'],
+				'output_tokens' => $r['output_tokens'],
+			] );
+		} catch ( \Throwable $e ) {
 			return new \WP_Error(
-				'spend_cap_reached',
-				'Spend cap reached. Adjust limits in amplifi.schema settings.',
-				[ 'status' => 429 ]
+				'schema_generate_error',
+				$e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine(),
+				[ 'status' => 500 ]
 			);
 		}
-
-		$prompt = Prompt_Builder::build_for_post( $ctx );
-		$client = new Anthropic_Client( $key, $model );
-		$r      = $client->generate_jsonld( $prompt['system'], $prompt['user'] );
-
-		if ( isset( $r['error'] ) ) {
-			return new \WP_Error( 'ai_error', $r['error'], [ 'status' => 502 ] );
-		}
-
-		Spend_Tracker::record( $model, $r['input_tokens'], $r['output_tokens'] );
-
-		$json_ld   = (string) wp_json_encode( $r['jsonld'] );
-		$validated = $this->make_validator()->validate( $json_ld );
-		$cost_usd  = Spend_Tracker::estimate_cost( $model, $r['input_tokens'], $r['output_tokens'] );
-
-		return $this->ok( [
-			'jsonld'        => $r['jsonld'],
-			'errors'        => $validated['errors'],
-			'cost_usd'      => $cost_usd,
-			'input_tokens'  => $r['input_tokens'],
-			'output_tokens' => $r['output_tokens'],
-		] );
 	}
 
 	// -------------------------------------------------------------------------
