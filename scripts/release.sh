@@ -7,36 +7,21 @@ set -euo pipefail
 # Usage:
 #   ./scripts/release.sh <version>
 #
-# Examples:
-#   ./scripts/release.sh 1.2.0
-#
-# What it does:
-#   1. Validates version format (semver)
-#   2. Zips ALL plugins (excluding dev files)
-#   3. Generates changelog from git log since last tag
-#   4. Creates a GitHub release with the zips, manifest, and changelog
-#
-# Note: Always releases all plugins. The dynamic plugin hub depends on
-# every plugin zip being present in the latest release.
+# Builds the single combined amplifi-plugins zip and creates a GitHub release.
 # ============================================================================
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PLUGINS_DIR="${REPO_ROOT}/plugins"
+PLUGIN_DIR="${REPO_ROOT}/plugins/amplifi-plugins"
 DIST_DIR="${REPO_ROOT}/dist"
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+SLUG="amplifi-plugins"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
 validate_version() {
-    # Accepts semver with optional pre-release suffix: 1.2.0 or 1.2.0-beta.1 or 2.0.0-rc.2
-    [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]] || die "Invalid version '$1'. Use semver (e.g. 1.2.0 or 2.0.0-beta.1)"
+    [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]] || die "Invalid version '$1'. Use semver (e.g. 3.0.0 or 3.1.0-beta.1)"
 }
 
 is_prerelease() {
-    # True if version contains a pre-release suffix (has a hyphen).
     [[ "$1" == *-* ]]
 }
 
@@ -69,58 +54,6 @@ generate_changelog() {
     echo "Built by [amplifi.studio](https://amplifi.studio)"
 }
 
-bump_plugin_version() {
-    local slug="$1"
-    local version="$2"
-    local main_file="${PLUGINS_DIR}/${slug}/${slug}.php"
-
-    [[ -f "$main_file" ]] || return 0
-
-    echo "  Bumping version in ${slug}/${slug}.php to ${version}..."
-
-    # Update "Version: X.X.X[-suffix]" in the plugin file header.
-    perl -i -pe "s/(Version:\s+)[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?/\${1}${version}/" "$main_file"
-
-    # Update define( 'AC*_VERSION', 'X.X.X[-suffix]' ) constant.
-    perl -i -pe "s/(define\(\s*'[A-Z_]+VERSION',\s*')[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?'/\${1}${version}'/" "$main_file"
-}
-
-build_plugin_zip() {
-    local slug="$1"
-    local version="$2"
-    local plugin_dir="${PLUGINS_DIR}/${slug}"
-    local zip_name="${slug}-v${version}.zip"
-
-    [[ -d "$plugin_dir" ]] || die "Plugin '${slug}' not found at ${plugin_dir}"
-
-    echo "  Packaging ${slug}..."
-
-    # Create a temp staging dir so the zip root is the plugin slug.
-    local staging
-    staging="$(mktemp -d)"
-    cp -R "${plugin_dir}" "${staging}/${slug}"
-
-    # Remove dev files from the copy.
-    rm -rf "${staging}/${slug}/docker-compose.yml" \
-           "${staging}/${slug}/.git" \
-           "${staging}/${slug}/node_modules" \
-           "${staging}/${slug}/tests" \
-           "${staging}/${slug}/.env"
-
-    # Copy shared framework into plugin.
-    cp "${REPO_ROOT}/shared/amplifi-framework.php" "${staging}/${slug}/includes/amplifi-framework.php"
-
-    # Copy LICENSE and README into the plugin zip.
-    cp "${REPO_ROOT}/LICENSE" "${staging}/${slug}/LICENSE"
-    [[ -f "${plugin_dir}/README.md" ]] && cp "${plugin_dir}/README.md" "${staging}/${slug}/README.md"
-
-    # Build the zip.
-    (cd "${staging}" && zip -r "${DIST_DIR}/${zip_name}" "${slug}" -x "*.DS_Store" "*/.*")
-
-    rm -rf "${staging}"
-    echo "  -> dist/${zip_name}"
-}
-
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -130,25 +63,25 @@ build_plugin_zip() {
 VERSION="$1"
 validate_version "$VERSION"
 
-# Always release all plugins.
-PLUGINS=()
-for d in "${PLUGINS_DIR}"/*/; do
-    [[ -d "$d" ]] && PLUGINS+=("$(basename "$d")")
-done
-
-[[ ${#PLUGINS[@]} -gt 0 ]] || die "No plugins found in ${PLUGINS_DIR}"
+[[ -d "$PLUGIN_DIR" ]] || die "Combined plugin not found at ${PLUGIN_DIR}"
 
 echo "==> Releasing amplifi.plugins v${VERSION}"
-echo "    Plugins: ${PLUGINS[*]}"
 echo ""
 
-# Bump version numbers in all plugin main PHP files.
-echo "==> Bumping version numbers to ${VERSION}..."
-for slug in "${PLUGINS[@]}"; do
-    bump_plugin_version "$slug" "$VERSION"
+# Bump version in the master bootstrap.
+MAIN_FILE="${PLUGIN_DIR}/${SLUG}.php"
+echo "==> Bumping version to ${VERSION}..."
+perl -i -pe "s/(Version:\s+)[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?/\${1}${VERSION}/" "$MAIN_FILE"
+perl -i -pe "s/(define\(\s*'[A-Z_]+VERSION',\s*')[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?'/\${1}${VERSION}'/" "$MAIN_FILE"
+
+# Also bump version in each feature's main file (for internal consistency).
+for feature_dir in "${PLUGIN_DIR}"/features/*/; do
+    for f in "${feature_dir}"*.php; do
+        [[ -f "$f" ]] || continue
+        perl -i -pe "s/(define\(\s*'[A-Z_]+VERSION',\s*')[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?'/\${1}${VERSION}'/" "$f"
+    done
 done
 
-# Commit the version bumps.
 git add -A
 if ! git diff --cached --quiet; then
     git commit -m "Bump version to ${VERSION}"
@@ -158,10 +91,31 @@ fi
 rm -rf "${DIST_DIR}"
 mkdir -p "${DIST_DIR}"
 
-# Build zips.
-for slug in "${PLUGINS[@]}"; do
-    build_plugin_zip "$slug" "$VERSION"
-done
+# Build the single combined zip.
+echo "==> Packaging ${SLUG}..."
+STAGING="$(mktemp -d)"
+cp -R "${PLUGIN_DIR}" "${STAGING}/${SLUG}"
+
+# Remove dev files.
+rm -rf "${STAGING}/${SLUG}/docker-compose.yml" \
+       "${STAGING}/${SLUG}/.git" \
+       "${STAGING}/${SLUG}/.env"
+find "${STAGING}/${SLUG}" -name 'node_modules' -type d -exec rm -rf {} + 2>/dev/null || true
+find "${STAGING}/${SLUG}" -name 'vendor' -type d -exec rm -rf {} + 2>/dev/null || true
+find "${STAGING}/${SLUG}" -name 'tests' -type d -exec rm -rf {} + 2>/dev/null || true
+find "${STAGING}/${SLUG}" -name 'composer.json' -delete 2>/dev/null || true
+find "${STAGING}/${SLUG}" -name 'composer.lock' -delete 2>/dev/null || true
+find "${STAGING}/${SLUG}" -name 'phpunit.xml.dist' -delete 2>/dev/null || true
+find "${STAGING}/${SLUG}" -name '.phpunit.result.cache' -delete 2>/dev/null || true
+
+# Copy LICENSE into the zip root.
+cp "${REPO_ROOT}/LICENSE" "${STAGING}/${SLUG}/LICENSE"
+
+# Build the zip.
+ZIP_NAME="${SLUG}-v${VERSION}.zip"
+(cd "${STAGING}" && zip -r "${DIST_DIR}/${ZIP_NAME}" "${SLUG}" -x "*.DS_Store" "*/.*")
+rm -rf "${STAGING}"
+echo "  -> dist/${ZIP_NAME}"
 
 # Copy manifest into dist.
 cp "${REPO_ROOT}/plugins-manifest.json" "${DIST_DIR}/plugins-manifest.json"
@@ -183,23 +137,18 @@ TAG="v${VERSION}"
 git tag -a "$TAG" -m "Release ${TAG}"
 git push origin "$TAG"
 
-# Build the gh release command with all zip assets.
-ASSET_ARGS=("${DIST_DIR}/plugins-manifest.json")
-for slug in "${PLUGINS[@]}"; do
-    ASSET_ARGS+=("${DIST_DIR}/${slug}-v${VERSION}.zip")
-done
-
 PRERELEASE_FLAG=()
 if is_prerelease "$VERSION"; then
     PRERELEASE_FLAG=(--prerelease)
-    echo "    (marking as prerelease — won't be served to the auto-updater)"
+    echo "    (marking as prerelease)"
 fi
 
 gh release create "$TAG" \
     --title "amplifi.plugins ${TAG}" \
     --notes-file "${DIST_DIR}/CHANGELOG.md" \
     ${PRERELEASE_FLAG[@]+"${PRERELEASE_FLAG[@]}"} \
-    "${ASSET_ARGS[@]}"
+    "${DIST_DIR}/${ZIP_NAME}" \
+    "${DIST_DIR}/plugins-manifest.json"
 
 echo ""
 echo "==> Done! Release: $(gh release view "$TAG" --json url -q .url)"
