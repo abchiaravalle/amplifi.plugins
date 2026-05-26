@@ -190,7 +190,8 @@ final class Post_Editor {
 				status.textContent = 'Generating with AI…';
 				const r = await api('entries/generate', { method: 'POST', body: { post_id: parseInt(postId, 10) } });
 				if (!r.ok) {
-					status.innerHTML = '<span class="ac-error">' + (r.data.message || 'AI error') + '</span>';
+					var errMsg = r.data.message || r.data.error || (r.data.data && r.data.data.error) || JSON.stringify(r.data) || 'Unknown error';
+					status.innerHTML = '<span class="ac-error">' + errMsg + '</span>';
 					return;
 				}
 				status.textContent = 'Generated. Review and Save.';

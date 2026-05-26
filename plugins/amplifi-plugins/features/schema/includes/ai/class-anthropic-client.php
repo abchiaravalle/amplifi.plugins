@@ -62,7 +62,7 @@ final class Anthropic_Client {
 			'timeout' => 60,
 			'headers' => [
 				'x-api-key'         => $this->api_key,
-				'anthropic-version' => '2023-06-01',
+				'anthropic-version' => '2024-10-22',
 				'content-type'      => 'application/json',
 			],
 			'body' => wp_json_encode( $req ),
@@ -70,10 +70,12 @@ final class Anthropic_Client {
 		if ( is_wp_error( $r ) ) {
 			return [ 'ok' => false, 'error' => $r->get_error_message() ];
 		}
-		$code = wp_remote_retrieve_response_code( $r );
-		$body = json_decode( (string) wp_remote_retrieve_body( $r ), true );
+		$code     = wp_remote_retrieve_response_code( $r );
+		$raw_body = (string) wp_remote_retrieve_body( $r );
+		$body     = json_decode( $raw_body, true );
 		if ( $code < 200 || $code >= 300 ) {
-			return [ 'ok' => false, 'error' => $body['error']['message'] ?? "http_$code" ];
+			$msg = $body['error']['message'] ?? $raw_body;
+			return [ 'ok' => false, 'error' => "HTTP $code: $msg" ];
 		}
 		return [ 'ok' => true, 'body' => $body ];
 	}
