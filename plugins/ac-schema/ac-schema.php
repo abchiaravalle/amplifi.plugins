@@ -3,7 +3,7 @@
  * Plugin Name:       amplifi.schema
  * Plugin URI:        https://amplifi.studio/schema
  * Description:       Bulk-generate, edit, and deploy schema.org JSON-LD with Claude.
- * Version:           0.1.0
+ * Version:           3.0.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Amplifi Studio
@@ -30,7 +30,7 @@ if ( defined( 'AMPLIFI_SCHEMA_VERSION' ) ) {
 	return;
 }
 
-define( 'AMPLIFI_SCHEMA_VERSION', '0.1.0' );
+define( 'AMPLIFI_SCHEMA_VERSION', '3.0.0' );
 define( 'AMPLIFI_SCHEMA_DB_VERSION', '1' );
 define( 'AMPLIFI_SCHEMA_FILE', __FILE__ );
 define( 'AMPLIFI_SCHEMA_PATH', plugin_dir_path( __FILE__ ) );
