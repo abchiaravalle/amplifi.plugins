@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( defined( 'ACWPT_VERSION' ) ) {
 	return;
 }
-define( 'ACWPT_VERSION', '3.0.1' );
+define( 'ACWPT_VERSION', '3.0.2' );
 define( 'ACWPT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACWPT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACWPT_PLUGIN_FILE', __FILE__ );
