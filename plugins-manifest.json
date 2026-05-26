@@ -1,50 +1,56 @@
 {
-  "schema_version": 1,
-  "plugins": {
-    "ac-wp-translator": {
+  "schema_version": 2,
+  "combined_plugin": "amplifi-plugins",
+  "features": {
+    "translate": {
       "name": "Translate",
-      "description": "AI-powered real-time translation using Anthropic Claude. URL-based language prefixes (/es/, /fr/, etc.), native-speaker B2B prompts per language, custom never-translate list and glossary, and smart caching.",
+      "description": "AI-powered real-time translation using Anthropic Claude.",
       "icon": "dashicons-translation"
     },
-    "ac-bulk-meta": {
+    "meta": {
       "name": "Meta",
-      "description": "AI-powered bulk SEO meta editor with FAQ generation and JSON-LD structured data.",
+      "description": "Bulk SEO meta editor with FAQ generation.",
       "icon": "dashicons-editor-code"
     },
-    "ac-magic-links": {
+    "magic": {
       "name": "Magic",
-      "description": "One-click magic links for password-protected pages with usage logging and IP geolocation.",
+      "description": "One-click magic links for password-protected pages.",
       "icon": "dashicons-admin-links"
     },
-    "ac-static-cache": {
+    "cache": {
       "name": "LockCache",
-      "description": "Static HTML cache for password-protected posts with admin management and debug logging.",
+      "description": "Static HTML cache for password-protected posts.",
       "icon": "dashicons-performance"
     },
-    "ac-pods": {
+    "pods": {
       "name": "Pods",
-      "description": "Podcast carousel and floating player via Apple Podcasts RSS feed or built-in custom post type.",
+      "description": "Podcast carousel and floating player.",
       "icon": "dashicons-microphone"
     },
-    "ac-sync": {
+    "sync": {
       "name": "Sync",
-      "description": "WordPress environment sync with REST API for file, database, and media operations between production and staging.",
+      "description": "Environment sync via REST API.",
       "icon": "dashicons-update"
     },
-    "amplifi-security": {
+    "security": {
       "name": "Security",
-      "description": "WordPress security with an AI brain. Local scans, Claude triage with your own API key, and alerts only on confirmed or likely findings.",
+      "description": "AI-powered security scanner with Claude triage.",
       "icon": "dashicons-shield-alt"
     },
-    "ac-alt-text": {
+    "alt": {
       "name": "Alt",
-      "description": "AI-powered alt text for WordPress images. Bulk-generate for the existing media library and auto-generate on upload, with cost caps and daily email reports.",
+      "description": "AI alt text for WordPress images.",
       "icon": "dashicons-format-image"
     },
-    "ac-schema": {
+    "schema": {
       "name": "Schema",
-      "description": "AI-generated schema.org JSON-LD with bulk generation, per-post editor, foreign-source detection (Yoast, Rank Math, SEOPress, AIOSEO), URL rules, and single @graph output.",
-      "icon": "dashicons-editor-code"
+      "description": "AI-generated schema.org JSON-LD with bulk generation and foreign-source detection.",
+      "icon": "dashicons-database-view"
+    },
+    "optimize": {
+      "name": "Optimize",
+      "description": "AI SEO triage — scan for fixable issues, draft fixes with Claude, approve each one.",
+      "icon": "dashicons-chart-line"
     }
   }
 }
