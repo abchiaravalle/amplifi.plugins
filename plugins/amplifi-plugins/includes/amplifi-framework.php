@@ -211,66 +211,99 @@ if ( ! defined( 'AMPLIFI_FRAMEWORK_LOADED' ) ) {
 	function amplifi_render_hub() {
 		global $amplifi_plugins;
 
-		$catalog = amplifi_get_manifest();
-		$release = amplifi_get_latest_release();
-		$latest_version = $release ? ltrim( $release['tag_name'], 'v' ) : '';
-		$install_nonce  = wp_create_nonce( 'amplifi_install_plugin' );
+		// Feature registry from the master bootstrap.
+		$all_features = [
+			'schema'    => [ 'name' => 'Schema',    'desc' => 'AI schema.org JSON-LD generation, editing, and deployment.', 'icon' => 'dashicons-database-view' ],
+			'security'  => [ 'name' => 'Security',  'desc' => 'AI-powered security scanning with Claude triage.', 'icon' => 'dashicons-shield-alt' ],
+			'meta'      => [ 'name' => 'Meta',      'desc' => 'Bulk SEO meta editor with FAQ generation.', 'icon' => 'dashicons-editor-code' ],
+			'magic'     => [ 'name' => 'Magic',     'desc' => 'One-click magic links for password-protected pages.', 'icon' => 'dashicons-admin-links' ],
+			'pods'      => [ 'name' => 'Pods',      'desc' => 'Podcast carousel and floating player.', 'icon' => 'dashicons-microphone' ],
+			'cache'     => [ 'name' => 'LockCache', 'desc' => 'Static HTML cache for password-protected posts.', 'icon' => 'dashicons-performance' ],
+			'sync'      => [ 'name' => 'Sync',      'desc' => 'REST API sync between WordPress environments.', 'icon' => 'dashicons-update' ],
+			'translate' => [ 'name' => 'Translate', 'desc' => 'AI-powered real-time translation via Claude.', 'icon' => 'dashicons-translation' ],
+			'alt'       => [ 'name' => 'Alt',       'desc' => 'AI alt text for WordPress images.', 'icon' => 'dashicons-format-image' ],
+			'optimize'  => [ 'name' => 'Optimize',  'desc' => 'AI SEO triage — scan, propose fixes, approve.', 'icon' => 'dashicons-chart-line' ],
+		];
+
+		$enabled = get_option( 'amplifi_plugins_enabled_features', [] );
+		if ( ! is_array( $enabled ) ) { $enabled = []; }
+		$toggle_nonce = wp_create_nonce( 'amplifi_toggle_feature' );
 
 		?>
 		<div class="wrap amplifi-hub">
 			<h1>amplifi.studio</h1>
-			<p class="amplifi-tagline">WordPress plugins by <a href="https://amplifi.studio" target="_blank">amplifi.studio</a></p>
+			<p class="amplifi-tagline">Enable or disable features below. Changes take effect on page reload.</p>
+
+			<style>
+				.amplifi-plugin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 20px; }
+				.amplifi-plugin-card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 20px; position: relative; }
+				.amplifi-plugin-card.is-enabled { border-color: #2271b1; }
+				.amplifi-plugin-card h3 { margin: 0 0 8px 0; font-size: 15px; }
+				.amplifi-plugin-card h3 .dashicons { margin-right: 6px; color: #888; }
+				.amplifi-plugin-card.is-enabled h3 .dashicons { color: #2271b1; }
+				.amplifi-plugin-card .description { color: #666; margin: 0 0 14px 0; font-size: 13px; }
+				.amplifi-toggle { display: flex; align-items: center; gap: 10px; }
+				.amplifi-toggle label { position: relative; display: inline-block; width: 44px; height: 24px; cursor: pointer; }
+				.amplifi-toggle label input { opacity: 0; width: 0; height: 0; }
+				.amplifi-toggle .slider { position: absolute; inset: 0; background: #ccc; border-radius: 24px; transition: .2s; }
+				.amplifi-toggle .slider:before { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+				.amplifi-toggle input:checked + .slider { background: #2271b1; }
+				.amplifi-toggle input:checked + .slider:before { transform: translateX(20px); }
+				.amplifi-toggle .toggle-label { font-size: 13px; font-weight: 500; }
+			</style>
 
 			<div class="amplifi-plugin-grid">
-				<?php foreach ( $catalog as $slug => $info ) :
-					$installed    = isset( $amplifi_plugins[ $slug ] );
-					$version      = $installed ? $amplifi_plugins[ $slug ]['version'] : '';
-					$has_update   = $installed && $latest_version && version_compare( $latest_version, $version, '>' );
-					$download_url = amplifi_get_download_url( $slug );
-					$icon_class   = ! empty( $info['icon'] ) ? $info['icon'] : 'dashicons-admin-plugins';
+				<?php foreach ( $all_features as $slug => $info ) :
+					$is_on = in_array( $slug, $enabled, true );
 				?>
-					<div class="amplifi-plugin-card">
-						<h3><span class="dashicons <?php echo esc_attr( $icon_class ); ?>"></span><?php echo esc_html( $info['name'] ); ?></h3>
-						<p class="description"><?php echo esc_html( $info['description'] ); ?></p>
-						<p>
-							<?php if ( $installed && $has_update ) : ?>
-								<span class="status update-available">Update available: <?php echo esc_html( $latest_version ); ?></span>
-							<?php elseif ( $installed ) : ?>
-								<span class="status installed">Installed <?php echo esc_html( $version ); ?></span>
-							<?php else : ?>
-								<span class="status available">Available</span>
-							<?php endif; ?>
-						</p>
-						<p class="actions">
-							<?php if ( $installed && $has_update ) : ?>
-								<a href="<?php echo esc_url( admin_url( 'update-core.php' ) ); ?>" class="button button-primary">Update</a>
-								<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . amplifi_page_slug( $slug ) ) ); ?>" class="button">Settings</a>
-							<?php elseif ( $installed ) : ?>
-								<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . amplifi_page_slug( $slug ) ) ); ?>" class="button button-primary">Settings</a>
-							<?php elseif ( $download_url && current_user_can( 'install_plugins' ) ) : ?>
-								<button type="button" class="button button-primary amplifi-install-btn" data-slug="<?php echo esc_attr( $slug ); ?>" data-nonce="<?php echo esc_attr( $install_nonce ); ?>">Install</button>
-							<?php else : ?>
-								<a href="https://github.com/<?php echo esc_attr( AMPLIFI_GITHUB_REPO ); ?>/releases/latest" target="_blank" class="button">Download</a>
-							<?php endif; ?>
-						</p>
+					<div class="amplifi-plugin-card <?php echo $is_on ? 'is-enabled' : ''; ?>" data-feature="<?php echo esc_attr( $slug ); ?>">
+						<h3><span class="dashicons <?php echo esc_attr( $info['icon'] ); ?>"></span><?php echo esc_html( $info['name'] ); ?></h3>
+						<p class="description"><?php echo esc_html( $info['desc'] ); ?></p>
+						<div class="amplifi-toggle">
+							<label>
+								<input type="checkbox" class="amplifi-feature-toggle" data-feature="<?php echo esc_attr( $slug ); ?>" <?php checked( $is_on ); ?> />
+								<span class="slider"></span>
+							</label>
+							<span class="toggle-label"><?php echo $is_on ? 'Enabled' : 'Disabled'; ?></span>
+						</div>
 					</div>
 				<?php endforeach; ?>
 			</div>
 
-			<div style="margin-top: 32px; padding: 16px; background: #f0f6fc; border-left: 4px solid #2271b1; border-radius: 2px;">
-				<strong>Auto-Updates Enabled</strong><br>
-				Plugins check for new releases from <a href="https://github.com/<?php echo esc_attr( AMPLIFI_GITHUB_REPO ); ?>/releases" target="_blank">GitHub</a> automatically.
-				Updates appear in <strong>Dashboard &gt; Updates</strong> like any other plugin.
-				Release data is cached for 6 hours.
-				<button type="button" id="amplifi-check-updates" class="button button-secondary" style="margin-left:12px; vertical-align:middle;">Check Now</button>
-				<span id="amplifi-check-status" style="margin-left:8px; font-size:13px;"></span>
-			</div>
-
-			<p style="margin-top: 24px; color: #999; font-size: 12px;">
-				This software is provided "AS IS" without warranty of any kind.
-				See <a href="https://github.com/<?php echo esc_attr( AMPLIFI_GITHUB_REPO ); ?>/blob/main/LICENSE" target="_blank">LICENSE</a> for details.
+			<p style="margin-top: 20px; color: #888; font-size: 12px;">
+				amplifi.plugins v<?php echo esc_html( defined( 'AMPLIFI_PLUGINS_VERSION' ) ? AMPLIFI_PLUGINS_VERSION : '?' ); ?>
+				· <a href="https://github.com/abchiaravalle/amplifi.plugins/releases" target="_blank">Releases</a>
 			</p>
 		</div>
+		<script>
+		(function(){
+			document.querySelectorAll('.amplifi-feature-toggle').forEach(function(cb){
+				cb.addEventListener('change', function(){
+					var feature = cb.dataset.feature;
+					var enable  = cb.checked;
+					var card    = cb.closest('.amplifi-plugin-card');
+					var label   = card.querySelector('.toggle-label');
+					label.textContent = 'Saving…';
+					var fd = new FormData();
+					fd.append('action', 'amplifi_toggle_feature');
+					fd.append('_ajax_nonce', <?php echo wp_json_encode( $toggle_nonce ); ?>);
+					fd.append('feature', feature);
+					fd.append('enable', enable ? '1' : '');
+					fetch(ajaxurl, { method: 'POST', credentials: 'same-origin', body: fd })
+					.then(function(r){ return r.json(); })
+					.then(function(data){
+						if (data.success) {
+							label.textContent = enable ? 'Enabled — reloading…' : 'Disabled — reloading…';
+							setTimeout(function(){ location.reload(); }, 600);
+						} else {
+							label.textContent = 'Error';
+							cb.checked = !enable;
+						}
+					});
+				});
+			});
+		})();
+		</script>
 		<?php
 	}
 

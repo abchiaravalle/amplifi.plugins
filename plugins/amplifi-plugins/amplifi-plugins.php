@@ -42,62 +42,58 @@ add_action( 'init', function () {
 	];
 }, 99 );
 
-// ---- Feature bootstraps ----
-// Each feature defines its own constants, loads its own classes, hooks into WP.
-// The framework is already loaded above, so features' own framework loads are no-ops.
-
-$amplifi_features = [
-	'schema'    => 'features/schema/ac-schema.php',
-	'security'  => 'features/security/amplifi-security.php',
-	'meta'      => 'features/meta/ac-bulk-meta.php',
-	'magic'     => 'features/magic/ac-magic-links.php',
-	'pods'      => 'features/pods/ac-pods.php',
-	'cache'     => 'features/cache/ac-static-cache.php',
-	'sync'      => 'features/sync/ac-sync.php',
-	'translate' => 'features/translate/ac-wp-translator.php',
-	'alt'       => 'features/alt/ac-alt-text.php',
-	'optimize'  => 'features/optimize/amplifi-optimize.php',
+// ---- Feature registry ----
+$amplifi_all_features = [
+	'schema'    => [ 'file' => 'features/schema/ac-schema.php',            'name' => 'Schema',    'desc' => 'AI schema.org JSON-LD generation, editing, and deployment.' ],
+	'security'  => [ 'file' => 'features/security/amplifi-security.php',   'name' => 'Security',  'desc' => 'AI-powered security scanning with Claude triage.' ],
+	'meta'      => [ 'file' => 'features/meta/ac-bulk-meta.php',           'name' => 'Meta',      'desc' => 'Bulk SEO meta editor with FAQ generation.' ],
+	'magic'     => [ 'file' => 'features/magic/ac-magic-links.php',        'name' => 'Magic',     'desc' => 'One-click magic links for password-protected pages.' ],
+	'pods'      => [ 'file' => 'features/pods/ac-pods.php',                'name' => 'Pods',      'desc' => 'Podcast carousel and floating player.' ],
+	'cache'     => [ 'file' => 'features/cache/ac-static-cache.php',       'name' => 'LockCache', 'desc' => 'Static HTML cache for password-protected posts.' ],
+	'sync'      => [ 'file' => 'features/sync/ac-sync.php',               'name' => 'Sync',      'desc' => 'REST API sync between WordPress environments.' ],
+	'translate' => [ 'file' => 'features/translate/ac-wp-translator.php',  'name' => 'Translate', 'desc' => 'AI-powered real-time translation via Claude.' ],
+	'alt'       => [ 'file' => 'features/alt/ac-alt-text.php',             'name' => 'Alt',       'desc' => 'AI alt text for WordPress images.' ],
+	'optimize'  => [ 'file' => 'features/optimize/amplifi-optimize.php',   'name' => 'Optimize',  'desc' => 'AI SEO triage — scan, propose fixes, approve.' ],
 ];
 
-foreach ( $amplifi_features as $feature_name => $feature_path ) {
-	$full_path = AMPLIFI_PLUGINS_PATH . $feature_path;
+// Load only enabled features. Default: none enabled.
+$amplifi_enabled = get_option( 'amplifi_plugins_enabled_features', [] );
+if ( ! is_array( $amplifi_enabled ) ) {
+	$amplifi_enabled = [];
+}
+
+foreach ( $amplifi_all_features as $slug => $feature ) {
+	if ( ! in_array( $slug, $amplifi_enabled, true ) ) {
+		continue;
+	}
+	$full_path = AMPLIFI_PLUGINS_PATH . $feature['file'];
 	if ( is_file( $full_path ) ) {
 		require_once $full_path;
 	}
 }
 
 // ---- Master activation hook ----
-// Feature files call register_activation_hook( __FILE__, ... ) but __FILE__
-// points to the feature file, not the main plugin file. WordPress only fires
-// activation hooks for the file declared in "Plugin Name:". So we call each
-// feature's installer/activator manually here.
 register_activation_hook( __FILE__, function () {
-	// Schema
 	if ( class_exists( \Amplifi\Schema\Installer::class ) ) {
 		\Amplifi\Schema\Installer::install();
 	}
 	if ( class_exists( \Amplifi\Schema\Activator::class ) ) {
 		\Amplifi\Schema\Activator::activate();
 	}
-	// Security
 	if ( class_exists( \Amplifi\Security\Installer::class ) ) {
 		\Amplifi\Security\Installer::install();
 	}
 	if ( class_exists( \Amplifi\Security\Activator::class ) ) {
 		\Amplifi\Security\Activator::activate();
 	}
-	// ac-bulk-meta: creates FAQ table on activation
 	if ( class_exists( 'AC_Bulk_Meta' ) ) {
 		$m = new \AC_Bulk_Meta();
 		if ( method_exists( $m, 'activate' ) ) {
 			$m->activate();
 		}
 	}
-	// ac-wp-translator: creates translations table on activation
-	if ( class_exists( 'ACWPT_Admin' ) ) {
-		if ( method_exists( 'ACWPT_Admin', 'activate_plugin' ) ) {
-			\ACWPT_Admin::activate_plugin();
-		}
+	if ( class_exists( 'ACWPT_Admin' ) && method_exists( 'ACWPT_Admin', 'activate_plugin' ) ) {
+		\ACWPT_Admin::activate_plugin();
 	}
 	flush_rewrite_rules();
 } );
@@ -110,6 +106,27 @@ register_deactivation_hook( __FILE__, function () {
 		\Amplifi\Security\Deactivator::deactivate();
 	}
 	flush_rewrite_rules();
+} );
+
+// ---- Feature toggle AJAX handler ----
+add_action( 'wp_ajax_amplifi_toggle_feature', function () {
+	check_ajax_referer( 'amplifi_toggle_feature' );
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_send_json_error( 'Forbidden' );
+	}
+	$feature = sanitize_key( wp_unslash( $_POST['feature'] ?? '' ) );
+	$enable  = (bool) ( $_POST['enable'] ?? false );
+	$enabled = get_option( 'amplifi_plugins_enabled_features', [] );
+	if ( ! is_array( $enabled ) ) {
+		$enabled = [];
+	}
+	if ( $enable && ! in_array( $feature, $enabled, true ) ) {
+		$enabled[] = $feature;
+	} elseif ( ! $enable ) {
+		$enabled = array_values( array_filter( $enabled, fn( $f ) => $f !== $feature ) );
+	}
+	update_option( 'amplifi_plugins_enabled_features', $enabled );
+	wp_send_json_success( [ 'enabled' => $enabled ] );
 } );
 
 // ---- Detect old individual amplifi plugins ----

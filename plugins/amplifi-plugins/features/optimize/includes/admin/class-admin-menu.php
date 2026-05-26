@@ -41,28 +41,29 @@ class Amplifi_Optimize_Admin_Menu {
 	public function register(): void {
 		$cap = 'manage_options';
 
-		add_menu_page(
-			'amplifi.optimize',
-			'amplifi.optimize',
-			$cap,
-			self::MENU_SLUG,
-			array( $this, 'render' ),
-			'dashicons-chart-line',
-			81
-		);
+		if ( function_exists( 'amplifi_register_plugin' ) ) {
+			amplifi_register_plugin(
+				'amplifi-optimize',
+				'Optimize',
+				'AI-powered SEO triage.',
+				defined( 'AMPLIFI_OPTIMIZE_VERSION' ) ? AMPLIFI_OPTIMIZE_VERSION : '1.0.0',
+				defined( 'AMPLIFI_OPTIMIZE_FILE' ) ? AMPLIFI_OPTIMIZE_FILE : __FILE__,
+				array( $this, 'render' )
+			);
+		}
 
+		$parent = 'amplifi-studio';
 		$submenus = array(
-			array( 'dashboard', __( 'Dashboard', 'amplifi-optimize' ), self::MENU_SLUG ),
-			array( 'scans', __( 'Scans', 'amplifi-optimize' ), self::MENU_SLUG . '-scans' ),
-			array( 'queue', __( 'Review Queue', 'amplifi-optimize' ), self::MENU_SLUG . '-queue' ),
-			array( 'history', __( 'History', 'amplifi-optimize' ), self::MENU_SLUG . '-history' ),
-			array( 'settings', __( 'Settings', 'amplifi-optimize' ), self::MENU_SLUG . '-settings' ),
+			array( 'scans', __( 'Optimize: Scans', 'amplifi-optimize' ), 'amplifi-optimize-scans' ),
+			array( 'queue', __( 'Optimize: Queue', 'amplifi-optimize' ), 'amplifi-optimize-queue' ),
+			array( 'history', __( 'Optimize: History', 'amplifi-optimize' ), 'amplifi-optimize-history' ),
+			array( 'settings', __( 'Optimize: Settings', 'amplifi-optimize' ), 'amplifi-optimize-settings' ),
 		);
 
-		foreach ( $submenus as $i => $sub ) {
+		foreach ( $submenus as $sub ) {
 			list( , $label, $slug ) = $sub;
 			add_submenu_page(
-				self::MENU_SLUG,
+				$parent,
 				$label,
 				$label,
 				$cap,
