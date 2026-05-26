@@ -186,12 +186,20 @@ final class Rest_Controller {
 		$source     = (string) ( $body['source']     ?? 'manual' );
 		$json_ld    = (string) ( $body['json_ld']    ?? '' );
 
-		// Validate the JSON-LD before saving.
+		// Auto-inject @context if missing.
+		$parsed = json_decode( $json_ld, true );
+		if ( is_array( $parsed ) ) {
+			if ( empty( $parsed['@context'] ) ) {
+				$parsed['@context'] = 'https://schema.org';
+			}
+			$json_ld = (string) wp_json_encode( $parsed );
+		}
+
 		$result = $this->make_validator()->validate( $json_ld );
 		if ( ! $result['ok'] ) {
 			return new \WP_Error(
 				'invalid_schema',
-				'JSON-LD validation failed.',
+				'JSON-LD validation failed.: ' . implode( '; ', array_column( $result['errors'], 'message' ) ),
 				[ 'status' => 400, 'errors' => $result['errors'] ]
 			);
 		}
@@ -383,21 +391,30 @@ final class Rest_Controller {
 			);
 		}
 
-		$body    = $req->get_json_params();
+		$body = (array) $req->get_json_params();
+
+		// Ensure @context and @type are present — for global entries we know what they should be.
+		if ( empty( $body['@context'] ) ) {
+			$body['@context'] = 'https://schema.org';
+		}
+		$type_map = [ 'organization' => 'Organization', 'website' => 'WebSite', 'localbusiness' => 'LocalBusiness' ];
+		if ( empty( $body['@type'] ) ) {
+			$body['@type'] = $type_map[ $key ] ?? 'Thing';
+		}
+
 		$json_ld = (string) wp_json_encode( $body );
 
 		$result = $this->make_validator()->validate( $json_ld );
 		if ( ! $result['ok'] ) {
 			return new \WP_Error(
 				'invalid_schema',
-				'JSON-LD validation failed.',
+				'JSON-LD validation failed.: ' . implode( '; ', array_column( $result['errors'], 'message' ) ),
 				[ 'status' => 400, 'errors' => $result['errors'] ]
 			);
 		}
 
 		update_option( 'ac_schema_global_' . $key, $body );
 
-		// Mirror into the entries table for unified querying.
 		$store = new Entry_Store();
 		$store->save( [
 			'scope_type'  => 'global',
