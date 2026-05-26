@@ -1,0 +1,10 @@
+node_modules/
+*.log
+.DS_Store
+.idea/
+.vscode/
+vendor/
+
+# assets/build/ is intentionally NOT ignored — it ships with the plugin so
+# end users don't need Node to install. Run `npm run build` before
+# committing changes to assets/src/.

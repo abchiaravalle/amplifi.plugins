@@ -1,0 +1,16 @@
+.wrap.amplifi-security h1 { margin-bottom: 16px; }
+.wrap.amplifi-security details { margin: 8px 0; }
+.wrap.amplifi-security pre { background: #f6f7f7; border: 1px solid #dcdcde; padding: 8px; }
+.wrap.amplifi-security table.widefat td pre { white-space: pre-wrap; word-break: break-word; }
+.wrap.amplifi-security .nav-tab-wrapper { margin-bottom: 16px; }
+
+/* Onboarding wizard */
+.amplifi-wizard { max-width: 720px; }
+.amplifi-wizard-steps { list-style: none; padding: 0; margin: 0 0 24px; display: flex; gap: 8px; }
+.amplifi-wizard-steps li { flex: 1; padding: 8px 12px; background: #f0f0f1; color: #50575e; border-radius: 4px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.amplifi-wizard-steps li.is-active { background: #2271b1; color: #fff; font-weight: 600; }
+.amplifi-wizard-steps li.is-done { background: #d5e6d5; color: #2c5a2c; }
+.amplifi-wizard-steps .step-num { display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center; border-radius: 50%; background: rgba(255,255,255,0.5); font-weight: 700; }
+.amplifi-wizard-steps li.is-done .step-num { background: #2c7a2c; color: #fff; }
+.amplifi-wizard-steps li.is-active .step-num { background: rgba(255,255,255,0.25); color: #fff; }
+.amplifi-wizard-actions { margin-top: 20px; display: flex; gap: 8px; align-items: center; }
