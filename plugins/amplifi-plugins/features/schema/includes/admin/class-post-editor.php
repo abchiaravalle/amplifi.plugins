@@ -111,10 +111,16 @@ final class Post_Editor {
 		</div>
 		<script>
 		(function(){
-			const root  = document.getElementById('ac-schema-editor');
-			const postId = root.dataset.postId;
-			const rest   = root.dataset.rest;
-			const nonce  = root.dataset.nonce;
+			var REST_URL = <?php echo wp_json_encode( $rest_url ); ?>;
+			var REST_NONCE = <?php echo wp_json_encode( $nonce ); ?>;
+			var POST_ID = <?php echo wp_json_encode( (string) $post->ID ); ?>;
+
+			function init() {
+				const root = document.getElementById('ac-schema-editor');
+				if (!root) { return; }
+				const postId = POST_ID;
+				const rest   = REST_URL;
+				const nonce  = REST_NONCE;
 
 			function api(path, opts){
 				opts = opts || {};
@@ -239,6 +245,12 @@ final class Post_Editor {
 					if (r.ok) location.reload();
 				});
 			});
+			}
+			if (document.readyState === 'loading') {
+				document.addEventListener('DOMContentLoaded', init);
+			} else {
+				init();
+			}
 		})();
 		</script>
 		<?php
