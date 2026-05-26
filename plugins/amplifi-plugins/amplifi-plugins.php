@@ -28,6 +28,20 @@ define( 'AMPLIFI_PLUGINS_BASENAME', plugin_basename( __FILE__ ) );
 // makes them no-ops. This ensures the menu, hub, and auto-updater are registered once.
 require_once AMPLIFI_PLUGINS_PATH . 'includes/amplifi-framework.php';
 
+// Register the combined plugin for GitHub auto-updates.
+// The framework's updater matches zip assets by slug — 'amplifi-plugins' matches
+// 'amplifi-plugins-v3.0.0.zip'. Individual features no longer need their own zips.
+add_action( 'init', function () {
+	global $amplifi_plugins;
+	$amplifi_plugins['amplifi-plugins'] = [
+		'slug'        => 'amplifi-plugins',
+		'name'        => 'amplifi.plugins',
+		'description' => 'The complete amplifi.studio suite.',
+		'version'     => AMPLIFI_PLUGINS_VERSION,
+		'file'        => AMPLIFI_PLUGINS_FILE,
+	];
+}, 99 );
+
 // ---- Feature bootstraps ----
 // Each feature defines its own constants, loads its own classes, hooks into WP.
 // The framework is already loaded above, so features' own framework loads are no-ops.
