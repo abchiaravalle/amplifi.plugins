@@ -62,7 +62,7 @@ final class Anthropic_Client {
 			'timeout' => 60,
 			'headers' => [
 				'x-api-key'         => $this->api_key,
-				'anthropic-version' => '2024-10-22',
+				'anthropic-version' => '2023-06-01',
 				'content-type'      => 'application/json',
 			],
 			'body' => wp_json_encode( $req ),
