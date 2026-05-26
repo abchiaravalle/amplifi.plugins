@@ -103,13 +103,16 @@ if ( ! defined( 'AMPLIFI_FRAMEWORK_LOADED' ) ) {
 
 		// Register each plugin as a submenu.
 		foreach ( $amplifi_plugins as $slug => $plugin ) {
+			if ( ! empty( $plugin['_no_submenu'] ) ) {
+				continue;
+			}
 			add_submenu_page(
 				'amplifi-studio',
 				$plugin['name'],
 				$plugin['name'],
 				'manage_options',
 				amplifi_page_slug( $slug ),
-				$plugin['render']
+				$plugin['render'] ?? 'amplifi_render_hub'
 			);
 		}
 	}
@@ -270,7 +273,12 @@ if ( ! defined( 'AMPLIFI_FRAMEWORK_LOADED' ) ) {
 				<?php endforeach; ?>
 			</div>
 
-			<p style="margin-top: 20px; color: #888; font-size: 12px;">
+			<div style="margin-top: 24px;">
+				<button type="button" class="button" id="amplifi-check-updates">Check for updates</button>
+				<span id="amplifi-check-status" style="margin-left: 10px;"></span>
+			</div>
+
+			<p style="margin-top: 12px; color: #888; font-size: 12px;">
 				amplifi.plugins v<?php echo esc_html( defined( 'AMPLIFI_PLUGINS_VERSION' ) ? AMPLIFI_PLUGINS_VERSION : '?' ); ?>
 				· <a href="https://github.com/abchiaravalle/amplifi.plugins/releases" target="_blank">Releases</a>
 			</p>
@@ -302,6 +310,32 @@ if ( ! defined( 'AMPLIFI_FRAMEWORK_LOADED' ) ) {
 					});
 				});
 			});
+			var checkBtn = document.getElementById('amplifi-check-updates');
+			var checkStatus = document.getElementById('amplifi-check-status');
+			if (checkBtn) {
+				checkBtn.addEventListener('click', function(){
+					checkBtn.disabled = true;
+					checkStatus.textContent = 'Checking…';
+					var fd = new FormData();
+					fd.append('action', 'amplifi_check_updates');
+					fd.append('_ajax_nonce', <?php echo wp_json_encode( wp_create_nonce( 'amplifi_check_updates' ) ); ?>);
+					fetch(ajaxurl, { method: 'POST', credentials: 'same-origin', body: fd })
+					.then(function(r){ return r.json(); })
+					.then(function(data){
+						checkBtn.disabled = false;
+						if (data.success) {
+							checkStatus.textContent = 'Done — reloading…';
+							setTimeout(function(){ location.reload(); }, 800);
+						} else {
+							checkStatus.textContent = data.data || 'Failed.';
+						}
+					})
+					.catch(function(){
+						checkBtn.disabled = false;
+						checkStatus.textContent = 'Request failed.';
+					});
+				});
+			}
 		})();
 		</script>
 		<?php

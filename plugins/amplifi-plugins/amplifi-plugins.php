@@ -39,6 +39,8 @@ add_action( 'init', function () {
 		'description' => 'The complete amplifi.studio suite.',
 		'version'     => AMPLIFI_PLUGINS_VERSION,
 		'file'        => AMPLIFI_PLUGINS_FILE,
+		'render'      => 'amplifi_render_hub',
+		'_no_submenu' => true,
 	];
 }, 99 );
 
