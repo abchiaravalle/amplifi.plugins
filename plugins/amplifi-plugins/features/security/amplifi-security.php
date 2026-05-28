@@ -12,7 +12,7 @@ if ( defined( 'AMPLIFI_SECURITY_VERSION' ) ) {
 	return;
 }
 
-define( 'AMPLIFI_SECURITY_VERSION', '3.0.8' );
+define( 'AMPLIFI_SECURITY_VERSION', '3.0.9' );
 define( 'AMPLIFI_SECURITY_DB_VERSION', '1' );
 define( 'AMPLIFI_SECURITY_FILE', __FILE__ );
 define( 'AMPLIFI_SECURITY_PATH', plugin_dir_path( __FILE__ ) );
