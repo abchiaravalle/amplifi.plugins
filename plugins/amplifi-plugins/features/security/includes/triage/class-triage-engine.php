@@ -94,6 +94,11 @@ final class Triage_Engine {
 		// Batch up to MAX_BATCH / MAX_PAYLOAD_BYTES.
 		$batches = self::batch_for_payload( $still_to_send );
 
+		// Build the heavy context ONCE per scan and reuse across all batches —
+		// the plugin list and logs are identical for every batch in a run.
+		$site_context = self::site_context();
+		$logs         = Log_Fetcher::fetch_all( (int) ( self::MAX_PAYLOAD_BYTES / 4 ) );
+
 		foreach ( $batches as $batch ) {
 			$emergency = self::has_emergency( $batch );
 			$cap_check = Spend_Tracker::check_caps( $emergency );
@@ -103,7 +108,7 @@ final class Triage_Engine {
 			}
 
 			try {
-				self::dispatch_batch( $batch );
+				self::dispatch_batch( $batch, $site_context, $logs );
 				self::reset_failure_count();
 			} catch ( \Throwable $e ) {
 				Audit_Logger::log(
@@ -188,7 +193,7 @@ final class Triage_Engine {
 		return false;
 	}
 
-	private static function dispatch_batch( array $batch ): void {
+	private static function dispatch_batch( array $batch, array $site_context, string $logs ): void {
 		$settings = json_decode( (string) get_option( 'amplifi_security_settings', '{}' ), true );
 		$model    = (string) ( $settings['model']       ?? Anthropic_Client::DEFAULT_MODEL );
 		$tone     = (string) ( $settings['sensitivity'] ?? 'balanced' );
@@ -202,9 +207,6 @@ final class Triage_Engine {
 			],
 			$batch
 		);
-
-		$site_context = self::site_context();
-		$logs         = Log_Fetcher::fetch_all( self::MAX_PAYLOAD_BYTES / 4 );
 
 		$user_msg = Prompt_Builder::user_message( $site_context, $findings_for_prompt, $logs );
 		$system   = Prompt_Builder::system_prompt( $tone );
