@@ -51,6 +51,11 @@
       "name": "Optimize",
       "description": "AI SEO triage — scan for fixable issues, draft fixes with Claude, approve each one.",
       "icon": "dashicons-chart-line"
+    },
+    "consent": {
+      "name": "Consent",
+      "description": "Cookie consent that withholds your tracking scripts until consent, keeps a best-effort server-side record, honors GPC, and can auto-block unmanaged trackers.",
+      "icon": "dashicons-privacy"
     }
   }
 }
