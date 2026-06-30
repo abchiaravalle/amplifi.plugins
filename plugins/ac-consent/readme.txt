@@ -4,7 +4,7 @@ Tags: cookie consent, gdpr, ccpa, privacy, consent log, gpc, consent mode
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.7.0
+Stable tag: 1.8.0
 License: MIT
 
 Cookie consent that withholds your tracking scripts until consent, keeps a best-effort server-side record of each choice, honors GPC, and can auto-block unmanaged trackers.
@@ -129,6 +129,24 @@ excludes tracker hosts at the server. These are known limitations of every
 JavaScript-based consent blocker, not specific to this plugin.
 
 == Changelog ==
+
+= 1.8.0 =
+* Accessibility (WCAG 2.1 AA): the banner is now a labelled region that receives
+  focus on show (so screen-reader and keyboard users are told a choice is
+  required); focus is moved to the persistent preferences button after a choice
+  instead of being lost to the page; the preferences modal scroll-locks the page,
+  has matching accessible name/description, and never drops focus to <body>;
+  category checkboxes are 24px tap targets and the cookie-table header colour now
+  meets 4.5:1 contrast. Accept and Reject remain equal-weight (no dark pattern).
+* Internationalization: the plugin now loads its text domain (it ships via
+  GitHub, not wp.org, so this is required), declares Domain Path, ships a
+  languages/amplifi-consent.pot template, wraps the entire admin UI in gettext,
+  and passes the remaining visitor-facing JS strings (Privacy Policy, cookie
+  table headers, ARIA labels, cookie/cookies) through translation.
+* Robustness: the output-buffer tracker rewrite now skips pages over ~2 MB and
+  can never blank a page if a regex hits the PCRE backtrack limit (each pass is
+  null-guarded). The /config endpoint sends explicit no-store cache headers so a
+  CDN/page cache can't serve a stale token.
 
 = 1.7.0 =
 * Single-use consent tokens are now backed by a UNIQUE database key (schema v3),

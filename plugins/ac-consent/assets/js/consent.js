@@ -358,7 +358,7 @@
   function legalLinksHtml() {
     var bits = [];
     if (S.privacy_url) {
-      bits.push('<a href="' + escapeHtml(S.privacy_url) + '" target="_blank" rel="noopener">Privacy Policy</a>');
+      bits.push('<a href="' + escapeHtml(S.privacy_url) + '" target="_blank" rel="noopener">' + escapeHtml(S.privacy_text || 'Privacy Policy') + '</a>');
     }
     var legal = CFG.legal || {};
     Object.keys(legal).forEach(function (id) {
@@ -391,11 +391,17 @@
 
   function buildBanner() {
     var b = el('div', 'acconsent-banner acconsent-pos-' + (S.position || 'bottom'));
-    b.setAttribute('role', 'dialog');
-    b.setAttribute('aria-live', 'polite');
-    b.setAttribute('aria-label', S.banner_title || 'Cookie consent');
+    // A labelled, focusable region (NOT aria-live: a live region with content
+    // already present isn't announced; moving focus in on show is what announces
+    // it to AT). role=region + aria-labelledby gives it an accessible name.
+    b.setAttribute('role', 'region');
+    b.setAttribute('aria-label', S.banner_title || S.aria_consent || 'Cookie consent');
+    b.setAttribute('tabindex', '-1');
     var inner = el('div', 'acconsent-banner-inner');
-    inner.appendChild(el('div', 'acconsent-banner-title', escapeHtml(S.banner_title)));
+    var titleEl = el('div', 'acconsent-banner-title', escapeHtml(S.banner_title));
+    titleEl.id = 'acconsent-banner-title';
+    b.setAttribute('aria-labelledby', 'acconsent-banner-title');
+    inner.appendChild(titleEl);
     inner.appendChild(el('div', 'acconsent-banner-msg', escapeHtml(S.banner_message)));
     var links = legalLinksHtml();
     if (links) { var lw = el('div'); lw.innerHTML = links; inner.appendChild(lw); }
@@ -426,10 +432,24 @@
     var modal = el('div', 'acconsent-modal');
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-label', S.manage_label || 'Manage preferences');
 
-    modal.appendChild(el('div', 'acconsent-modal-title', escapeHtml(S.banner_title)));
-    modal.appendChild(el('div', 'acconsent-modal-msg', escapeHtml(S.banner_message)));
+    // Visible, labelled close control (Esc/overlay-click are undiscoverable for
+    // many users). First child so it's the first focus target in the trap.
+    var close = el('button', 'acconsent-modal-close', '\u00d7');
+    close.type = 'button';
+    close.setAttribute('aria-label', S.close_label || 'Close');
+    close.addEventListener('click', function () { closeModal(); });
+    modal.appendChild(close);
+
+    var mTitle = el('div', 'acconsent-modal-title', escapeHtml(S.banner_title));
+    mTitle.id = 'acconsent-modal-title';
+    var mMsg = el('div', 'acconsent-modal-msg', escapeHtml(S.banner_message));
+    mMsg.id = 'acconsent-modal-msg';
+    // Accessible name + description match what is VISIBLE (WCAG 2.4.6 / 1.3.1).
+    modal.setAttribute('aria-labelledby', 'acconsent-modal-title');
+    modal.setAttribute('aria-describedby', 'acconsent-modal-msg');
+    modal.appendChild(mTitle);
+    modal.appendChild(mMsg);
     var links = legalLinksHtml();
     if (links) { var lw = el('div'); lw.innerHTML = links; modal.appendChild(lw); }
 
@@ -455,8 +475,12 @@
       var cookies = (CFG.cookies && CFG.cookies[key]) || [];
       if (cookies.length) {
         var details = el('details', 'acconsent-cat-cookies');
-        details.appendChild(el('summary', null, cookies.length + ' cookie' + (cookies.length === 1 ? '' : 's')));
-        var tbl = '<table class="acconsent-cookie-tbl"><thead><tr><th>Name</th><th>Domain</th><th>Duration</th></tr></thead><tbody>';
+        var cw = (cookies.length === 1 ? (S.cookie_one || 'cookie') : (S.cookie_many || 'cookies'));
+        details.appendChild(el('summary', null, cookies.length + ' ' + cw));
+        var tbl = '<table class="acconsent-cookie-tbl"><thead><tr><th>' +
+          escapeHtml(S.col_name || 'Name') + '</th><th>' +
+          escapeHtml(S.col_domain || 'Domain') + '</th><th>' +
+          escapeHtml(S.col_duration || 'Duration') + '</th></tr></thead><tbody>';
         cookies.forEach(function (c) {
           tbl += '<tr><td>' + escapeHtml(c.name) + '</td><td>' + escapeHtml(c.domain || '—') + '</td><td>' + escapeHtml(c.duration || '—') + '</td></tr>';
         });
@@ -471,7 +495,7 @@
     var btns = el('div', 'acconsent-modal-btns');
     var reject = el('button', 'acconsent-btn acconsent-btn-primary', escapeHtml(S.reject_label));
     reject.type = 'button';
-    reject.addEventListener('click', function () { rejectAll(); closeModal(); });
+    reject.addEventListener('click', function () { rejectAll(); }); // commit() closes the modal.
 
     // Equal visual weight with Accept/Reject so saving a granular (protective)
     // choice is not demoted to a faint link (CNIL symmetry-in-choice).
@@ -482,13 +506,12 @@
       modal.querySelectorAll('.acconsent-cat-toggle').forEach(function (cb) {
         chosen[cb.getAttribute('data-cat')] = cb.checked;
       });
-      saveChoices(chosen);
-      closeModal();
+      saveChoices(chosen); // commit() closes the modal.
     });
 
     var accept = el('button', 'acconsent-btn acconsent-btn-primary', escapeHtml(S.accept_label));
     accept.type = 'button';
-    accept.addEventListener('click', function () { acceptAll(); closeModal(); });
+    accept.addEventListener('click', function () { acceptAll(); }); // commit() closes the modal.
 
     btns.appendChild(reject);
     btns.appendChild(save);
@@ -508,7 +531,11 @@
 
   function showBanner() {
     if (root.querySelector('.acconsent-banner')) return;
-    root.appendChild(buildBanner());
+    var b = buildBanner();
+    root.appendChild(b);
+    // Move focus into the banner so screen-reader / keyboard users are told a
+    // consent choice is required and land on it (announces name + role).
+    requestAnimationFrame(function () { try { b.focus(); } catch (e) {} });
   }
 
   function focusable(container) {
@@ -537,6 +564,7 @@
     var overlay = buildModal(readConsent());
     root.appendChild(overlay);
     modalOpen = true;
+    document.documentElement.style.overflow = 'hidden'; // scroll-lock the page behind the modal.
     document.addEventListener('keydown', escClose);
     document.addEventListener('keydown', trapTab);
     // Move focus into the dialog so keyboard / screen-reader users land inside it.
@@ -548,11 +576,16 @@
     var o = root.querySelector('.acconsent-modal-overlay');
     if (o) o.parentNode.removeChild(o);
     modalOpen = false;
+    document.documentElement.style.overflow = ''; // release scroll-lock.
     document.removeEventListener('keydown', escClose);
     document.removeEventListener('keydown', trapTab);
-    // Restore focus to whatever opened the modal (FAB, banner Manage, DNS link).
-    if (lastFocus && typeof lastFocus.focus === 'function') {
-      try { lastFocus.focus(); } catch (e) {}
+    // Restore focus to whatever opened the modal — but if that element was
+    // removed (e.g. the banner's Manage button after a commit), fall back to the
+    // persistent FAB so focus never drops to <body>.
+    var target = ( lastFocus && document.contains( lastFocus ) ) ? lastFocus
+      : document.querySelector('.acconsent-fab');
+    if (target && typeof target.focus === 'function') {
+      try { target.focus(); } catch (e) {}
     }
     lastFocus = null;
   }
@@ -572,6 +605,17 @@
     applyConsent(grantedSet({ categories: categories }));
     recordServer(event, categories, source);
     removeBanner();
+    // If a choice was committed from INSIDE the open modal (e.g. the Do-Not-Sell
+    // button, which lives in both banner and modal), close the modal first — that
+    // restores scroll-lock and focus correctly. Otherwise move focus to the
+    // persistent FAB (the banner button the user clicked was just removed, so
+    // focus would fall to <body>). If no FAB exists, focus is left at <body>.
+    if (modalOpen) {
+      closeModal();
+    } else {
+      var fab = document.querySelector('.acconsent-fab');
+      if (fab) { try { fab.focus(); } catch (e) {} }
+    }
     if (toastMsg) toast(toastMsg);
   }
 

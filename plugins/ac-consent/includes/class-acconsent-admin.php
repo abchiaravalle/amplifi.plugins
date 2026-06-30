@@ -33,6 +33,14 @@ class Amplifi_Consent_Admin {
 		wp_enqueue_script( 'acconsent-admin', ACCONSENT_PLUGIN_URL . 'assets/js/admin.js', array(), ACCONSENT_VERSION, true );
 		wp_localize_script( 'acconsent-admin', 'ACCONSENT_ADMIN', array(
 			'harness_url' => admin_url( 'admin-ajax.php?action=acconsent_harness&_ajax_nonce=' . wp_create_nonce( 'acconsent_harness' ) ),
+			'i18n'        => array(
+				'confirm_scan' => __( 'This runs the script once to detect its cookies and may contact the third party. Continue?', 'amplifi-consent' ),
+				'scanning'     => __( 'Scanning…', 'amplifi-consent' ),
+				/* translators: %1$d: number of cookies, %2$s: comma-separated cookie names. */
+				'found'        => __( 'Found %1$d cookie(s): %2$s — saving…', 'amplifi-consent' ),
+				'none'         => __( 'No new first-party cookies detected.', 'amplifi-consent' ),
+				'timed_out'    => __( 'Scan timed out (no cookies reported).', 'amplifi-consent' ),
+			),
 		) );
 		wp_add_inline_style( 'wp-admin', self::inline_css() );
 	}
@@ -74,14 +82,14 @@ class Amplifi_Consent_Admin {
 		$tab = self::current_tab();
 		echo '<div class="wrap acconsent-wrap">';
 		echo '<h1>amplifi.consent</h1>';
-		echo '<p class="acconsent-muted">Managed scripts are <strong>withheld</strong> until the visitor consents to their category. Every consent choice is recorded server-side (Consent Log) and can be mirrored to a webhook. Enable <strong>Auto-block</strong> in Settings to also gate trackers added by other plugins/the theme.</p>';
+		echo '<p class="acconsent-muted">' . esc_html__( 'Managed scripts are', 'amplifi-consent' ) . ' <strong>' . esc_html__( 'withheld', 'amplifi-consent' ) . '</strong> ' . esc_html__( 'until the visitor consents to their category. Every consent choice is recorded server-side (Consent Log) and can be mirrored to a webhook. Enable', 'amplifi-consent' ) . ' <strong>' . esc_html__( 'Auto-block', 'amplifi-consent' ) . '</strong> ' . esc_html__( 'in Settings to also gate trackers added by other plugins/the theme.', 'amplifi-consent' ) . '</p>';
 
 		echo '<h2 class="nav-tab-wrapper">';
-		printf( '<a href="%s" class="nav-tab %s">Settings</a>', self::tab_url( 'settings' ), 'settings' === $tab ? 'nav-tab-active' : '' );
-		printf( '<a href="%s" class="nav-tab %s">Scripts</a>', self::tab_url( 'scripts' ), 'scripts' === $tab ? 'nav-tab-active' : '' );
-		printf( '<a href="%s" class="nav-tab %s">Cookies</a>', self::tab_url( 'cookies' ), 'cookies' === $tab ? 'nav-tab-active' : '' );
-		printf( '<a href="%s" class="nav-tab %s">Legal Docs</a>', self::tab_url( 'legal' ), 'legal' === $tab ? 'nav-tab-active' : '' );
-		printf( '<a href="%s" class="nav-tab %s">Consent Log</a>', self::tab_url( 'log' ), 'log' === $tab ? 'nav-tab-active' : '' );
+		printf( '<a href="%s" class="nav-tab %s">' . esc_html__( 'Settings', 'amplifi-consent' ) . '</a>', self::tab_url( 'settings' ), 'settings' === $tab ? 'nav-tab-active' : '' );
+		printf( '<a href="%s" class="nav-tab %s">' . esc_html__( 'Scripts', 'amplifi-consent' ) . '</a>', self::tab_url( 'scripts' ), 'scripts' === $tab ? 'nav-tab-active' : '' );
+		printf( '<a href="%s" class="nav-tab %s">' . esc_html__( 'Cookies', 'amplifi-consent' ) . '</a>', self::tab_url( 'cookies' ), 'cookies' === $tab ? 'nav-tab-active' : '' );
+		printf( '<a href="%s" class="nav-tab %s">' . esc_html__( 'Legal Docs', 'amplifi-consent' ) . '</a>', self::tab_url( 'legal' ), 'legal' === $tab ? 'nav-tab-active' : '' );
+		printf( '<a href="%s" class="nav-tab %s">' . esc_html__( 'Consent Log', 'amplifi-consent' ) . '</a>', self::tab_url( 'log' ), 'log' === $tab ? 'nav-tab-active' : '' );
 		echo '</h2>';
 
 		if ( 'settings' === $tab ) {
@@ -114,10 +122,11 @@ class Amplifi_Consent_Admin {
 				$raw[ $cb ] = isset( $_POST['settings'][ $cb ] ) ? 1 : 0;
 			}
 			Amplifi_Consent_Store::save_settings( $raw );
-			self::notice( 'Settings saved.' );
+			self::notice( __( 'Settings saved.', 'amplifi-consent' ) );
 		} elseif ( 'test_webhook' === $action ) {
 			$res = Amplifi_Consent_Webhook::test();
-			self::notice( 'Webhook test: ' . $res['message'] );
+			/* translators: %s: webhook test result message returned by the receiver */
+			self::notice( sprintf( __( 'Webhook test: %s', 'amplifi-consent' ), $res['message'] ) );
 		} elseif ( 'save_legal_doc' === $action ) {
 			$doc = Amplifi_Consent_Store::save_legal_doc( array(
 				'id'    => isset( $_POST['doc_id'] ) ? sanitize_key( $_POST['doc_id'] ) : '',
@@ -133,7 +142,7 @@ class Amplifi_Consent_Admin {
 					wp_unslash( $_POST['doc_content'] )
 				);
 			}
-			self::notice( 'Legal document saved.' );
+			self::notice( __( 'Legal document saved.', 'amplifi-consent' ) );
 		} elseif ( 'publish_legal_version' === $action ) {
 			$id = isset( $_POST['doc_id'] ) ? sanitize_key( $_POST['doc_id'] ) : '';
 			Amplifi_Consent_Store::publish_legal_version(
@@ -141,10 +150,10 @@ class Amplifi_Consent_Admin {
 				isset( $_POST['doc_version'] ) ? sanitize_text_field( wp_unslash( $_POST['doc_version'] ) ) : '',
 				isset( $_POST['doc_content'] ) ? wp_unslash( $_POST['doc_content'] ) : ''
 			);
-			self::notice( 'New version published. Returning visitors will be re-prompted to consent against the updated text.' );
+			self::notice( __( 'New version published. Returning visitors will be re-prompted to consent against the updated text.', 'amplifi-consent' ) );
 		} elseif ( 'delete_legal_doc' === $action ) {
 			Amplifi_Consent_Store::delete_legal_doc( isset( $_POST['doc_id'] ) ? sanitize_key( $_POST['doc_id'] ) : '' );
-			self::notice( 'Legal document deleted.' );
+			self::notice( __( 'Legal document deleted.', 'amplifi-consent' ) );
 		} elseif ( 'save_scripts' === $action ) {
 			$rows = isset( $_POST['scripts'] ) ? wp_unslash( $_POST['scripts'] ) : array();
 			// Normalize enabled checkboxes (unchecked boxes don't post).
@@ -152,7 +161,7 @@ class Amplifi_Consent_Admin {
 				$rows[ $i ]['enabled'] = isset( $r['enabled'] ) ? 1 : 0;
 			}
 			Amplifi_Consent_Store::save_scripts( $rows );
-			self::notice( 'Scripts saved.' );
+			self::notice( __( 'Scripts saved.', 'amplifi-consent' ) );
 		} elseif ( 'add_script' === $action ) {
 			$scripts   = Amplifi_Consent_Store::get_scripts();
 			$scripts[] = array(
@@ -163,24 +172,25 @@ class Amplifi_Consent_Admin {
 				'enabled'   => 1,
 			);
 			Amplifi_Consent_Store::save_scripts( $scripts );
-			self::notice( 'Script added.' );
+			self::notice( __( 'Script added.', 'amplifi-consent' ) );
 		} elseif ( 'delete_script' === $action ) {
 			$id      = isset( $_POST['script_id'] ) ? sanitize_key( $_POST['script_id'] ) : '';
 			$scripts = array_filter( Amplifi_Consent_Store::get_scripts(), function ( $s ) use ( $id ) {
 				return $s['id'] !== $id;
 			} );
 			Amplifi_Consent_Store::save_scripts( $scripts );
-			self::notice( 'Script deleted.' );
+			self::notice( __( 'Script deleted.', 'amplifi-consent' ) );
 		} elseif ( 'save_cookies' === $action ) {
 			$rows = isset( $_POST['cookies'] ) ? wp_unslash( $_POST['cookies'] ) : array();
 			Amplifi_Consent_Store::save_cookies( $rows );
-			self::notice( 'Cookie catalog saved.' );
+			self::notice( __( 'Cookie catalog saved.', 'amplifi-consent' ) );
 		} elseif ( 'merge_cookies' === $action ) {
 			$detected  = isset( $_POST['detected'] ) ? json_decode( wp_unslash( $_POST['detected'] ), true ) : array();
 			$script_id = isset( $_POST['script_id'] ) ? sanitize_key( $_POST['script_id'] ) : '';
 			if ( is_array( $detected ) ) {
 				Amplifi_Consent_Store::merge_detected_cookies( $detected, $script_id );
-				self::notice( count( $detected ) . ' detected cookie(s) merged into the catalog. Categorize them below.' );
+				/* translators: %d: number of detected cookies merged into the catalog */
+				self::notice( sprintf( __( '%d detected cookie(s) merged into the catalog. Categorize them below.', 'amplifi-consent' ), count( $detected ) ) );
 			}
 		}
 	}
@@ -213,18 +223,22 @@ class Amplifi_Consent_Admin {
 		$enabled_on    = ! empty( $s['enabled'] );
 		if ( ! $enabled_on ) {
 			$status_class = 'acconsent-status-warn';
-			$status_msg   = 'The consent banner is currently <strong>disabled</strong> — no scripts are being gated.';
+			$status_msg   = esc_html__( 'The consent banner is currently', 'amplifi-consent' ) . ' <strong>' . esc_html__( 'disabled', 'amplifi-consent' ) . '</strong> ' . esc_html__( '— no scripts are being gated.', 'amplifi-consent' );
 		} elseif ( 0 === $managed_count && ! $autoblock_on ) {
 			$status_class = 'acconsent-status-warn';
-			$status_msg   = 'You are gating <strong>0 trackers</strong>: no managed scripts are configured and auto-block is OFF. Trackers loaded by your theme or other plugins will fire before consent. Add your tracking scripts on the Scripts tab, or turn on auto-block below.';
+			$status_msg   = esc_html__( 'You are gating', 'amplifi-consent' ) . ' <strong>' . esc_html__( '0 trackers', 'amplifi-consent' ) . '</strong>' . esc_html__( ': no managed scripts are configured and auto-block is OFF. Trackers loaded by your theme or other plugins will fire before consent. Add your tracking scripts on the Scripts tab, or turn on auto-block below.', 'amplifi-consent' );
 		} else {
 			$status_class = 'acconsent-status-ok';
-			$status_msg   = sprintf(
-				'Gating <strong>%d managed script%s</strong>; auto-block for unmanaged trackers is <strong>%s</strong>.',
+			$status_msg   = esc_html__( 'Gating', 'amplifi-consent' ) . ' <strong>' . sprintf(
+				/* translators: 1: number of managed scripts being gated, 2: plural suffix ('s' or empty string) */
+				esc_html__( '%1$d managed script%2$s', 'amplifi-consent' ),
 				$managed_count,
-				1 === $managed_count ? '' : 's',
-				$autoblock_on ? 'ON' : 'OFF'
-			);
+				1 === $managed_count ? '' : 's'
+			) . '</strong>; ' . sprintf(
+				/* translators: %s: auto-block state ('ON' or 'OFF'), wrapped in <strong> markup */
+				esc_html__( 'auto-block for unmanaged trackers is %s', 'amplifi-consent' ),
+				'<strong>' . ( $autoblock_on ? esc_html__( 'ON', 'amplifi-consent' ) : esc_html__( 'OFF', 'amplifi-consent' ) ) . '</strong>'
+			) . '.';
 		}
 		printf( '<div class="acconsent-status %s">%s</div>', esc_attr( $status_class ), wp_kses_post( $status_msg ) );
 
@@ -232,70 +246,70 @@ class Amplifi_Consent_Admin {
 		wp_nonce_field( self::NONCE );
 		echo '<input type="hidden" name="acconsent_action" value="save_settings">';
 
-		echo '<h2>Banner</h2>';
-		self::field_checkbox( 'settings[enabled]', 'Consent banner enabled', $s['enabled'] );
-		self::field_text( 'settings[banner_title]', 'Title', $s['banner_title'] );
-		self::field_textarea( 'settings[banner_message]', 'Message', $s['banner_message'] );
+		echo '<h2>' . esc_html__( 'Banner', 'amplifi-consent' ) . '</h2>';
+		self::field_checkbox( 'settings[enabled]', __( 'Consent banner enabled', 'amplifi-consent' ), $s['enabled'] );
+		self::field_text( 'settings[banner_title]', __( 'Title', 'amplifi-consent' ), $s['banner_title'] );
+		self::field_textarea( 'settings[banner_message]', __( 'Message', 'amplifi-consent' ), $s['banner_message'] );
 
-		echo '<h2>Buttons & toasts</h2>';
-		self::field_text( 'settings[accept_label]', 'Accept button', $s['accept_label'] );
-		self::field_text( 'settings[reject_label]', 'Reject button', $s['reject_label'] );
-		self::field_text( 'settings[manage_label]', 'Manage button', $s['manage_label'] );
-		self::field_text( 'settings[save_label]', 'Save-choices button', $s['save_label'] );
-		self::field_text( 'settings[toast_accepted]', 'Toast on accept/save', $s['toast_accepted'] );
-		self::field_text( 'settings[toast_rejected]', 'Toast on reject', $s['toast_rejected'] );
+		echo '<h2>' . esc_html__( 'Buttons & toasts', 'amplifi-consent' ) . '</h2>';
+		self::field_text( 'settings[accept_label]', __( 'Accept button', 'amplifi-consent' ), $s['accept_label'] );
+		self::field_text( 'settings[reject_label]', __( 'Reject button', 'amplifi-consent' ), $s['reject_label'] );
+		self::field_text( 'settings[manage_label]', __( 'Manage button', 'amplifi-consent' ), $s['manage_label'] );
+		self::field_text( 'settings[save_label]', __( 'Save-choices button', 'amplifi-consent' ), $s['save_label'] );
+		self::field_text( 'settings[toast_accepted]', __( 'Toast on accept/save', 'amplifi-consent' ), $s['toast_accepted'] );
+		self::field_text( 'settings[toast_rejected]', __( 'Toast on reject', 'amplifi-consent' ), $s['toast_rejected'] );
 
-		echo '<h2>Behavior</h2>';
-		self::field_number( 'settings[consent_days]', 'Consent remembered for (days)', $s['consent_days'], 1, 365 );
-		echo '<div class="acconsent-field"><label>Banner position</label><select name="settings[position]">';
-		foreach ( array( 'bottom' => 'Bottom bar', 'center' => 'Centered modal' ) as $val => $lbl ) {
+		echo '<h2>' . esc_html__( 'Behavior', 'amplifi-consent' ) . '</h2>';
+		self::field_number( 'settings[consent_days]', __( 'Consent remembered for (days)', 'amplifi-consent' ), $s['consent_days'], 1, 365 );
+		echo '<div class="acconsent-field"><label>' . esc_html__( 'Banner position', 'amplifi-consent' ) . '</label><select name="settings[position]">';
+		foreach ( array( 'bottom' => __( 'Bottom bar', 'amplifi-consent' ), 'center' => __( 'Centered modal', 'amplifi-consent' ) ) as $val => $lbl ) {
 			printf( '<option value="%s" %s>%s</option>', esc_attr( $val ), selected( $s['position'], $val, false ), esc_html( $lbl ) );
 		}
 		echo '</select></div>';
-		echo '<div class="acconsent-field"><label>Accent color</label><input type="text" name="settings[accent_color]" value="' . esc_attr( $s['accent_color'] ) . '" placeholder="#055c5f"></div>';
+		echo '<div class="acconsent-field"><label>' . esc_html__( 'Accent color', 'amplifi-consent' ) . '</label><input type="text" name="settings[accent_color]" value="' . esc_attr( $s['accent_color'] ) . '" placeholder="#055c5f"></div>';
 
-		echo '<h2>Disclosure &amp; withdrawal</h2>';
-		self::field_text( 'settings[privacy_url]', 'Privacy Policy URL (shown on the banner before any choice)', $s['privacy_url'], 'https://…/privacy-policy/' );
-		self::field_text( 'settings[prefs_label]', 'Preferences trigger label', $s['prefs_label'] );
-		self::field_checkbox( 'settings[floating_button]', 'Show a persistent floating "preferences" button (always-available withdrawal path)', $s['floating_button'] );
+		echo '<h2>' . esc_html__( 'Disclosure & withdrawal', 'amplifi-consent' ) . '</h2>';
+		self::field_text( 'settings[privacy_url]', __( 'Privacy Policy URL (shown on the banner before any choice)', 'amplifi-consent' ), $s['privacy_url'], 'https://…/privacy-policy/' );
+		self::field_text( 'settings[prefs_label]', __( 'Preferences trigger label', 'amplifi-consent' ), $s['prefs_label'] );
+		self::field_checkbox( 'settings[floating_button]', __( 'Show a persistent floating "preferences" button (always-available withdrawal path)', 'amplifi-consent' ), $s['floating_button'] );
 
-		echo '<h2>Consent record &amp; proof</h2>';
-		self::field_text( 'settings[policy_version]', 'Policy version (bump to force everyone to re-consent)', $s['policy_version'] );
-		echo '<div class="acconsent-field"><label>IP handling in the consent log</label><select name="settings[ip_mode]">';
-		foreach ( array( 'hash' => 'Hashed (salted, non-reversible) — recommended', 'truncate' => 'Truncated (drop last octet)', 'none' => 'Do not store IP' ) as $val => $lbl ) {
+		echo '<h2>' . esc_html__( 'Consent record & proof', 'amplifi-consent' ) . '</h2>';
+		self::field_text( 'settings[policy_version]', __( 'Policy version (bump to force everyone to re-consent)', 'amplifi-consent' ), $s['policy_version'] );
+		echo '<div class="acconsent-field"><label>' . esc_html__( 'IP handling in the consent log', 'amplifi-consent' ) . '</label><select name="settings[ip_mode]">';
+		foreach ( array( 'hash' => __( 'Hashed (salted, non-reversible) — recommended', 'amplifi-consent' ), 'truncate' => __( 'Truncated (drop last octet)', 'amplifi-consent' ), 'none' => __( 'Do not store IP', 'amplifi-consent' ) ) as $val => $lbl ) {
 			printf( '<option value="%s" %s>%s</option>', esc_attr( $val ), selected( $s['ip_mode'], $val, false ), esc_html( $lbl ) );
 		}
 		echo '</select></div>';
-		self::field_number( 'settings[retention_days]', 'Delete consent-log rows older than (days) — 0 keeps them forever. If you set a limit, keep it at or above ~730 to satisfy the CCPA 24-month record minimum.', isset( $s['retention_days'] ) ? $s['retention_days'] : 0, 0, 36500 );
-		self::field_checkbox( 'settings[trust_proxy]', 'Behind Cloudflare / a reverse proxy: use the forwarded client IP for rate-limiting (CF-Connecting-IP / X-Forwarded-For). Leave OFF on a direct-connect origin — the forwarded header is client-spoofable there.', isset( $s['trust_proxy'] ) ? $s['trust_proxy'] : false );
-		self::field_checkbox( 'settings[webhook_enabled]', 'Send each consent event to a webhook', $s['webhook_enabled'] );
-		self::field_text( 'settings[webhook_url]', 'Webhook URL', $s['webhook_url'], 'https://…' );
-		self::field_text( 'settings[webhook_secret]', 'Webhook secret (HMAC-SHA256 signs each payload)', $s['webhook_secret'] );
-		echo '<p class="acconsent-muted">The receiver verifies the <code>X-Amplifi-Consent-Signature: sha256=…</code> header. Delivery is non-blocking and fires after the database record is written.</p>';
+		self::field_number( 'settings[retention_days]', __( 'Delete consent-log rows older than (days) — 0 keeps them forever. If you set a limit, keep it at or above ~730 to satisfy the CCPA 24-month record minimum.', 'amplifi-consent' ), isset( $s['retention_days'] ) ? $s['retention_days'] : 0, 0, 36500 );
+		self::field_checkbox( 'settings[trust_proxy]', __( 'Behind Cloudflare / a reverse proxy: use the forwarded client IP for rate-limiting (CF-Connecting-IP / X-Forwarded-For). Leave OFF on a direct-connect origin — the forwarded header is client-spoofable there.', 'amplifi-consent' ), isset( $s['trust_proxy'] ) ? $s['trust_proxy'] : false );
+		self::field_checkbox( 'settings[webhook_enabled]', __( 'Send each consent event to a webhook', 'amplifi-consent' ), $s['webhook_enabled'] );
+		self::field_text( 'settings[webhook_url]', __( 'Webhook URL', 'amplifi-consent' ), $s['webhook_url'], 'https://…' );
+		self::field_text( 'settings[webhook_secret]', __( 'Webhook secret (HMAC-SHA256 signs each payload)', 'amplifi-consent' ), $s['webhook_secret'] );
+		echo '<p class="acconsent-muted">' . esc_html__( 'The receiver verifies the', 'amplifi-consent' ) . ' <code>X-Amplifi-Consent-Signature: sha256=…</code> ' . esc_html__( 'header. Delivery is non-blocking and fires after the database record is written.', 'amplifi-consent' ) . '</p>';
 
-		echo '<h2>US / CCPA</h2>';
-		self::field_checkbox( 'settings[gpc_enabled]', 'Honor the Global Privacy Control (GPC) browser signal as an opt-out', $s['gpc_enabled'] );
-		self::field_checkbox( 'settings[do_not_sell]', 'Show a one-click "Do Not Sell or Share My Personal Information" opt-out button (CCPA/CPRA)', isset( $s['do_not_sell'] ) ? $s['do_not_sell'] : true );
-		self::field_text( 'settings[dns_label]', '"Do Not Sell or Share" button label', isset( $s['dns_label'] ) ? $s['dns_label'] : 'Do Not Sell or Share My Personal Information' );
+		echo '<h2>' . esc_html__( 'US / CCPA', 'amplifi-consent' ) . '</h2>';
+		self::field_checkbox( 'settings[gpc_enabled]', __( 'Honor the Global Privacy Control (GPC) browser signal as an opt-out', 'amplifi-consent' ), $s['gpc_enabled'] );
+		self::field_checkbox( 'settings[do_not_sell]', __( 'Show a one-click "Do Not Sell or Share My Personal Information" opt-out button (CCPA/CPRA)', 'amplifi-consent' ), isset( $s['do_not_sell'] ) ? $s['do_not_sell'] : true );
+		self::field_text( 'settings[dns_label]', __( '"Do Not Sell or Share" button label', 'amplifi-consent' ), isset( $s['dns_label'] ) ? $s['dns_label'] : 'Do Not Sell or Share My Personal Information' );
 
-		echo '<h2>Google Consent Mode v2</h2>';
-		self::field_checkbox( 'settings[consent_mode]', 'Push Consent Mode v2 defaults (all denied) before tags, and update on choice', $s['consent_mode'] );
+		echo '<h2>' . esc_html__( 'Google Consent Mode v2', 'amplifi-consent' ) . '</h2>';
+		self::field_checkbox( 'settings[consent_mode]', __( 'Push Consent Mode v2 defaults (all denied) before tags, and update on choice', 'amplifi-consent' ), $s['consent_mode'] );
 
-		echo '<h2>Auto-block unmanaged trackers</h2>';
-		self::field_checkbox( 'settings[autoblock]', 'Also gate third-party trackers added by OTHER plugins / the theme (by domain) until consent', $s['autoblock'] );
-		self::field_textarea( 'settings[blocklist]', 'Blocked tracker domains (one per line)', $s['blocklist'] );
-		echo '<p class="acconsent-muted">When on, any <code>&lt;script src&gt;</code>, <code>&lt;img&gt;</code>, or <code>&lt;iframe&gt;</code> pointing at one of these hosts is neutralized until the visitor consents. Each line is <code>host|category</code> — the category it is released under (default <code>marketing</code>, the strictest opt-in, if you omit it). This catches trackers you did not paste into the Scripts tab, but only those present in the page HTML — trackers injected by JavaScript after load are caught by the network shim where possible.</p>';
+		echo '<h2>' . esc_html__( 'Auto-block unmanaged trackers', 'amplifi-consent' ) . '</h2>';
+		self::field_checkbox( 'settings[autoblock]', __( 'Also gate third-party trackers added by OTHER plugins / the theme (by domain) until consent', 'amplifi-consent' ), $s['autoblock'] );
+		self::field_textarea( 'settings[blocklist]', __( 'Blocked tracker domains (one per line)', 'amplifi-consent' ), $s['blocklist'] );
+		echo '<p class="acconsent-muted">' . esc_html__( 'When on, any', 'amplifi-consent' ) . ' <code>&lt;script src&gt;</code>, <code>&lt;img&gt;</code>, ' . esc_html__( 'or', 'amplifi-consent' ) . ' <code>&lt;iframe&gt;</code> ' . esc_html__( 'pointing at one of these hosts is neutralized until the visitor consents. Each line is', 'amplifi-consent' ) . ' <code>host|category</code> ' . esc_html__( '— the category it is released under (default', 'amplifi-consent' ) . ' <code>marketing</code>' . esc_html__( ', the strictest opt-in, if you omit it). This catches trackers you did not paste into the Scripts tab, but only those present in the page HTML — trackers injected by JavaScript after load are caught by the network shim where possible.', 'amplifi-consent' ) . '</p>';
 
-		submit_button( 'Save settings' );
+		submit_button( __( 'Save settings', 'amplifi-consent' ) );
 		echo '</form>';
 
 		// Webhook test (separate form).
 		echo '<form method="post" class="acconsent-card">';
 		wp_nonce_field( self::NONCE );
 		echo '<input type="hidden" name="acconsent_action" value="test_webhook">';
-		echo '<h2>Test webhook</h2>';
-		echo '<p class="acconsent-muted">Sends a signed <code>consent.test</code> payload to the configured URL and reports the HTTP status.</p>';
-		submit_button( 'Send test', 'secondary', 'submit', false );
+		echo '<h2>' . esc_html__( 'Test webhook', 'amplifi-consent' ) . '</h2>';
+		echo '<p class="acconsent-muted">' . esc_html__( 'Sends a signed', 'amplifi-consent' ) . ' <code>consent.test</code> ' . esc_html__( 'payload to the configured URL and reports the HTTP status.', 'amplifi-consent' ) . '</p>';
+		submit_button( __( 'Send test', 'amplifi-consent' ), 'secondary', 'submit', false );
 		echo '</form>';
 	}
 
@@ -305,8 +319,8 @@ class Amplifi_Consent_Admin {
 		$docs = Amplifi_Consent_Store::get_legal_docs();
 
 		echo '<div class="acconsent-card">';
-		echo '<h2>Versioned legal documents</h2>';
-		echo '<p class="acconsent-muted">Manage your Privacy Policy, Terms, and Cookie Policy here as <strong>versioned</strong> documents. Place each on a page with <code>[amplifi-legal-doc slug="&lt;slug&gt;"]</code>. The <strong>current version</strong> of every published doc is stamped into every consent record, so the log proves exactly which policy texts a visitor agreed to. Publishing a new version re-prompts returning visitors.</p>';
+		echo '<h2>' . esc_html__( 'Versioned legal documents', 'amplifi-consent' ) . '</h2>';
+		echo '<p class="acconsent-muted">' . esc_html__( 'Manage your Privacy Policy, Terms, and Cookie Policy here as', 'amplifi-consent' ) . ' <strong>' . esc_html__( 'versioned', 'amplifi-consent' ) . '</strong> ' . esc_html__( 'documents. Place each on a page with', 'amplifi-consent' ) . ' <code>[amplifi-legal-doc slug="&lt;slug&gt;"]</code>. ' . esc_html__( 'The', 'amplifi-consent' ) . ' <strong>' . esc_html__( 'current version', 'amplifi-consent' ) . '</strong> ' . esc_html__( 'of every published doc is stamped into every consent record, so the log proves exactly which policy texts a visitor agreed to. Publishing a new version re-prompts returning visitors.', 'amplifi-consent' ) . '</p>';
 		echo '</div>';
 
 		// Existing docs.
@@ -314,22 +328,24 @@ class Amplifi_Consent_Admin {
 			$cur = Amplifi_Consent_Store::current_version( $doc );
 			echo '<div class="acconsent-card">';
 			echo '<h2>' . esc_html( $doc['title'] ) . ' <span class="acconsent-cat-pill">' . esc_html( $doc['type'] ) . '</span></h2>';
-			echo '<p class="acconsent-muted">Shortcode: <code>[amplifi-legal-doc slug="' . esc_attr( $doc['slug'] ) . '"]</code>';
+			echo '<p class="acconsent-muted">' . esc_html__( 'Shortcode:', 'amplifi-consent' ) . ' <code>[amplifi-legal-doc slug="' . esc_attr( $doc['slug'] ) . '"]</code>';
 			if ( $cur ) {
-				echo ' &nbsp;·&nbsp; Current: <strong>' . esc_html( $cur['version'] ) . '</strong> (' . esc_html( $cur['published_at'] ) . ' UTC)';
+				echo ' &nbsp;·&nbsp; ' . esc_html__( 'Current:', 'amplifi-consent' ) . ' <strong>' . esc_html( $cur['version'] ) . '</strong> (' . esc_html( $cur['published_at'] ) . ' ' . esc_html__( 'UTC', 'amplifi-consent' ) . ')';
 			} else {
-				echo ' &nbsp;·&nbsp; <em>No version published yet.</em>';
+				echo ' &nbsp;·&nbsp; <em>' . esc_html__( 'No version published yet.', 'amplifi-consent' ) . '</em>';
 			}
-			echo ' &nbsp;·&nbsp; ' . count( $doc['versions'] ) . ' version(s)</p>';
+			/* translators: %d: number of saved versions of this legal document */
+			echo ' &nbsp;·&nbsp; ' . sprintf( esc_html__( '%d version(s)', 'amplifi-consent' ), count( $doc['versions'] ) ) . '</p>';
 
 			// Publish a new version.
 			echo '<form method="post">';
 			wp_nonce_field( self::NONCE );
 			echo '<input type="hidden" name="acconsent_action" value="publish_legal_version">';
 			echo '<input type="hidden" name="doc_id" value="' . esc_attr( $id ) . '">';
-			self::field_text( 'doc_version', 'New version label (blank = auto v' . ( count( $doc['versions'] ) + 1 ) . ')', '' );
-			self::field_textarea( 'doc_content', 'Document content (HTML allowed)', $cur ? $cur['content'] : '' );
-			submit_button( 'Publish new version', 'primary', 'submit', false );
+			/* translators: %d: next auto-generated version number */
+			self::field_text( 'doc_version', sprintf( __( 'New version label (blank = auto v%d)', 'amplifi-consent' ), count( $doc['versions'] ) + 1 ), '' );
+			self::field_textarea( 'doc_content', __( 'Document content (HTML allowed)', 'amplifi-consent' ), $cur ? $cur['content'] : '' );
+			submit_button( __( 'Publish new version', 'amplifi-consent' ), 'primary', 'submit', false );
 			echo ' ';
 			echo '</form>';
 
@@ -338,7 +354,7 @@ class Amplifi_Consent_Admin {
 			wp_nonce_field( self::NONCE );
 			echo '<input type="hidden" name="acconsent_action" value="delete_legal_doc">';
 			echo '<input type="hidden" name="doc_id" value="' . esc_attr( $id ) . '">';
-			echo '<button type="submit" class="button-link-delete" onclick="return confirm(\'Delete this document and all its versions?\')">Delete document</button>';
+			echo '<button type="submit" class="button-link-delete" onclick="return confirm(\'' . esc_js( __( 'Delete this document and all its versions?', 'amplifi-consent' ) ) . '\')">' . esc_html__( 'Delete document', 'amplifi-consent' ) . '</button>';
 			echo '</form>';
 			echo '</div>';
 		}
@@ -347,17 +363,17 @@ class Amplifi_Consent_Admin {
 		echo '<form method="post" class="acconsent-card">';
 		wp_nonce_field( self::NONCE );
 		echo '<input type="hidden" name="acconsent_action" value="save_legal_doc">';
-		echo '<h2>Add a legal document</h2>';
-		self::field_text( 'doc_title', 'Title', '', 'e.g. Privacy Policy' );
-		self::field_text( 'doc_slug', 'Slug (used in the shortcode)', '', 'privacy-policy' );
-		echo '<div class="acconsent-field"><label>Type</label><select name="doc_type">';
-		foreach ( array( 'privacy' => 'Privacy Policy', 'terms' => 'Terms & Conditions', 'cookie' => 'Cookie Policy', 'custom' => 'Custom' ) as $val => $lbl ) {
+		echo '<h2>' . esc_html__( 'Add a legal document', 'amplifi-consent' ) . '</h2>';
+		self::field_text( 'doc_title', __( 'Title', 'amplifi-consent' ), '', 'e.g. Privacy Policy' );
+		self::field_text( 'doc_slug', __( 'Slug (used in the shortcode)', 'amplifi-consent' ), '', 'privacy-policy' );
+		echo '<div class="acconsent-field"><label>' . esc_html__( 'Type', 'amplifi-consent' ) . '</label><select name="doc_type">';
+		foreach ( array( 'privacy' => __( 'Privacy Policy', 'amplifi-consent' ), 'terms' => __( 'Terms & Conditions', 'amplifi-consent' ), 'cookie' => __( 'Cookie Policy', 'amplifi-consent' ), 'custom' => __( 'Custom', 'amplifi-consent' ) ) as $val => $lbl ) {
 			printf( '<option value="%s">%s</option>', esc_attr( $val ), esc_html( $lbl ) );
 		}
 		echo '</select></div>';
-		self::field_text( 'doc_version', 'Initial version label (blank = v1)', '' );
-		self::field_textarea( 'doc_content', 'Document content (HTML allowed)', '' );
-		submit_button( 'Create document' );
+		self::field_text( 'doc_version', __( 'Initial version label (blank = v1)', 'amplifi-consent' ), '' );
+		self::field_textarea( 'doc_content', __( 'Document content (HTML allowed)', 'amplifi-consent' ), '' );
+		submit_button( __( 'Create document', 'amplifi-consent' ) );
 		echo '</form>';
 	}
 
@@ -370,15 +386,15 @@ class Amplifi_Consent_Admin {
 		$export_json = esc_url( rest_url( Amplifi_Consent_Rest::NS . '/export?format=json' ) );
 
 		echo '<div class="acconsent-card">';
-		echo '<h2>Consent log <span class="acconsent-cat-pill">' . esc_html( $total ) . ' record(s)</span></h2>';
-		echo '<p class="acconsent-muted">A best-effort, server-side record designed to help you demonstrate consent (GDPR Art. 7(1)). Each row is stamped server-side with the time, the policy/catalog versions live when the visitor saw the banner, legal-doc versions, GPC signal, and a privacy-preserving IP. Records are written by a client request, so an event can be missed if the visitor is offline or blocks the request — this is a tool, not a legal guarantee. Export for DSAR / DPA / audit:</p>';
-		echo '<p><a class="button" href="' . $export_csv . '">Download CSV</a> <a class="button" href="' . $export_json . '">Download JSON</a></p>';
+		echo '<h2>' . esc_html__( 'Consent log', 'amplifi-consent' ) . ' <span class="acconsent-cat-pill">' . esc_html( $total ) . ' ' . esc_html__( 'record(s)', 'amplifi-consent' ) . '</span></h2>';
+		echo '<p class="acconsent-muted">' . esc_html__( 'A best-effort, server-side record designed to help you demonstrate consent (GDPR Art. 7(1)). Each row is stamped server-side with the time, the policy/catalog versions live when the visitor saw the banner, legal-doc versions, GPC signal, and a privacy-preserving IP. Records are written by a client request, so an event can be missed if the visitor is offline or blocks the request — this is a tool, not a legal guarantee. Export for DSAR / DPA / audit:', 'amplifi-consent' ) . '</p>';
+		echo '<p><a class="button" href="' . $export_csv . '">' . esc_html__( 'Download CSV', 'amplifi-consent' ) . '</a> <a class="button" href="' . $export_json . '">' . esc_html__( 'Download JSON', 'amplifi-consent' ) . '</a></p>';
 		echo '</div>';
 
 		echo '<div class="acconsent-card">';
-		echo '<table class="widefat striped"><thead><tr><th>When (UTC)</th><th>Event</th><th>Categories</th><th>Policy</th><th>Catalog</th><th>GPC</th><th>Source</th><th>Visitor</th></tr></thead><tbody>';
+		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'When (UTC)', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Event', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Categories', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Policy', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Catalog', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'GPC', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Source', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Visitor', 'amplifi-consent' ) . '</th></tr></thead><tbody>';
 		if ( empty( $rows ) ) {
-			echo '<tr><td colspan="8"><span class="acconsent-muted">No consent recorded yet.</span></td></tr>';
+			echo '<tr><td colspan="8"><span class="acconsent-muted">' . esc_html__( 'No consent recorded yet.', 'amplifi-consent' ) . '</span></td></tr>';
 		}
 		foreach ( (array) $rows as $r ) {
 			$cats = json_decode( $r['categories'], true );
@@ -418,26 +434,26 @@ class Amplifi_Consent_Admin {
 		echo '<form method="post" class="acconsent-card">';
 		wp_nonce_field( self::NONCE );
 		echo '<input type="hidden" name="acconsent_action" value="add_script">';
-		echo '<h2>Add a tracking script</h2>';
-		echo '<p class="acconsent-muted">Paste the full snippet (the whole <code>&lt;script&gt;...&lt;/script&gt;</code>, including external <code>src</code> loaders). It will be withheld until the visitor consents to its category.</p>';
-		self::field_text( 'new_label', 'Label', '', 'e.g. Google Analytics 4' );
-		echo '<div class="acconsent-field"><label>Category</label><select name="new_category">';
+		echo '<h2>' . esc_html__( 'Add a tracking script', 'amplifi-consent' ) . '</h2>';
+		echo '<p class="acconsent-muted">' . esc_html__( 'Paste the full snippet (the whole', 'amplifi-consent' ) . ' <code>&lt;script&gt;...&lt;/script&gt;</code>, ' . esc_html__( 'including external', 'amplifi-consent' ) . ' <code>src</code> ' . esc_html__( 'loaders). It will be withheld until the visitor consents to its category.', 'amplifi-consent' ) . '</p>';
+		self::field_text( 'new_label', __( 'Label', 'amplifi-consent' ), '', 'e.g. Google Analytics 4' );
+		echo '<div class="acconsent-field"><label>' . esc_html__( 'Category', 'amplifi-consent' ) . '</label><select name="new_category">';
 		foreach ( $categories as $key => $cat ) {
 			if ( ! empty( $cat['locked'] ) ) { continue; }
 			printf( '<option value="%s">%s</option>', esc_attr( $key ), esc_html( $cat['label'] ) );
 		}
 		echo '</select></div>';
-		echo '<div class="acconsent-field"><label>Placement</label><select name="new_placement">';
-		foreach ( array( 'head' => '<head>', 'body_open' => 'After <body>', 'footer' => 'Footer' ) as $val => $lbl ) {
+		echo '<div class="acconsent-field"><label>' . esc_html__( 'Placement', 'amplifi-consent' ) . '</label><select name="new_placement">';
+		foreach ( array( 'head' => __( '<head>', 'amplifi-consent' ), 'body_open' => __( 'After <body>', 'amplifi-consent' ), 'footer' => __( 'Footer', 'amplifi-consent' ) ) as $val => $lbl ) {
 			printf( '<option value="%s">%s</option>', esc_attr( $val ), esc_html( $lbl ) );
 		}
 		echo '</select></div>';
-		self::field_textarea( 'new_code', 'Script code', '', '<script>...</script>' );
-		submit_button( 'Add script', 'primary', 'submit', false );
+		self::field_textarea( 'new_code', __( 'Script code', 'amplifi-consent' ), '', '<script>...</script>' );
+		submit_button( __( 'Add script', 'amplifi-consent' ), 'primary', 'submit', false );
 		echo '</form>';
 
 		if ( empty( $scripts ) ) {
-			echo '<div class="acconsent-card"><p class="acconsent-muted">No scripts yet. Add one above.</p></div>';
+			echo '<div class="acconsent-card"><p class="acconsent-muted">' . esc_html__( 'No scripts yet. Add one above.', 'amplifi-consent' ) . '</p></div>';
 			return;
 		}
 
@@ -445,8 +461,8 @@ class Amplifi_Consent_Admin {
 		echo '<form method="post" class="acconsent-card">';
 		wp_nonce_field( self::NONCE );
 		echo '<input type="hidden" name="acconsent_action" value="save_scripts">';
-		echo '<h2>Managed scripts</h2>';
-		echo '<table class="widefat striped"><thead><tr><th>On</th><th>Label</th><th>Category</th><th>Placement</th><th>Code</th><th>Scan</th><th></th></tr></thead><tbody>';
+		echo '<h2>' . esc_html__( 'Managed scripts', 'amplifi-consent' ) . '</h2>';
+		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'On', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Label', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Category', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Placement', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Code', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Scan', 'amplifi-consent' ) . '</th><th></th></tr></thead><tbody>';
 		foreach ( $scripts as $i => $s ) {
 			echo '<tr class="acconsent-script-row">';
 			echo '<td><input type="hidden" name="scripts[' . $i . '][id]" value="' . esc_attr( $s['id'] ) . '"><input type="checkbox" name="scripts[' . $i . '][enabled]" value="1" ' . checked( $s['enabled'], true, false ) . '></td>';
@@ -458,17 +474,17 @@ class Amplifi_Consent_Admin {
 			}
 			echo '</select></td>';
 			echo '<td><select name="scripts[' . $i . '][placement]">';
-			foreach ( array( 'head' => 'head', 'body_open' => 'body', 'footer' => 'footer' ) as $val => $lbl ) {
+			foreach ( array( 'head' => __( 'head', 'amplifi-consent' ), 'body_open' => __( 'body', 'amplifi-consent' ), 'footer' => __( 'footer', 'amplifi-consent' ) ) as $val => $lbl ) {
 				printf( '<option value="%s" %s>%s</option>', esc_attr( $val ), selected( $s['placement'], $val, false ), esc_html( $lbl ) );
 			}
 			echo '</select></td>';
 			echo '<td class="acconsent-code-cell"><textarea name="scripts[' . $i . '][code]">' . esc_textarea( $s['code'] ) . '</textarea></td>';
-			echo '<td><button type="button" class="button acconsent-scan-btn" data-script-id="' . esc_attr( $s['id'] ) . '">Scan cookies</button><div class="acconsent-scan-result" data-for="' . esc_attr( $s['id'] ) . '"></div></td>';
+			echo '<td><button type="button" class="button acconsent-scan-btn" data-script-id="' . esc_attr( $s['id'] ) . '">' . esc_html__( 'Scan cookies', 'amplifi-consent' ) . '</button><div class="acconsent-scan-result" data-for="' . esc_attr( $s['id'] ) . '"></div></td>';
 			echo '<td><button type="submit" class="button-link-delete" name="acconsent_inline_delete" value="' . esc_attr( $s['id'] ) . '" formaction="" onclick="return false;" style="display:none"></button></td>';
 			echo '</tr>';
 		}
 		echo '</tbody></table>';
-		submit_button( 'Save changes' );
+		submit_button( __( 'Save changes', 'amplifi-consent' ) );
 		echo '</form>';
 
 		// Per-script delete forms + merge-cookies form (used by scanner JS).
@@ -477,7 +493,7 @@ class Amplifi_Consent_Admin {
 			wp_nonce_field( self::NONCE );
 			echo '<input type="hidden" name="acconsent_action" value="delete_script">';
 			echo '<input type="hidden" name="script_id" value="' . esc_attr( $s['id'] ) . '">';
-			echo '<button type="submit" class="button-link-delete" onclick="return confirm(\'Delete this script?\')">Delete: ' . esc_html( $s['label'] ? $s['label'] : $s['id'] ) . '</button> &nbsp;';
+			echo '<button type="submit" class="button-link-delete" onclick="return confirm(\'' . esc_js( __( 'Delete this script?', 'amplifi-consent' ) ) . '\')">' . esc_html__( 'Delete:', 'amplifi-consent' ) . ' ' . esc_html( $s['label'] ? $s['label'] : $s['id'] ) . '</button> &nbsp;';
 			echo '</form>';
 		}
 
@@ -503,20 +519,20 @@ class Amplifi_Consent_Admin {
 		echo '<form method="post" class="acconsent-card">';
 		wp_nonce_field( self::NONCE );
 		echo '<input type="hidden" name="acconsent_action" value="save_cookies">';
-		echo '<h2>Cookie catalog</h2>';
-		echo '<p class="acconsent-muted">Detected cookies appear here after a scan. Assign each to a category — this is exactly what visitors see in the Manage panel. Newly-detected cookies start as <strong>Unclassified</strong> and are NOT disclosed to visitors until you categorize them.</p>';
-		echo '<p class="acconsent-muted" style="border-left:3px solid #d6a100;padding-left:10px"><strong>Scanner note:</strong> “Scan cookies” executes the script once in this admin context to observe the cookies it sets. That run is a real execution and may contact the third party. Use it only on scripts you trust; it is optional — you can categorize cookies by hand instead.</p>';
+		echo '<h2>' . esc_html__( 'Cookie catalog', 'amplifi-consent' ) . '</h2>';
+		echo '<p class="acconsent-muted">' . esc_html__( 'Detected cookies appear here after a scan. Assign each to a category — this is exactly what visitors see in the Manage panel. Newly-detected cookies start as', 'amplifi-consent' ) . ' <strong>' . esc_html__( 'Unclassified', 'amplifi-consent' ) . '</strong> ' . esc_html__( 'and are NOT disclosed to visitors until you categorize them.', 'amplifi-consent' ) . '</p>';
+		echo '<p class="acconsent-muted" style="border-left:3px solid #d6a100;padding-left:10px"><strong>' . esc_html__( 'Scanner note:', 'amplifi-consent' ) . '</strong> ' . esc_html__( '“Scan cookies” executes the script once in this admin context to observe the cookies it sets. That run is a real execution and may contact the third party. Use it only on scripts you trust; it is optional — you can categorize cookies by hand instead.', 'amplifi-consent' ) . '</p>';
 
 		if ( empty( $cookies ) ) {
-			echo '<p class="acconsent-muted">No cookies catalogued yet. Go to the <strong>Scripts</strong> tab and click “Scan cookies” on a script.</p>';
+			echo '<p class="acconsent-muted">' . esc_html__( 'No cookies catalogued yet. Go to the', 'amplifi-consent' ) . ' <strong>' . esc_html__( 'Scripts', 'amplifi-consent' ) . '</strong> ' . esc_html__( 'tab and click “Scan cookies” on a script.', 'amplifi-consent' ) . '</p>';
 		} else {
-			echo '<table class="widefat striped"><thead><tr><th>Name</th><th>Category</th><th>Set by</th><th>Domain</th><th>Duration</th><th>Description</th></tr></thead><tbody>';
+			echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Name', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Category', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Set by', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Domain', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Duration', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Description', 'amplifi-consent' ) . '</th></tr></thead><tbody>';
 			foreach ( $cookies as $i => $c ) {
 				echo '<tr>';
 				echo '<td><strong>' . esc_html( $c['name'] ) . '</strong><input type="hidden" name="cookies[' . $i . '][name]" value="' . esc_attr( $c['name'] ) . '"></td>';
 				echo '<td><select name="cookies[' . $i . '][category]">';
 				if ( 'unclassified' === $c['category'] ) {
-					echo '<option value="unclassified" selected>— Unclassified (review) —</option>';
+					echo '<option value="unclassified" selected>' . esc_html__( '— Unclassified (review) —', 'amplifi-consent' ) . '</option>';
 				}
 				foreach ( $categories as $key => $cat ) {
 					printf( '<option value="%s" %s>%s</option>', esc_attr( $key ), selected( $c['category'], $key, false ), esc_html( $cat['label'] ) );
@@ -530,7 +546,7 @@ class Amplifi_Consent_Admin {
 				echo '</tr>';
 			}
 			echo '</tbody></table>';
-			submit_button( 'Save catalog' );
+			submit_button( __( 'Save catalog', 'amplifi-consent' ) );
 		}
 		echo '</form>';
 	}

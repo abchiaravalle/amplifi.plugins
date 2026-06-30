@@ -113,6 +113,16 @@ class Amplifi_Consent_Frontend {
 				'consent_mode'   => (bool) $settings['consent_mode'],
 				'do_not_sell'    => (bool) $settings['do_not_sell'],
 				'dns_label'      => $settings['dns_label'],
+				// Visitor-facing strings that live only in the JS — passed here so
+				// they are translatable (gettext) rather than baked into consent.js.
+				'privacy_text'   => __( 'Privacy Policy', 'amplifi-consent' ),
+				'aria_consent'   => __( 'Cookie consent', 'amplifi-consent' ),
+				'col_name'       => __( 'Name', 'amplifi-consent' ),
+				'col_domain'     => __( 'Domain', 'amplifi-consent' ),
+				'col_duration'   => __( 'Duration', 'amplifi-consent' ),
+				'cookie_one'     => __( 'cookie', 'amplifi-consent' ),
+				'cookie_many'    => __( 'cookies', 'amplifi-consent' ),
+				'close_label'    => __( 'Close', 'amplifi-consent' ),
 			),
 			'categories'     => $categories,
 			'cookies'        => $cookies_by_cat,
@@ -581,6 +591,16 @@ gtag('consent','default',{
 		if ( empty( $entries ) ) {
 			return $html;
 		}
+
+		// Size cap: on a very large page, running five regex passes over the whole
+		// buffer is expensive AND raises the odds of hitting pcre.backtrack_limit
+		// (which makes preg_* return NULL). The JS net-shim already neutralizes
+		// these same vectors at runtime, so skip the server rewrite for oversized
+		// documents rather than risk CPU spikes or a blanked page.
+		if ( strlen( $html ) > 2097152 ) { // ~2 MB
+			return $html;
+		}
+
 		// Build one alternation, but remember each host's category for the callback.
 		$host_cat = array();
 		$quoted   = array();
@@ -601,8 +621,15 @@ gtag('consent','default',{
 			return 'marketing';
 		};
 
+		// Run a preg_replace_callback but NEVER let a PCRE failure (backtrack
+		// limit, etc.) blank the page: on NULL, keep the prior HTML unchanged.
+		$safe_replace = function ( $re, $cb, $subject ) {
+			$out = preg_replace_callback( $re, $cb, $subject );
+			return ( null === $out ) ? $subject : $out;
+		};
+
 		// 1) <script ...src="tracker">...</script> (skip already-gated/our own).
-		$html = preg_replace_callback(
+		$html = $safe_replace(
 			'#<script\b(?![^>]*\bdata-acconsent\b)(?![^>]*type=["\']text/plain["\'])[^>]*\bsrc=["\']([^"\']*(?:' . $pattern . ')[^"\']*)["\'][^>]*>(.*?)</script>#is',
 			function ( $m ) use ( $cat_for ) {
 				$src = $m[1];
@@ -613,7 +640,7 @@ gtag('consent','default',{
 		);
 
 		// 2) Inline <script> bodies that reference a tracker host (gtag/fbq loaders).
-		$html = preg_replace_callback(
+		$html = $safe_replace(
 			'#<script\b(?![^>]*\bsrc=)(?![^>]*\bdata-acconsent\b)(?![^>]*type=["\']text/plain["\'])([^>]*)>(.*?)</script>#is',
 			function ( $m ) use ( $pattern, $cat_for ) {
 				if ( preg_match( '#(' . $pattern . ')#i', $m[2], $mm ) ) {
@@ -626,12 +653,12 @@ gtag('consent','default',{
 		);
 
 		// 3) Tracking <img>/<iframe> pixels.
-		$html = preg_replace_callback(
+		$html = $safe_replace(
 			'#<(img|iframe)\b(?![^>]*\bdata-acconsent\b)[^>]*\bsrc=["\']([^"\']*(?:' . $pattern . ')[^"\']*)["\'][^>]*>#is',
 			function ( $m ) use ( $cat_for ) {
 				$cat = $cat_for( $m[2] );
 				$tag = preg_replace( '/\bsrc=/i', 'data-acconsent-blocked="' . esc_attr( $cat ) . '" data-acconsent-src=', $m[0], 1 );
-				return $tag;
+				return ( null === $tag ) ? $m[0] : $tag;
 			},
 			$html
 		);
@@ -640,7 +667,7 @@ gtag('consent','default',{
 		// to a tracker host: a preconnect/dns-prefetch performs a DNS+TLS
 		// handshake to the third party BEFORE consent, leaking the visitor IP.
 		// Strip them entirely (they're an optimization, not required to load).
-		$html = preg_replace_callback(
+		$html = $safe_replace(
 			'#<link\b[^>]*\brel=["\'](?:preconnect|dns-prefetch|preload|prefetch)["\'][^>]*\bhref=["\']([^"\']*(?:' . $pattern . ')[^"\']*)["\'][^>]*/?>#is',
 			function () {
 				return ''; // drop the hint.
@@ -648,7 +675,7 @@ gtag('consent','default',{
 			$html
 		);
 		// Same, with rel/href in the opposite order.
-		$html = preg_replace_callback(
+		$html = $safe_replace(
 			'#<link\b[^>]*\bhref=["\']([^"\']*(?:' . $pattern . ')[^"\']*)["\'][^>]*\brel=["\'](?:preconnect|dns-prefetch|preload|prefetch)["\'][^>]*/?>#is',
 			function () {
 				return '';

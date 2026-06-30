@@ -3,11 +3,12 @@
 Plugin Name: amplifi.consent
 Plugin URI: https://github.com/abchiaravalle/amplifi.plugins
 Description: First-party cookie consent that hard-withholds tracking scripts until the visitor accepts. Managed scripts are emitted inside inert base64 <template> elements (browsers never execute their contents) and only materialized after consent — nothing fires on reject. Per-category toggles, accept/reject toast, version-bound consent (configurable 1–365 days), a [amplifi-consent-manager] shortcode, a best-effort server-side consent log, GPC support, optional auto-block of unmanaged trackers, and an admin cookie scanner that loads each script in an isolated admin harness frame (a real execution that may contact the third party — only scan scripts you trust) to detect the cookies it sets so you can categorize them.
-Version: 1.7.0
+Version: 1.8.0
 Author: amplifi.studio
 Author URI: https://amplifi.studio
 License: MIT
 Text Domain: amplifi-consent
+Domain Path: /languages
 */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -17,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( defined( 'ACCONSENT_VERSION' ) ) {
 	return;
 }
-define( 'ACCONSENT_VERSION', '1.7.0' );
+define( 'ACCONSENT_VERSION', '1.8.0' );
 define( 'ACCONSENT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACCONSENT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACCONSENT_PLUGIN_FILE', __FILE__ );
@@ -61,6 +62,12 @@ class Amplifi_Consent {
 		Amplifi_Consent_Admin::init();
 		Amplifi_Consent_Rest::init();
 
+		// Load translations. Required because this plugin ships via GitHub /
+		// the amplifi.studio updater, NOT wp.org, so the .org language-pack
+		// auto-loader doesn't apply; without this an operator's .mo in
+		// wp-content/languages/plugins/ won't load on the 6.0 minimum target.
+		add_action( 'init', array( __CLASS__, 'load_textdomain' ) );
+
 		// Create/upgrade the consent-log table on a version bump (covers sites
 		// that updated the plugin without re-running the activation hook). Runs on
 		// `init` (not just admin_init) so front-end-only / headless sites that
@@ -74,6 +81,11 @@ class Amplifi_Consent {
 		if ( ! wp_next_scheduled( 'acconsent_daily_purge' ) ) {
 			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'acconsent_daily_purge' );
 		}
+	}
+
+	/** Load the plugin's translations from /languages. */
+	public static function load_textdomain() {
+		load_plugin_textdomain( 'amplifi-consent', false, dirname( plugin_basename( ACCONSENT_PLUGIN_FILE ) ) . '/languages' );
 	}
 }
 

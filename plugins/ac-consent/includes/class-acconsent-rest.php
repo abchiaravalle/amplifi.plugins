@@ -56,6 +56,14 @@ class Amplifi_Consent_Rest {
 	 * needs to render + decide.
 	 */
 	public static function get_config() {
+		// This response sets a per-visitor cookie and mints a unique token, so it
+		// MUST never be cached by a page cache / CDN (a stale token would 403 and
+		// force a refresh for many visitors). Send explicit no-store headers.
+		nocache_headers();
+		if ( ! headers_sent() ) {
+			header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private' );
+		}
+
 		$settings = Amplifi_Consent_Store::get_settings();
 
 		// Cookies grouped by category (skip 'unclassified' — not disclosed until reviewed).

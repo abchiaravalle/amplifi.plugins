@@ -6,6 +6,7 @@
 (function () {
   'use strict';
   if (typeof window.ACCONSENT_ADMIN === 'undefined') return;
+  var T = (window.ACCONSENT_ADMIN && window.ACCONSENT_ADMIN.i18n) || {};
 
   var pending = null;
 
@@ -17,9 +18,13 @@
     var resultEl = document.querySelector('.acconsent-scan-result[data-for="' + d.scriptId + '"]');
     var cookies = d.cookies || [];
     if (resultEl) {
-      resultEl.textContent = cookies.length
-        ? ('Found ' + cookies.length + ' cookie(s): ' + cookies.map(function (c) { return c.name; }).join(', ') + ' — saving…')
-        : 'No new first-party cookies detected.';
+      if (cookies.length) {
+        var names = cookies.map(function (c) { return c.name; }).join(', ');
+        var tmpl = T.found || 'Found %1$d cookie(s): %2$s — saving…';
+        resultEl.textContent = tmpl.replace('%1$d', cookies.length).replace('%2$s', names);
+      } else {
+        resultEl.textContent = T.none || 'No new first-party cookies detected.';
+      }
     }
     if (cookies.length) {
       // Post to the hidden merge form so PHP persists them, then reload to the Cookies tab.
@@ -42,10 +47,10 @@
     var btn = e.target.closest('.acconsent-scan-btn');
     if (!btn) return;
     e.preventDefault();
-    if (!window.confirm('This runs the script once to detect its cookies and may contact the third party. Continue?')) return;
+    if (!window.confirm(T.confirm_scan || 'This runs the script once to detect its cookies and may contact the third party. Continue?')) return;
     var id = btn.getAttribute('data-script-id');
     var resultEl = document.querySelector('.acconsent-scan-result[data-for="' + id + '"]');
-    if (resultEl) resultEl.textContent = 'Scanning…';
+    if (resultEl) resultEl.textContent = T.scanning || 'Scanning…';
     cleanup();
     var iframe = document.createElement('iframe');
     // The harness must read document.cookie (its purpose) so it needs
@@ -59,7 +64,7 @@
     // Safety timeout.
     setTimeout(function () {
       if (pending === iframe) {
-        if (resultEl) resultEl.textContent = 'Scan timed out (no cookies reported).';
+        if (resultEl) resultEl.textContent = T.timed_out || 'Scan timed out (no cookies reported).';
         cleanup();
       }
     }, 8000);
