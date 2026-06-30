@@ -10,6 +10,8 @@
   var pending = null;
 
   window.addEventListener('message', function (e) {
+    // Only trust messages from our own origin (the same-origin scan harness).
+    if (e.origin !== window.location.origin) return;
     var d = e.data;
     if (!d || !d.acconsent) return;
     var resultEl = document.querySelector('.acconsent-scan-result[data-for="' + d.scriptId + '"]');
@@ -40,11 +42,16 @@
     var btn = e.target.closest('.acconsent-scan-btn');
     if (!btn) return;
     e.preventDefault();
+    if (!window.confirm('This runs the script once to detect its cookies and may contact the third party. Continue?')) return;
     var id = btn.getAttribute('data-script-id');
     var resultEl = document.querySelector('.acconsent-scan-result[data-for="' + id + '"]');
     if (resultEl) resultEl.textContent = 'Scanning…';
     cleanup();
     var iframe = document.createElement('iframe');
+    // The harness must read document.cookie (its purpose) so it needs
+    // allow-same-origin, but we deny top-navigation, popups, form submission,
+    // pointer-lock, etc. to limit the blast radius of running third-party JS.
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
     iframe.style.cssText = 'width:0;height:0;border:0;position:absolute;left:-9999px';
     iframe.src = window.ACCONSENT_ADMIN.harness_url + '&script_id=' + encodeURIComponent(id);
     document.body.appendChild(iframe);

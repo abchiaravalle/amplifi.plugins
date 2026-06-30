@@ -16,6 +16,7 @@ class Amplifi_Consent_Store {
 	const OPT_SETTINGS = 'acconsent_settings';
 	const OPT_SCRIPTS  = 'acconsent_scripts';
 	const OPT_COOKIES  = 'acconsent_cookies';
+	const OPT_LEGAL    = 'acconsent_legal';
 
 	/**
 	 * The commonly-accepted consent categories. `necessary` is always granted
@@ -60,7 +61,108 @@ class Amplifi_Consent_Store {
 			'accent_color'    => '#055c5f',
 			'position'        => 'bottom', // bottom | center
 			'enabled'         => true,
+			// Disclosure (shown on the banner before any choice).
+			'privacy_url'     => '',
+			'prefs_label'     => __( 'Cookie preferences', 'amplifi-consent' ),
+			'floating_button' => true, // always-available withdrawal trigger (GDPR Art. 7(3)).
+			// Consent record / proof.
+			'policy_version'  => '1', // bump to force re-consent on policy change.
+			'ip_mode'         => 'truncate', // truncate (data-min default) | hash | none.
+			'retention_days'  => 0, // 0 = keep forever; any positive value is floored at 730 days (CCPA 24-month minimum).
+			// Behind a trusted reverse proxy / CDN (Cloudflare): derive the real
+			// client IP from CF-Connecting-IP / X-Forwarded-For for rate-limiting.
+			// OFF by default — XFF is client-spoofable on a direct-connect origin.
+			'trust_proxy'     => false,
+			// Webhook mirror of the server consent log.
+			'webhook_url'     => '',
+			'webhook_secret'  => '',
+			'webhook_enabled' => false,
+			// US / CCPA.
+			'gpc_enabled'     => true, // honor Global Privacy Control as an opt-out.
+			// Google Consent Mode v2 defaults pushed before tags.
+			'consent_mode'    => false,
+			// Auto-block unmanaged third-party trackers by domain. ON by default
+			// so an out-of-box install actually governs the trackers most sites
+			// load via the theme / other plugins (not just hand-pasted scripts).
+			'autoblock'       => true,
+			'blocklist'       => self::default_blocklist(),
+			// CCPA/CPRA one-click "Do Not Sell or Share" opt-out link.
+			'do_not_sell'     => true,
+			'dns_label'       => __( 'Do Not Sell or Share My Personal Information', 'amplifi-consent' ),
 		);
+	}
+
+	/**
+	 * Default tracker-domain blocklist for the auto-block engine. Any <script
+	 * src>, <img>, or <iframe> pointing at one of these hosts that was NOT added
+	 * through the managed-scripts store is neutralized until consent.
+	 *
+	 * Each line is `host|category` — the category the tracker is released under,
+	 * so granting Analytics does NOT release Marketing/ad pixels and vice-versa.
+	 * A bare `host` (no `|category`) defaults to `marketing`, the strictest
+	 * opt-in bucket, so an unclassified tracker fails safe (requires the most
+	 * explicit consent rather than leaking on a narrower grant).
+	 */
+	public static function default_blocklist() {
+		return implode( "\n", array(
+			// Tag managers can load anything → strictest bucket.
+			'googletagmanager.com|marketing',
+			// Analytics / product measurement / session replay.
+			'google-analytics.com|analytics',
+			'analytics.google.com|analytics',
+			'clarity.ms|analytics',
+			'hotjar.com|analytics',
+			'static.hotjar.com|analytics',
+			'cdn.segment.com|analytics',
+			'openreplay.com|analytics',
+			// Advertising / remarketing / B2B de-anonymization → marketing.
+			'connect.facebook.net|marketing',
+			'facebook.com/tr|marketing',
+			'snap.licdn.com|marketing',
+			'px.ads.linkedin.com|marketing',
+			'bat.bing.com|marketing',
+			'doubleclick.net|marketing',
+			'googleadservices.com|marketing',
+			'snitcher.com|marketing',
+			'rb2b.com|marketing',
+			'analytics.tiktok.com|marketing',
+			'static.ads-twitter.com|marketing',
+			'analytics.twitter.com|marketing',
+			't.co/i/adsct|marketing',
+			'ct.pinterest.com|marketing',
+			's.pinimg.com|marketing',
+			'pixel.reddit.com|marketing',
+			'alb.reddit.com|marketing',
+		) );
+	}
+
+	/**
+	 * Parse a `host|category` blocklist string into an ordered list of
+	 * [ 'host' => string, 'category' => string ]. A line without a category
+	 * defaults to 'marketing' (strictest opt-in). Only the gated, opt-in
+	 * categories are valid release targets; anything else coerces to marketing.
+	 */
+	public static function parse_blocklist( $raw ) {
+		$valid = array( 'functional', 'analytics', 'marketing' );
+		$lines = preg_split( '/[\r\n]+/', (string) $raw );
+		$out   = array();
+		foreach ( (array) $lines as $line ) {
+			$line = trim( $line );
+			if ( '' === $line ) {
+				continue;
+			}
+			$parts = explode( '|', $line, 2 );
+			$host  = trim( strtolower( $parts[0] ) );
+			if ( '' === $host ) {
+				continue;
+			}
+			$cat = isset( $parts[1] ) ? trim( strtolower( $parts[1] ) ) : 'marketing';
+			if ( ! in_array( $cat, $valid, true ) ) {
+				$cat = 'marketing';
+			}
+			$out[] = array( 'host' => $host, 'category' => $cat );
+		}
+		return $out;
 	}
 
 	public static function get_settings() {
@@ -87,10 +189,65 @@ class Amplifi_Consent_Store {
 					$clean[ $key ] = preg_match( '/^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/', $settings[ $key ] ) ? $settings[ $key ] : $default;
 					break;
 				case 'enabled':
+				case 'floating_button':
+				case 'webhook_enabled':
+				case 'gpc_enabled':
+				case 'consent_mode':
+				case 'autoblock':
+				case 'do_not_sell':
+				case 'trust_proxy':
 					$clean[ $key ] = (bool) $settings[ $key ];
 					break;
 				case 'position':
 					$clean[ $key ] = in_array( $settings[ $key ], array( 'bottom', 'center' ), true ) ? $settings[ $key ] : $default;
+					break;
+				case 'ip_mode':
+					$clean[ $key ] = in_array( $settings[ $key ], array( 'hash', 'truncate', 'none' ), true ) ? $settings[ $key ] : $default;
+					break;
+				case 'privacy_url':
+					$clean[ $key ] = esc_url_raw( $settings[ $key ], array( 'http', 'https' ) );
+					break;
+				case 'webhook_url':
+					$clean[ $key ] = esc_url_raw( $settings[ $key ], array( 'http', 'https' ) );
+					break;
+				case 'webhook_secret':
+					$clean[ $key ] = sanitize_text_field( $settings[ $key ] );
+					break;
+				case 'policy_version':
+					$clean[ $key ] = sanitize_text_field( substr( (string) $settings[ $key ], 0, 40 ) );
+					if ( '' === $clean[ $key ] ) {
+						$clean[ $key ] = '1';
+					}
+					break;
+				case 'retention_days':
+					// 0 = keep forever. Any positive value is FLOORED at 730 days
+					// so an operator can't accidentally purge consent proof below
+					// the CCPA 24-month record-keeping minimum (§7101).
+					$rd = max( 0, intval( $settings[ $key ] ) );
+					$clean[ $key ] = ( 0 === $rd ) ? 0 : max( 730, $rd );
+					break;
+				case 'blocklist':
+					// Newline-separated `host|category` list; keep host-ish tokens
+					// and an optional pipe-delimited category. parse_blocklist()
+					// validates the category later, so preserve the pipe here.
+					$lines = preg_split( '/[\r\n]+/', (string) $settings[ $key ] );
+					$out   = array();
+					foreach ( (array) $lines as $line ) {
+						$line  = trim( strtolower( $line ) );
+						if ( '' === $line ) {
+							continue;
+						}
+						$parts = explode( '|', $line, 2 );
+						$h     = trim( $parts[0] );
+						$h     = preg_replace( '#^https?://#', '', $h );
+						$h     = preg_replace( '#[^a-z0-9\.\-/_]#', '', $h );
+						if ( '' === $h ) {
+							continue;
+						}
+						$cat = isset( $parts[1] ) ? preg_replace( '#[^a-z]#', '', trim( $parts[1] ) ) : '';
+						$out[] = '' !== $cat ? $h . '|' . $cat : $h;
+					}
+					$clean[ $key ] = implode( "\n", array_values( array_unique( $out ) ) );
 					break;
 				default:
 					$clean[ $key ] = sanitize_text_field( $settings[ $key ] );
@@ -98,6 +255,43 @@ class Amplifi_Consent_Store {
 		}
 		update_option( self::OPT_SETTINGS, $clean );
 		return $clean;
+	}
+
+	/**
+	 * The active policy version. Returned in every consent receipt so a record
+	 * can be tied to exactly what the user agreed to. Bumping it (in settings)
+	 * invalidates stored client consent and re-prompts.
+	 */
+	public static function policy_version() {
+		$s = self::get_settings();
+		return isset( $s['policy_version'] ) ? (string) $s['policy_version'] : '1';
+	}
+
+	/**
+	 * Stable hash of the current managed-script + cookie catalog. Stored on each
+	 * consent receipt AND compared client-side: if the catalog changes (a new
+	 * tracker is added), a returning visitor's stored consent is treated as
+	 * stale and they are re-prompted instead of silently auto-releasing the new
+	 * tracker. Closes the GDPR "consent not specific" / silent-re-release hole.
+	 */
+	public static function catalog_hash() {
+		$parts = array();
+		foreach ( self::get_scripts() as $s ) {
+			if ( empty( $s['enabled'] ) ) {
+				continue;
+			}
+			$parts[] = $s['id'] . ':' . $s['category'] . ':' . md5( (string) $s['code'] );
+		}
+		sort( $parts );
+		// Fold in the current version label of every published legal doc, so
+		// publishing Privacy Policy v3 (or Terms v2) changes the hash and
+		// re-prompts returning visitors to consent against the new text.
+		$legal = array();
+		foreach ( self::legal_snapshot() as $id => $snap ) {
+			$legal[] = $id . ':' . $snap['version'];
+		}
+		sort( $legal );
+		return substr( hash( 'sha256', self::policy_version() . '|' . implode( '|', $parts ) . '|' . implode( '|', $legal ) ), 0, 16 );
 	}
 
 	/* ---------------- Managed scripts ---------------- */
@@ -113,10 +307,15 @@ class Amplifi_Consent_Store {
 	 * but stored verbatim so it can be re-emitted as a gated tag.
 	 */
 	public static function sanitize_script( $s ) {
-		$categories = array_keys( self::categories() );
+		// SECURITY: 'necessary' is DELIBERATELY excluded from the allowed set for
+		// managed scripts. A script tagged 'necessary' would release on every
+		// load — even after the visitor clicks Reject — with no consent. Only the
+		// opt-in categories may carry a tracking script; anything else is coerced
+		// to 'analytics' (a gated, opt-in bucket).
+		$categories = array( 'functional', 'analytics', 'marketing' );
 		$placements = array( 'head', 'body_open', 'footer' );
 		return array(
-			'id'        => isset( $s['id'] ) && $s['id'] ? sanitize_key( $s['id'] ) : 'scr_' . wp_generate_password( 8, false, false ),
+			'id'        => isset( $s['id'] ) && $s['id'] ? sanitize_key( $s['id'] ) : 'scr_' . strtolower( wp_generate_password( 8, false, false ) ),
 			'label'     => isset( $s['label'] ) ? sanitize_text_field( $s['label'] ) : '',
 			'category'  => isset( $s['category'] ) && in_array( $s['category'], $categories, true ) ? $s['category'] : 'analytics',
 			'placement' => isset( $s['placement'] ) && in_array( $s['placement'], $placements, true ) ? $s['placement'] : 'head',
@@ -156,10 +355,11 @@ class Amplifi_Consent_Store {
 	}
 
 	public static function sanitize_cookie( $c ) {
-		$categories = array_keys( self::categories() );
+		$categories   = array_keys( self::categories() );
+		$categories[] = 'unclassified'; // detected-but-not-yet-reviewed; NOT shown under a granted bucket.
 		return array(
 			'name'        => isset( $c['name'] ) ? sanitize_text_field( $c['name'] ) : '',
-			'category'    => isset( $c['category'] ) && in_array( $c['category'], $categories, true ) ? $c['category'] : 'analytics',
+			'category'    => isset( $c['category'] ) && in_array( $c['category'], $categories, true ) ? $c['category'] : 'unclassified',
 			'script_id'   => isset( $c['script_id'] ) ? sanitize_key( $c['script_id'] ) : '',
 			'domain'      => isset( $c['domain'] ) ? sanitize_text_field( $c['domain'] ) : '',
 			'duration'    => isset( $c['duration'] ) ? sanitize_text_field( $c['duration'] ) : '',
@@ -203,7 +403,7 @@ class Amplifi_Consent_Store {
 			}
 			$existing[ $name ] = self::sanitize_cookie( array(
 				'name'      => $name,
-				'category'  => '', // unset → defaults to analytics; admin re-categorizes.
+				'category'  => '', // unset → defaults to 'unclassified' (withheld from disclosure until an admin reviews).
 				'script_id' => $script_id,
 				'domain'    => isset( $d['domain'] ) ? $d['domain'] : '',
 				'duration'  => isset( $d['duration'] ) ? $d['duration'] : '',
@@ -211,6 +411,160 @@ class Amplifi_Consent_Store {
 		}
 		update_option( self::OPT_COOKIES, array_values( $existing ) );
 		return array_values( $existing );
+	}
+
+	/* ---------------- Legal documents (versioned) ---------------- */
+
+	/**
+	 * Legal docs are versioned policy texts (Privacy Policy, Terms, Cookie
+	 * Policy, or custom) managed inside the app. Each doc has an ordered list of
+	 * versions; the newest is "current". The current version label of every
+	 * published doc is snapshotted into every consent receipt, so the log can
+	 * prove exactly which policy texts were live when a visitor consented.
+	 * Placed on the site via the [amplifi-legal-doc] shortcode and linked from
+	 * the consent manager.
+	 *
+	 * Shape: [ doc_id => [ 'id','slug','title','type','versions'=>[ ['version','content','published_at'], ... ] ] ]
+	 */
+	public static function get_legal_docs() {
+		$docs = get_option( self::OPT_LEGAL, array() );
+		return is_array( $docs ) ? $docs : array();
+	}
+
+	public static function get_legal_doc( $id ) {
+		$id   = sanitize_key( $id );
+		$docs = self::get_legal_docs();
+		return isset( $docs[ $id ] ) ? $docs[ $id ] : null;
+	}
+
+	/** Resolve a doc by slug (used by the shortcode). */
+	public static function get_legal_doc_by_slug( $slug ) {
+		$slug = sanitize_title( $slug );
+		foreach ( self::get_legal_docs() as $doc ) {
+			if ( isset( $doc['slug'] ) && $doc['slug'] === $slug ) {
+				return $doc;
+			}
+		}
+		return null;
+	}
+
+	/** The current (newest) version record of a doc, or null. */
+	public static function current_version( $doc ) {
+		if ( empty( $doc['versions'] ) || ! is_array( $doc['versions'] ) ) {
+			return null;
+		}
+		return end( $doc['versions'] );
+	}
+
+	/**
+	 * Create or update a doc's metadata (title/slug/type). Does NOT add a
+	 * version — use publish_legal_version for that.
+	 */
+	public static function save_legal_doc( $data ) {
+		$docs  = self::get_legal_docs();
+		$types = array( 'privacy', 'terms', 'cookie', 'custom' );
+		$id    = isset( $data['id'] ) && $data['id'] ? sanitize_key( $data['id'] ) : 'doc_' . strtolower( wp_generate_password( 8, false, false ) );
+		$slug  = isset( $data['slug'] ) && $data['slug'] ? sanitize_title( $data['slug'] ) : sanitize_title( isset( $data['title'] ) ? $data['title'] : $id );
+
+		$existing            = isset( $docs[ $id ] ) ? $docs[ $id ] : array( 'versions' => array() );
+		$existing['id']      = $id;
+		$existing['slug']    = $slug;
+		$existing['title']   = isset( $data['title'] ) ? sanitize_text_field( $data['title'] ) : ( isset( $existing['title'] ) ? $existing['title'] : 'Untitled' );
+		$existing['type']    = isset( $data['type'] ) && in_array( $data['type'], $types, true ) ? $data['type'] : ( isset( $existing['type'] ) ? $existing['type'] : 'custom' );
+		if ( ! isset( $existing['versions'] ) || ! is_array( $existing['versions'] ) ) {
+			$existing['versions'] = array();
+		}
+		$docs[ $id ] = $existing;
+		update_option( self::OPT_LEGAL, $docs );
+		return $existing;
+	}
+
+	/**
+	 * Publish a new immutable version of a doc. Appending a version is what
+	 * makes the doc's "current version" advance — and bumping any published
+	 * doc's version changes the catalog_hash() below, which forces returning
+	 * visitors to re-consent against the new policy text.
+	 */
+	public static function publish_legal_version( $id, $version_label, $content ) {
+		$docs = self::get_legal_docs();
+		$id   = sanitize_key( $id );
+		if ( ! isset( $docs[ $id ] ) ) {
+			return new WP_Error( 'acconsent_legal', 'Unknown legal document.' );
+		}
+		$label = sanitize_text_field( $version_label );
+		if ( '' === $label ) {
+			// Auto-increment: v1, v2, …
+			$label = 'v' . ( count( $docs[ $id ]['versions'] ) + 1 );
+		}
+		$docs[ $id ]['versions'][] = array(
+			'version'      => $label,
+			'content'      => wp_kses_post( $content ),
+			'published_at' => current_time( 'mysql', true ),
+		);
+		update_option( self::OPT_LEGAL, $docs );
+		return $docs[ $id ];
+	}
+
+	public static function delete_legal_doc( $id ) {
+		$docs = self::get_legal_docs();
+		$id   = sanitize_key( $id );
+		unset( $docs[ $id ] );
+		update_option( self::OPT_LEGAL, $docs );
+	}
+
+	/**
+	 * Snapshot of every doc's current version, for stamping into a consent
+	 * receipt and for surfacing links in the consent manager.
+	 * Returns [ doc_id => [ 'title','slug','type','version','url' ] ].
+	 */
+	public static function legal_snapshot() {
+		$out = array();
+		foreach ( self::get_legal_docs() as $id => $doc ) {
+			$cur = self::current_version( $doc );
+			if ( ! $cur ) {
+				continue; // unpublished docs aren't part of the consent record.
+			}
+			$out[ $id ] = array(
+				'title'   => isset( $doc['title'] ) ? $doc['title'] : '',
+				'slug'    => isset( $doc['slug'] ) ? $doc['slug'] : '',
+				'type'    => isset( $doc['type'] ) ? $doc['type'] : 'custom',
+				'version' => isset( $cur['version'] ) ? $cur['version'] : '',
+				'url'     => self::legal_doc_url( $doc ),
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * Best-effort public URL for a doc: the first page/post that contains the
+	 * doc's [amplifi-legal-doc] shortcode, else empty. Cached briefly.
+	 */
+	public static function legal_doc_url( $doc ) {
+		if ( empty( $doc['slug'] ) ) {
+			return '';
+		}
+		$slug  = $doc['slug'];
+		$cache = get_transient( 'acconsent_legal_url_' . $slug );
+		if ( false !== $cache ) {
+			return $cache;
+		}
+		$url   = '';
+		$pages = get_posts( array(
+			'post_type'      => array( 'page', 'post' ),
+			'post_status'    => 'publish',
+			'posts_per_page' => 50,
+			's'              => 'amplifi-legal-doc',
+			'fields'         => 'ids',
+		) );
+		foreach ( $pages as $pid ) {
+			$content = get_post_field( 'post_content', $pid );
+			if ( false !== strpos( $content, 'amplifi-legal-doc' ) && false !== strpos( $content, $slug ) ) {
+				$url = get_permalink( $pid );
+				break;
+			}
+		}
+		set_transient( 'acconsent_legal_url_' . $slug, $url, 5 * MINUTE_IN_SECONDS );
+		return $url;
 	}
 
 	public static function activate() {
@@ -222,6 +576,13 @@ class Amplifi_Consent_Store {
 		}
 		if ( false === get_option( self::OPT_COOKIES, false ) ) {
 			update_option( self::OPT_COOKIES, array() );
+		}
+		if ( false === get_option( self::OPT_LEGAL, false ) ) {
+			update_option( self::OPT_LEGAL, array() );
+		}
+		// Create / upgrade the consent-log table.
+		if ( class_exists( 'Amplifi_Consent_Log' ) ) {
+			Amplifi_Consent_Log::install();
 		}
 	}
 }

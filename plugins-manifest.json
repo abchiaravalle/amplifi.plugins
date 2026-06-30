@@ -54,7 +54,7 @@
     },
     "consent": {
       "name": "Consent",
-      "description": "First-party cookie consent that hard-withholds tracking scripts until the visitor accepts.",
+      "description": "Cookie consent that withholds your tracking scripts until consent, keeps a best-effort server-side record, honors GPC, and can auto-block unmanaged trackers.",
       "icon": "dashicons-privacy"
     }
   }
