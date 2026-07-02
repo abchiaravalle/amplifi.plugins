@@ -1,0 +1,854 @@
+# Translation template for amplifi.consent.
+# Copyright (C) 2026 amplifi.studio
+# This file is distributed under the same license as the amplifi.consent package.
+# amplifi.studio <https://amplifi.studio>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: amplifi.consent\n"
+"Report-Msgid-Bugs-To: https://github.com/abchiaravalle/amplifi.plugins\n"
+"POT-Creation-Date: 2026-06-30 00:00-0400\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: includes/class-acconsent-admin.php:37
+msgid ""
+"This runs the script once to detect its cookies and may contact the third "
+"party. Continue?"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:38
+msgid "Scanning…"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:40
+#, php-format
+msgid "Found %1$d cookie(s): %2$s — saving…"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:41
+msgid "No new first-party cookies detected."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:42
+msgid "Scan timed out (no cookies reported)."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:85
+msgid "Managed scripts are"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:85
+msgid "withheld"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:85
+msgid ""
+"until the visitor consents to their category. Every consent choice is "
+"recorded server-side (Consent Log) and can be mirrored to a webhook. Enable"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:85
+msgid "Auto-block"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:85
+msgid "in Settings to also gate trackers added by other plugins/the theme."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:88
+msgid "Settings"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:89 includes/class-acconsent-admin.php:527
+msgid "Scripts"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:90
+msgid "Cookies"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:91
+msgid "Legal Docs"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:92
+msgid "Consent Log"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:125
+msgid "Settings saved."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:129
+#, php-format
+msgid "Webhook test: %s"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:145
+msgid "Legal document saved."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:153
+msgid ""
+"New version published. Returning visitors will be re-prompted to consent "
+"against the updated text."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:156
+msgid "Legal document deleted."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:164
+msgid "Scripts saved."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:175
+msgid "Script added."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:182
+msgid "Script deleted."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:186
+msgid "Cookie catalog saved."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:193
+#, php-format
+msgid "%d detected cookie(s) merged into the catalog. Categorize them below."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:226
+msgid "The consent banner is currently"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:226
+msgid "disabled"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:226
+msgid "— no scripts are being gated."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:229
+msgid "You are gating"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:229
+msgid "0 trackers"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:229
+msgid ""
+": no managed scripts are configured and auto-block is OFF. Trackers loaded "
+"by your theme or other plugins will fire before consent. Add your tracking "
+"scripts on the Scripts tab, or turn on auto-block below."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:232
+msgid "Gating"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:234
+#, php-format
+msgid "%1$d managed script%2$s"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:239
+#, php-format
+msgid "auto-block for unmanaged trackers is %s"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:240
+msgid "ON"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:240
+msgid "OFF"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:249
+msgid "Banner"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:250
+msgid "Consent banner enabled"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:251
+#: includes/class-acconsent-admin.php:367
+msgid "Title"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:252
+msgid "Message"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:254
+msgid "Buttons & toasts"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:255
+msgid "Accept button"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:256
+msgid "Reject button"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:257
+msgid "Manage button"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:258
+msgid "Save-choices button"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:259
+msgid "Toast on accept/save"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:260
+msgid "Toast on reject"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:262
+msgid "Behavior"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:263
+msgid "Consent remembered for (days)"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:264
+msgid "Banner position"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:265
+msgid "Bottom bar"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:265
+msgid "Centered modal"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:269
+msgid "Accent color"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:271
+msgid "Disclosure & withdrawal"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:272
+msgid "Privacy Policy URL (shown on the banner before any choice)"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:273
+msgid "Preferences trigger label"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:274
+msgid ""
+"Show a persistent floating \"preferences\" button (always-available "
+"withdrawal path)"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:276
+msgid "Consent record & proof"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:277
+msgid "Policy version (bump to force everyone to re-consent)"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:278
+msgid "IP handling in the consent log"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:279
+msgid "Hashed (salted, non-reversible) — recommended"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:279
+msgid "Truncated (drop last octet)"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:279
+msgid "Do not store IP"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:283
+msgid ""
+"Delete consent-log rows older than (days) — 0 keeps them forever. If you set "
+"a limit, keep it at or above ~730 to satisfy the CCPA 24-month record "
+"minimum."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:284
+msgid ""
+"Behind Cloudflare / a reverse proxy: use the forwarded client IP for rate-"
+"limiting (CF-Connecting-IP / X-Forwarded-For). Leave OFF on a direct-connect "
+"origin — the forwarded header is client-spoofable there."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:285
+msgid "Send each consent event to a webhook"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:286
+msgid "Webhook URL"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:287
+msgid "Webhook secret (HMAC-SHA256 signs each payload)"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:288
+msgid "The receiver verifies the"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:288
+msgid ""
+"header. Delivery is non-blocking and fires after the database record is "
+"written."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:290
+msgid "US / CCPA"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:291
+msgid "Honor the Global Privacy Control (GPC) browser signal as an opt-out"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:292
+msgid ""
+"Show a one-click \"Do Not Sell or Share My Personal Information\" opt-out "
+"button (CCPA/CPRA)"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:293
+msgid "\"Do Not Sell or Share\" button label"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:295
+msgid "Google Consent Mode v2"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:296
+msgid ""
+"Push Consent Mode v2 defaults (all denied) before tags, and update on choice"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:298
+msgid "Auto-block unmanaged trackers"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:299
+msgid ""
+"Also gate third-party trackers added by OTHER plugins / the theme (by "
+"domain) until consent"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:300
+msgid "Blocked tracker domains (one per line)"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:301
+msgid "When on, any"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:301
+msgid "or"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:301
+msgid ""
+"pointing at one of these hosts is neutralized until the visitor consents. "
+"Each line is"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:301
+msgid "— the category it is released under (default"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:301
+msgid ""
+", the strictest opt-in, if you omit it). This catches trackers you did not "
+"paste into the Scripts tab, but only those present in the page HTML — "
+"trackers injected by JavaScript after load are caught by the network shim "
+"where possible."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:303
+msgid "Save settings"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:310
+msgid "Test webhook"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:311
+msgid "Sends a signed"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:311
+msgid "payload to the configured URL and reports the HTTP status."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:312
+msgid "Send test"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:322
+msgid "Versioned legal documents"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:323
+msgid "Manage your Privacy Policy, Terms, and Cookie Policy here as"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:323
+msgid "versioned"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:323
+msgid "documents. Place each on a page with"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:323
+msgid "The"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:323
+msgid "current version"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:323
+msgid ""
+"of every published doc is stamped into every consent record, so the log "
+"proves exactly which policy texts a visitor agreed to. Publishing a new "
+"version re-prompts returning visitors."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:331
+msgid "Shortcode:"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:333
+msgid "Current:"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:333
+msgid "UTC"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:335
+msgid "No version published yet."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:338
+#, php-format
+msgid "%d version(s)"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:346
+#, php-format
+msgid "New version label (blank = auto v%d)"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:347
+#: includes/class-acconsent-admin.php:375
+msgid "Document content (HTML allowed)"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:348
+msgid "Publish new version"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:357
+msgid "Delete this document and all its versions?"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:357
+msgid "Delete document"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:366
+msgid "Add a legal document"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:368
+msgid "Slug (used in the shortcode)"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:369
+msgid "Type"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:370
+#: includes/class-acconsent-frontend.php:118
+msgid "Privacy Policy"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:370
+msgid "Terms & Conditions"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:370
+msgid "Cookie Policy"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:370
+msgid "Custom"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:374
+msgid "Initial version label (blank = v1)"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:376
+msgid "Create document"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:389
+msgid "Consent log"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:389
+msgid "record(s)"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:390
+msgid ""
+"A best-effort, server-side record designed to help you demonstrate consent "
+"(GDPR Art. 7(1)). Each row is stamped server-side with the time, the policy/"
+"catalog versions live when the visitor saw the banner, legal-doc versions, "
+"GPC signal, and a privacy-preserving IP. Records are written by a client "
+"request, so an event can be missed if the visitor is offline or blocks the "
+"request — this is a tool, not a legal guarantee. Export for DSAR / DPA / "
+"audit:"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:391
+msgid "Download CSV"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:391
+msgid "Download JSON"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:395
+msgid "When (UTC)"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:395
+msgid "Event"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:395
+msgid "Categories"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:395
+msgid "Policy"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:395
+msgid "Catalog"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:395
+msgid "GPC"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:395
+msgid "Source"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:395
+msgid "Visitor"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:397
+msgid "No consent recorded yet."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:437
+msgid "Add a tracking script"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:438
+msgid "Paste the full snippet (the whole"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:438
+msgid "including external"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:438
+msgid ""
+"loaders). It will be withheld until the visitor consents to its category."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:439
+#: includes/class-acconsent-admin.php:465
+msgid "Label"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:440
+#: includes/class-acconsent-admin.php:465
+#: includes/class-acconsent-admin.php:529
+msgid "Category"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:446
+#: includes/class-acconsent-admin.php:465
+msgid "Placement"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:447
+msgid "<head>"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:447
+msgid "After <body>"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:447
+msgid "Footer"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:451
+msgid "Script code"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:452
+msgid "Add script"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:456
+msgid "No scripts yet. Add one above."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:464
+msgid "Managed scripts"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:465
+msgid "On"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:465
+msgid "Code"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:465
+msgid "Scan"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:477
+msgid "head"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:477
+msgid "body"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:477
+msgid "footer"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:482
+msgid "Scan cookies"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:487
+msgid "Save changes"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:496
+msgid "Delete this script?"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:496
+msgid "Delete:"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:522
+msgid "Cookie catalog"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:523
+msgid ""
+"Detected cookies appear here after a scan. Assign each to a category — this "
+"is exactly what visitors see in the Manage panel. Newly-detected cookies "
+"start as"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:523
+msgid "Unclassified"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:523
+msgid "and are NOT disclosed to visitors until you categorize them."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:524
+msgid "Scanner note:"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:524
+msgid ""
+"“Scan cookies” executes the script once in this admin context to observe the "
+"cookies it sets. That run is a real execution and may contact the third "
+"party. Use it only on scripts you trust; it is optional — you can categorize "
+"cookies by hand instead."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:527
+msgid "No cookies catalogued yet. Go to the"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:527
+msgid "tab and click “Scan cookies” on a script."
+msgstr ""
+
+#: includes/class-acconsent-admin.php:529
+#: includes/class-acconsent-frontend.php:120
+msgid "Name"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:529
+msgid "Set by"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:529
+#: includes/class-acconsent-frontend.php:121
+msgid "Domain"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:529
+#: includes/class-acconsent-frontend.php:122
+msgid "Duration"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:529
+msgid "Description"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:535
+msgid "— Unclassified (review) —"
+msgstr ""
+
+#: includes/class-acconsent-admin.php:549
+msgid "Save catalog"
+msgstr ""
+
+#: includes/class-acconsent-frontend.php:119
+msgid "Cookie consent"
+msgstr ""
+
+#: includes/class-acconsent-frontend.php:123
+msgid "cookie"
+msgstr ""
+
+#: includes/class-acconsent-frontend.php:124
+msgid "cookies"
+msgstr ""
+
+#: includes/class-acconsent-frontend.php:125
+msgid "Close"
+msgstr ""
+
+#: includes/class-acconsent-frontend.php:714
+msgid "Manage cookie preferences"
+msgstr ""
+
+#: includes/class-acconsent-frontend.php:760
+#, php-format
+msgid "Version %1$s — effective %2$s"
+msgstr ""
+
+#: includes/class-acconsent-store.php:28
+msgid "Strictly Necessary"
+msgstr ""
+
+#: includes/class-acconsent-store.php:29
+msgid "Required for the site to function. Always active."
+msgstr ""
+
+#: includes/class-acconsent-store.php:33
+msgid "Functional"
+msgstr ""
+
+#: includes/class-acconsent-store.php:34
+msgid "Remembers preferences and choices to personalize your experience."
+msgstr ""
+
+#: includes/class-acconsent-store.php:38
+msgid "Analytics"
+msgstr ""
+
+#: includes/class-acconsent-store.php:39
+msgid "Helps us understand how visitors use the site so we can improve it."
+msgstr ""
+
+#: includes/class-acconsent-store.php:43
+msgid "Marketing"
+msgstr ""
+
+#: includes/class-acconsent-store.php:44
+msgid "Used to track visitors and show relevant advertising."
+msgstr ""
+
+#: includes/class-acconsent-store.php:52
+msgid "We value your privacy"
+msgstr ""
+
+#: includes/class-acconsent-store.php:53
+msgid ""
+"We use cookies to improve your experience. Tracking scripts will not run "
+"until you accept. You can accept, reject, or manage your choices."
+msgstr ""
+
+#: includes/class-acconsent-store.php:54
+msgid "Accept all"
+msgstr ""
+
+#: includes/class-acconsent-store.php:55
+msgid "Reject all"
+msgstr ""
+
+#: includes/class-acconsent-store.php:56
+msgid "Manage"
+msgstr ""
+
+#: includes/class-acconsent-store.php:57
+msgid "Save choices"
+msgstr ""
+
+#: includes/class-acconsent-store.php:58
+msgid "Preferences saved — thanks!"
+msgstr ""
+
+#: includes/class-acconsent-store.php:59
+msgid "Tracking declined. Only essential cookies are active."
+msgstr ""
+
+#: includes/class-acconsent-store.php:66
+msgid "Cookie preferences"
+msgstr ""
+
+#: includes/class-acconsent-store.php:91
+msgid "Do Not Sell or Share My Personal Information"
+msgstr ""
