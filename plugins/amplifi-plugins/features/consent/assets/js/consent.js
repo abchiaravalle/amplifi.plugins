@@ -720,35 +720,46 @@
       root = document.createElement('div');
       root.id = 'acconsent-root';
     }
-    // Root MUST be a direct child of <body>, not wherever wp_footer() happened
-    // to echo it in the page template. Several real themes/plugins (megamenu
-    // libraries like mmenu/jet-menu, off-canvas nav, page-transition wrappers)
-    // restructure the DOM by wrapping the existing body content into a new
-    // container div — and that wrapper commonly carries `transform`,
-    // `will-change: transform`, `filter`, or `contain: layout/paint`, any of
-    // which creates a NEW containing block for `position: fixed` descendants
-    // per spec. If our root ends up trapped inside such a wrapper, the banner/
-    // modal/FAB stop being fixed to the viewport and instead become fixed
-    // relative to that wrapper — breaking the popup. Force root to be a
-    // direct child of body every time boot() runs (this call MOVES an
-    // existing node, it doesn't clone it).
-    document.body.appendChild(root);
+    // Root, AND the persistent FAB trigger, MUST be direct children of
+    // <body> — not wherever wp_footer() happened to echo them in the page
+    // template. render_banner() (PHP) echoes #acconsent-root and the
+    // .acconsent-fab <button> as TWO SEPARATE top-level siblings, both
+    // `position: fixed`, and consent.js never previously repositioned
+    // either one. Several real themes/plugins (megamenu libraries like
+    // mmenu/jet-menu, off-canvas nav, page-transition wrappers) restructure
+    // the DOM by wrapping the existing body content into a new container
+    // div — and that wrapper commonly carries `transform`, `will-change:
+    // transform`, `filter`, or `contain: layout/paint`, any of which
+    // creates a NEW containing block for `position: fixed` descendants per
+    // spec. If root and/or the FAB end up trapped inside such a wrapper,
+    // they stop being fixed to the viewport and instead become fixed
+    // relative to that wrapper — breaking the popup/FAB positioning even
+    // though `position: fixed` is correctly applied in CSS. Force BOTH to
+    // be direct children of body every time boot() runs (moves existing
+    // nodes, doesn't clone them) and keep them there via the same
+    // MutationObserver guard below.
+    function anchorToBody() {
+      if (root.parentNode !== document.body) {
+        document.body.appendChild(root);
+      }
+      var fab = document.querySelector('.acconsent-fab');
+      if (fab && fab.parentNode !== document.body) {
+        document.body.appendChild(fab);
+      }
+    }
+    anchorToBody();
     root.hidden = false;
 
     // Some of those same DOM-restructuring scripts run asynchronously AFTER
     // this boot() (on a later tick, on first interaction, or on window load,
     // not just DOMContentLoaded) — so a one-time re-parent above isn't
-    // sufficient by itself. Watch <body>'s direct children and, if root ever
-    // stops being one of them, move it back immediately. This keeps the
-    // popup correctly positioned even when the page's body structure changes
-    // dynamically after initial boot.
+    // sufficient by itself. Watch <body>'s direct children and, if root or
+    // the FAB ever stop being direct children of body, move them back
+    // immediately. This keeps the popup and FAB correctly positioned even
+    // when the page's body structure changes dynamically after initial boot.
     if (window.MutationObserver) {
-      var bodyGuard = new MutationObserver(function () {
-        if (root.parentNode !== document.body) {
-          document.body.appendChild(root);
-        }
-      });
-      bodyGuard.observe(document.body, { childList: true });
+      var bodyGuard = new MutationObserver(anchorToBody);
+      bodyGuard.observe(document.body, { childList: true, subtree: true });
     }
 
     document.addEventListener('click', function (e) {
