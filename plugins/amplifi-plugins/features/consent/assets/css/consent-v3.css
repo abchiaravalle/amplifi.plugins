@@ -93,7 +93,7 @@
   background: rgba(255,255,255,.06) !important; color: var(--acconsent-text-dim) !important;
   font-size: 20px !important; line-height: 1 !important; cursor: pointer !important; padding: 0 !important;
   box-sizing: border-box !important; -webkit-appearance: none !important; appearance: none !important;
-  display: flex; align-items: center; justify-content: center;
+  display: flex !important; align-items: center !important; justify-content: center !important;
 }
 .acconsent-modal-close:hover { background: rgba(255,255,255,.14); color: var(--acconsent-text); }
 .acconsent-modal-title { font-size: 19px !important; font-weight: 700; margin: 0 40px 8px 0; color: var(--acconsent-text); }
@@ -161,7 +161,7 @@
   background: var(--acconsent-surface-solid) !important; color: var(--acconsent-text) !important; line-height: 1 !important;
   cursor: pointer !important; box-shadow: 0 4px 16px rgba(0,0,0,.34) !important; padding: 0 !important;
   box-sizing: border-box !important; -webkit-appearance: none !important; appearance: none !important;
-  display: flex; align-items: center; justify-content: center;
+  display: flex !important; align-items: center !important; justify-content: center !important;
 }
 /* Docking side, set via the "Floating button side" admin setting
    (fab_position: left | right — default left, unchanged). The PHP side
