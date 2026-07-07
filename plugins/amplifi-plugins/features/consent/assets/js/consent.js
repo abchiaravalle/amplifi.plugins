@@ -719,9 +719,37 @@
     if (!root) {
       root = document.createElement('div');
       root.id = 'acconsent-root';
-      document.body.appendChild(root);
     }
+    // Root MUST be a direct child of <body>, not wherever wp_footer() happened
+    // to echo it in the page template. Several real themes/plugins (megamenu
+    // libraries like mmenu/jet-menu, off-canvas nav, page-transition wrappers)
+    // restructure the DOM by wrapping the existing body content into a new
+    // container div — and that wrapper commonly carries `transform`,
+    // `will-change: transform`, `filter`, or `contain: layout/paint`, any of
+    // which creates a NEW containing block for `position: fixed` descendants
+    // per spec. If our root ends up trapped inside such a wrapper, the banner/
+    // modal/FAB stop being fixed to the viewport and instead become fixed
+    // relative to that wrapper — breaking the popup. Force root to be a
+    // direct child of body every time boot() runs (this call MOVES an
+    // existing node, it doesn't clone it).
+    document.body.appendChild(root);
     root.hidden = false;
+
+    // Some of those same DOM-restructuring scripts run asynchronously AFTER
+    // this boot() (on a later tick, on first interaction, or on window load,
+    // not just DOMContentLoaded) — so a one-time re-parent above isn't
+    // sufficient by itself. Watch <body>'s direct children and, if root ever
+    // stops being one of them, move it back immediately. This keeps the
+    // popup correctly positioned even when the page's body structure changes
+    // dynamically after initial boot.
+    if (window.MutationObserver) {
+      var bodyGuard = new MutationObserver(function () {
+        if (root.parentNode !== document.body) {
+          document.body.appendChild(root);
+        }
+      });
+      bodyGuard.observe(document.body, { childList: true });
+    }
 
     document.addEventListener('click', function (e) {
       var dns = e.target.closest('[data-acconsent-donotsell]');

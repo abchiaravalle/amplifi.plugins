@@ -44,21 +44,31 @@
 .acconsent-banner-btns { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; align-items: center; }
 
 /* ---------- Buttons ---------- */
+/* !important on box-model/appearance properties: real WP themes and
+   frameworks (Bootstrap, hello-elementor's reset.css, etc.) commonly reset
+   `button`/`[type="button"]`/`[type="submit"]` element selectors. Those are
+   the SAME specificity (0,1,0) as our single class selector, so whichever
+   stylesheet loads later in the cascade wins on a tie — which is often the
+   theme, since it usually enqueues after plugins. Observed in the wild on
+   ascentialmls.com: hello-elementor's reset.css and Bootstrap both silently
+   overrode .acconsent-fab's border-radius/width with no !important on either
+   side. Force these here so real <button> elements can't be un-styled by a
+   same-specificity theme/framework rule loaded later. */
 .acconsent-btn {
-  font-size: 14px !important; font-weight: 600; line-height: 1; cursor: pointer;
-  border-radius: var(--acconsent-radius); padding: 11px 18px; border: 1px solid transparent;
-  font-family: var(--acconsent-font) !important;
+  font-size: 14px !important; font-weight: 600 !important; line-height: 1 !important; cursor: pointer !important;
+  border-radius: var(--acconsent-radius) !important; padding: 11px 18px !important; border: 1px solid transparent !important;
+  font-family: var(--acconsent-font) !important; box-sizing: border-box !important; text-align: center !important;
   transition: filter .12s ease, background .12s ease, border-color .12s ease;
-  -webkit-appearance: none; appearance: none;
+  -webkit-appearance: none !important; appearance: none !important;
 }
-.acconsent-btn-primary { background: var(--acconsent-btn-fill); color: var(--acconsent-btn-fill-text); }
+.acconsent-btn-primary { background: var(--acconsent-btn-fill) !important; color: var(--acconsent-btn-fill-text) !important; }
 .acconsent-btn-primary:hover { filter: brightness(0.94); }
-.acconsent-btn-secondary { background: rgba(255,255,255,.10); color: var(--acconsent-text); border-color: var(--acconsent-border); }
-.acconsent-btn-secondary:hover { background: rgba(255,255,255,.16); }
-.acconsent-btn-link { background: transparent; color: var(--acconsent-text-dim); padding: 11px 10px; text-decoration: underline; }
+.acconsent-btn-secondary { background: rgba(255,255,255,.10) !important; color: var(--acconsent-text) !important; border-color: var(--acconsent-border) !important; }
+.acconsent-btn-secondary:hover { background: rgba(255,255,255,.16) !important; }
+.acconsent-btn-link { background: transparent !important; color: var(--acconsent-text-dim) !important; padding: 11px 10px !important; text-decoration: underline; }
 .acconsent-btn-link:hover { color: var(--acconsent-text); }
-.acconsent-btn-outline { background: transparent; color: var(--acconsent-text); border-color: var(--acconsent-border); }
-.acconsent-btn-outline:hover { background: rgba(255,255,255,.10); border-color: rgba(255,255,255,.28); }
+.acconsent-btn-outline { background: transparent !important; color: var(--acconsent-text) !important; border-color: var(--acconsent-border) !important; }
+.acconsent-btn-outline:hover { background: rgba(255,255,255,.10) !important; border-color: rgba(255,255,255,.28) !important; }
 
 /* ---------- Modal ---------- */
 .acconsent-modal-overlay {
@@ -77,10 +87,12 @@
   backdrop-filter: blur(18px) saturate(120%);
 }
 .acconsent-modal-close {
-  position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; min-width: 32px;
-  border: 1px solid var(--acconsent-border); border-radius: var(--acconsent-radius);
-  background: rgba(255,255,255,.06); color: var(--acconsent-text-dim);
-  font-size: 20px !important; line-height: 1; cursor: pointer; padding: 0;
+  position: absolute !important; top: 14px !important; right: 14px !important;
+  width: 32px !important; height: 32px !important; min-width: 32px !important;
+  border: 1px solid var(--acconsent-border) !important; border-radius: var(--acconsent-radius) !important;
+  background: rgba(255,255,255,.06) !important; color: var(--acconsent-text-dim) !important;
+  font-size: 20px !important; line-height: 1 !important; cursor: pointer !important; padding: 0 !important;
+  box-sizing: border-box !important; -webkit-appearance: none !important; appearance: none !important;
   display: flex; align-items: center; justify-content: center;
 }
 .acconsent-modal-close:hover { background: rgba(255,255,255,.14); color: var(--acconsent-text); }
@@ -120,9 +132,10 @@
 
 /* ---------- Shortcode trigger ---------- */
 .acconsent-manage-trigger {
-  background: transparent; border: 1px solid currentColor; color: inherit;
-  font-size: 13px !important; font-weight: 600; padding: 8px 14px;
-  border-radius: var(--acconsent-radius); cursor: pointer;
+  background: transparent !important; border: 1px solid currentColor !important; color: inherit !important;
+  font-size: 13px !important; font-weight: 600 !important; padding: 8px 14px !important;
+  border-radius: var(--acconsent-radius) !important; cursor: pointer !important;
+  box-sizing: border-box !important; -webkit-appearance: none !important; appearance: none !important;
   font-family: var(--acconsent-font) !important;
 }
 .acconsent-manage-trigger:hover { opacity: .8; }
@@ -142,11 +155,12 @@
 
 /* ---------- Persistent floating preferences trigger (withdrawal path) ---------- */
 .acconsent-fab {
-  position: fixed; left: 16px; bottom: 16px; z-index: 2147482000;
-  width: 44px; height: 44px; border-radius: 50%;
-  border: 1px solid var(--acconsent-border);
-  background: var(--acconsent-surface-solid); color: var(--acconsent-text); line-height: 1;
-  cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.34); padding: 0;
+  position: fixed !important; left: 16px !important; bottom: 16px !important; z-index: 2147482000 !important;
+  width: 44px !important; height: 44px !important; min-width: 44px !important; border-radius: 50% !important;
+  border: 1px solid var(--acconsent-border) !important;
+  background: var(--acconsent-surface-solid) !important; color: var(--acconsent-text) !important; line-height: 1 !important;
+  cursor: pointer !important; box-shadow: 0 4px 16px rgba(0,0,0,.34) !important; padding: 0 !important;
+  box-sizing: border-box !important; -webkit-appearance: none !important; appearance: none !important;
   display: flex; align-items: center; justify-content: center;
 }
 .acconsent-fab:hover { box-shadow: 0 6px 22px rgba(0,0,0,.46); }

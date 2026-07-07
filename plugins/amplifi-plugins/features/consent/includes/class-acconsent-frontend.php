@@ -933,7 +933,7 @@ gtag('consent','default',{
 		$apply_passes = function ( $chunk ) use ( $pattern, $cat_for, $safe_replace ) {
 			// 1) <script ...src="tracker">...</script> (skip already-gated/our own).
 			$chunk = $safe_replace(
-				'#<script\b(?![^>]*\bdata-acconsent\b)(?![^>]*type=["\']text/plain["\'])[^>]*\bsrc=["\']([^"\']*(?:' . $pattern . ')[^"\']*)["\'][^>]*>(.*?)</script>#is',
+				'#<script\b(?![^>]*\bdata-acconsent\b)(?![^>]*type=["\']text/plain["\'])(?![^>]*\bid=["\']acconsent-)[^>]*\bsrc=["\']([^"\']*(?:' . $pattern . ')[^"\']*)["\'][^>]*>(.*?)</script>#is',
 				function ( $m ) use ( $cat_for ) {
 					$src = $m[1];
 					$cat = $cat_for( $src );
@@ -943,8 +943,18 @@ gtag('consent','default',{
 			);
 
 			// 2) Inline <script> bodies that reference a tracker host (gtag/fbq loaders).
+			// H-self-gate: exclude any of OUR OWN script tags (id="acconsent-*", e.g.
+			// the localized `acconsent-js-extra` config block) — its JSON payload
+			// legitimately CONTAINS the blocklisted hostnames as plain data
+			// (`sale_share_hosts`, `spi_hosts`, etc. list them so the browser-side
+			// net-shim knows what to gate), which is NOT the same as loading a
+			// tracker. Without this exclusion the plugin self-gates its own
+			// consent config, `window.ACCONSENT` never initializes, and consent.js
+			// bails out entirely (`if (typeof window.ACCONSENT === 'undefined')
+			// return;`) — killing the banner, FAB, and modal. Found in the wild on
+			// ascentialmls.com.
 			$chunk = $safe_replace(
-				'#<script\b(?![^>]*\bsrc=)(?![^>]*\bdata-acconsent\b)(?![^>]*type=["\']text/plain["\'])([^>]*)>(.*?)</script>#is',
+				'#<script\b(?![^>]*\bsrc=)(?![^>]*\bdata-acconsent\b)(?![^>]*type=["\']text/plain["\'])(?![^>]*\bid=["\']acconsent-)([^>]*)>(.*?)</script>#is',
 				function ( $m ) use ( $pattern, $cat_for ) {
 					if ( preg_match( '#(' . $pattern . ')#i', $m[2], $mm ) ) {
 						$cat = $cat_for( $mm[1] );
