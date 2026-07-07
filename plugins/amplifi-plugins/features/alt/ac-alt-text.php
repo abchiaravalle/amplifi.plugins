@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( defined( 'ACALT_VERSION' ) ) {
 	return;
 }
-define( 'ACALT_VERSION', '3.1.7' );
+define( 'ACALT_VERSION', '3.1.8' );
 define( 'ACALT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACALT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACALT_PLUGIN_FILE', __FILE__ );
