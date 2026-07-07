@@ -1061,8 +1061,11 @@ gtag('consent','default',{
 		echo '<div id="acconsent-root" hidden></div>';
 		$s = Amplifi_Consent_Store::get_settings();
 		if ( ! empty( $s['floating_button'] ) ) {
+			$fab_pos   = ( isset( $s['fab_position'] ) && 'right' === $s['fab_position'] ) ? 'right' : 'left';
+			$fab_class = 'acconsent-fab acconsent-fab-' . $fab_pos;
 			printf(
-				'<button type="button" class="acconsent-fab" data-acconsent-open aria-label="%s" title="%s">%s</button>',
+				'<button type="button" class="%s" data-acconsent-open aria-label="%s" title="%s">%s</button>',
+				esc_attr( $fab_class ),
 				esc_attr( $s['prefs_label'] ),
 				esc_attr( $s['prefs_label'] ),
 				/* inline cookie icon (SVG, no external asset, currentColor-inheriting) */ self::cookie_icon_svg()

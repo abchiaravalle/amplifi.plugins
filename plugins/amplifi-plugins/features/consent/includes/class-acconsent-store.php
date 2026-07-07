@@ -65,6 +65,11 @@ class Amplifi_Consent_Store {
 			'privacy_url'     => '',
 			'prefs_label'     => __( 'Cookie preferences', 'amplifi-consent' ),
 			'floating_button' => true, // always-available withdrawal trigger (GDPR Art. 7(3)).
+			// Which bottom corner the persistent floating "preferences" FAB
+			// docks to. Doesn't affect the banner (see `position` above,
+			// which controls bottom-bar vs. centered-modal layout) — this is
+			// specifically the small circular revisit button.
+			'fab_position'    => 'left', // left | right
 			// Consent record / proof.
 			'policy_version'  => '1', // bump to force re-consent on policy change.
 			'ip_mode'         => 'truncate', // truncate (data-min default) | hash | none.
@@ -268,6 +273,9 @@ class Amplifi_Consent_Store {
 					break;
 				case 'position':
 					$clean[ $key ] = in_array( $settings[ $key ], array( 'bottom', 'center' ), true ) ? $settings[ $key ] : $default;
+					break;
+				case 'fab_position':
+					$clean[ $key ] = in_array( $settings[ $key ], array( 'left', 'right' ), true ) ? $settings[ $key ] : $default;
 					break;
 				case 'ip_mode':
 					$clean[ $key ] = in_array( $settings[ $key ], array( 'hash', 'truncate', 'none' ), true ) ? $settings[ $key ] : $default;

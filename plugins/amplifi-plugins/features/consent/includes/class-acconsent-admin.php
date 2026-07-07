@@ -310,6 +310,11 @@ class Amplifi_Consent_Admin {
 		self::field_text( 'settings[privacy_url]', __( 'Privacy Policy URL (shown on the banner before any choice)', 'amplifi-consent' ), $s['privacy_url'], 'https://…/privacy-policy/' );
 		self::field_text( 'settings[prefs_label]', __( 'Preferences trigger label', 'amplifi-consent' ), $s['prefs_label'] );
 		self::field_checkbox( 'settings[floating_button]', __( 'Show a persistent floating "preferences" button (always-available withdrawal path)', 'amplifi-consent' ), $s['floating_button'] );
+		echo '<div class="acconsent-field"><label>' . esc_html__( 'Floating button side', 'amplifi-consent' ) . '</label><select name="settings[fab_position]">';
+		foreach ( array( 'left' => __( 'Bottom left', 'amplifi-consent' ), 'right' => __( 'Bottom right', 'amplifi-consent' ) ) as $val => $lbl ) {
+			printf( '<option value="%s" %s>%s</option>', esc_attr( $val ), selected( $s['fab_position'], $val, false ), esc_html( $lbl ) );
+		}
+		echo '</select></div>';
 
 		echo '<h2>' . esc_html__( 'Consent record & proof', 'amplifi-consent' ) . '</h2>';
 		self::field_text( 'settings[policy_version]', __( 'Policy version (bump to force everyone to re-consent)', 'amplifi-consent' ), $s['policy_version'] );
