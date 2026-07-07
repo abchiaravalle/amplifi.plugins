@@ -194,6 +194,14 @@ class Amplifi_Consent_Store {
 			'widget.intercom.io|marketing',      // Intercom is a sales/marketing engagement platform
 			'js.intercomcdn.com|marketing',
 			'js.driftt.com|marketing',           // Drift
+			// HubSpot's official WordPress plugin (Leadin) auto-injects its
+			// tracking beacon directly, completely outside any consent
+			// system's control — this is the only mechanism (the auto-block
+			// blocklist scanner) that can gate it without modifying Leadin
+			// itself. Covers all regional script shards (js-na1/js-na2/
+			// js-eu1.hs-scripts.com). Found unmanaged/ungated on
+			// ascentialmls.com (a site running the Leadin plugin).
+			'hs-scripts.com|marketing',
 			// Pure customer-support chat widgets — functional, not ad-tech.
 			'embed.tawk.to|functional',          // pure support chat widgets, not ad-tech
 			'static.zdassets.com|functional',    // Zendesk Chat/widget
