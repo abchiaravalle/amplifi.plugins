@@ -1,15 +1,5 @@
 <?php
-/*
-Plugin Name: amplifi.consent
-Plugin URI: https://github.com/abchiaravalle/amplifi.plugins
-Description: First-party cookie consent that hard-withholds tracking scripts until the visitor accepts. Managed scripts are emitted inside inert base64 <template> elements (browsers never execute their contents) and only materialized after consent — nothing fires on reject. Per-category toggles, accept/reject toast, version-bound consent (configurable 1–365 days), a [amplifi-consent-manager] shortcode, a best-effort server-side consent log, GPC support, optional auto-block of unmanaged trackers, and an admin cookie scanner that loads each script in an isolated admin harness frame (a real execution that may contact the third party — only scan scripts you trust) to detect the cookies it sets so you can categorize them.
-Version: 1.8.0
-Author: amplifi.studio
-Author URI: https://amplifi.studio
-License: MIT
-Text Domain: amplifi-consent
-Domain Path: /languages
-*/
+// Feature module of amplifi-plugins (amplifi.consent, v1.9.1); bundled, not a standalone plugin.
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -18,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( defined( 'ACCONSENT_VERSION' ) ) {
 	return;
 }
-define( 'ACCONSENT_VERSION', '1.8.0' );
+define( 'ACCONSENT_VERSION', '1.9.1' );
 define( 'ACCONSENT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACCONSENT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACCONSENT_PLUGIN_FILE', __FILE__ );

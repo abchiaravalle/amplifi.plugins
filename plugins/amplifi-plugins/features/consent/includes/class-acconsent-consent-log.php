@@ -23,7 +23,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Amplifi_Consent_Log {
 
 	const DB_VERSION_OPT = 'acconsent_db_version';
-	const DB_VERSION     = '3';
+	const DB_VERSION     = '4';
+
+	// Write-failure alerting (C4): when the server-side consent record starts
+	// failing to write (e.g. a DB permission problem, disk full, a self-heal
+	// that couldn't complete), the banner keeps showing to visitors but their
+	// choices silently stop being recorded. Surface that loudly instead of
+	// letting it fail silently forever.
+	const ALERT_OPT       = 'acconsent_log_alert';
+	const ALERT_THRESHOLD = 5;
 
 	public static function table() {
 		global $wpdb;
@@ -51,6 +59,7 @@ class Amplifi_Consent_Log {
 			policy_version VARCHAR(40) NOT NULL DEFAULT '',
 			catalog_hash VARCHAR(64) NOT NULL DEFAULT '',
 			gpc TINYINT(1) NOT NULL DEFAULT 0,
+			country VARCHAR(2) NOT NULL DEFAULT '',
 			source VARCHAR(20) NOT NULL DEFAULT '',
 			ip_hash VARCHAR(64) NOT NULL DEFAULT '',
 			user_agent VARCHAR(255) NOT NULL DEFAULT '',
@@ -61,7 +70,8 @@ class Amplifi_Consent_Log {
 			UNIQUE KEY receipt_id (receipt_id),
 			UNIQUE KEY jti (jti),
 			KEY visitor_id (visitor_id),
-			KEY created_gmt (created_gmt)
+			KEY created_gmt (created_gmt),
+			KEY country (country)
 		) {$charset};";
 		dbDelta( $sql );
 
@@ -164,6 +174,12 @@ class Amplifi_Consent_Log {
 			}
 			$categories[ $k ] = ! empty( $input['categories'][ $k ] );
 		}
+		// CCPA §1798.121 "Limit the Use of Sensitive PI" assertion: this is
+		// purely a RECORDED assertion of the right having been exercised (the
+		// actual blocking is unconditional client-side per H2 point 8), folded
+		// into the categories JSON blob as an extra key rather than a new
+		// column, so no schema migration is needed for it.
+		$categories['_sensitive_pi_limited'] = ! empty( $input['sensitive_pi_limited'] );
 
 		$visitor_id = isset( $input['visitor_id'] ) ? preg_replace( '/[^a-zA-Z0-9\-]/', '', substr( (string) $input['visitor_id'], 0, 64 ) ) : '';
 		$source     = isset( $input['source'] ) ? sanitize_key( $input['source'] ) : 'banner';
@@ -186,9 +202,10 @@ class Amplifi_Consent_Log {
 			'policy_version' => $policy_ver,
 			'catalog_hash'   => $catalog_hash,
 			'gpc'            => self::gpc_present() ? 1 : 0,
+			'country'        => self::client_country(),
 			'source'         => $source,
 			'ip_hash'        => self::ip_hash(),
-			'user_agent'     => isset( $_SERVER['HTTP_USER_AGENT'] ) ? substr( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ), 0, 255 ) : '',
+			'user_agent'     => self::capture_user_agent(),
 			'url'            => self::referer_path(),
 			'created_at'     => $now_local,
 			'created_gmt'    => $now_gmt,
@@ -222,7 +239,7 @@ class Amplifi_Consent_Log {
 		// updated but migration hasn't completed on a front-end-only request, or a
 		// prior ALTER failed), run the upgrade and retry — never silently drop the
 		// record, and never run without the authoritative single-use guard.
-		if ( ! self::has_column( 'legal_snapshot' ) || ! $has_jti_col || ! self::has_index( 'jti' ) ) {
+		if ( ! self::has_column( 'legal_snapshot' ) || ! $has_jti_col || ! self::has_index( 'jti' ) || ! self::has_column( 'country' ) ) {
 			self::install();
 			if ( ! isset( $db_row['jti'] ) && self::has_column( 'jti' ) ) {
 				$db_row['jti'] = ( '' !== $jti ) ? $jti : null;
@@ -243,8 +260,16 @@ class Amplifi_Consent_Log {
 			if ( '' !== $jti && self::is_duplicate_jti( $jti ) ) {
 				return new WP_Error( 'acconsent_replay', 'Consent token already used.', array( 'status' => 409 ) );
 			}
+			// A genuine write failure (not an expected replay) — alert the admin
+			// so a silently-failing consent record doesn't go unnoticed while the
+			// banner keeps showing to visitors.
+			self::note_write_failure( $wpdb->last_error );
 			return new WP_Error( 'acconsent_db', 'Failed to write consent record.' );
 		}
+
+		// Successful write: clear any standing failure alert so a transient blip
+		// doesn't keep the admin notice showing forever after the DB recovers.
+		self::clear_failure_alert();
 
 		// Decode categories back to an array for the return payload / webhook.
 		$receipt['categories'] = $categories;
@@ -290,16 +315,49 @@ class Amplifi_Consent_Log {
 	}
 
 	/**
-	 * Paginated read for the admin log viewer + CSV export.
+	 * Paginated read for the admin log viewer + CSV/JSON export and the DSAR
+	 * lookup routes. Supports optional filters — visitor_id (exact),
+	 * date_from/date_to (Y-m-d, inclusive), country (exact, case-insensitive)
+	 * — built into a dynamic WHERE clause via $wpdb->prepare(). `limit` is
+	 * capped at 5000 (was 1000) so a regulator/DSAR export of a busy site's
+	 * full history doesn't require dozens of paginated requests.
 	 */
 	public static function query( $args = array() ) {
 		global $wpdb;
 		$args   = wp_parse_args( $args, array( 'limit' => 50, 'offset' => 0 ) );
-		$limit  = max( 1, min( 1000, (int) $args['limit'] ) );
+		$limit  = max( 1, min( 5000, (int) $args['limit'] ) );
 		$offset = max( 0, (int) $args['offset'] );
 		$table  = self::table();
+
+		$where  = array( '1=1' );
+		$params = array();
+
+		if ( ! empty( $args['visitor_id'] ) ) {
+			$visitor_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', substr( (string) $args['visitor_id'], 0, 64 ) );
+			if ( '' !== $visitor_id ) {
+				$where[]  = 'visitor_id = %s';
+				$params[] = $visitor_id;
+			}
+		}
+		if ( ! empty( $args['date_from'] ) && preg_match( '/^\d{4}-\d{2}-\d{2}$/', (string) $args['date_from'] ) ) {
+			$where[]  = 'created_gmt >= %s';
+			$params[] = $args['date_from'] . ' 00:00:00';
+		}
+		if ( ! empty( $args['date_to'] ) && preg_match( '/^\d{4}-\d{2}-\d{2}$/', (string) $args['date_to'] ) ) {
+			$where[]  = 'created_gmt <= %s';
+			$params[] = $args['date_to'] . ' 23:59:59';
+		}
+		if ( ! empty( $args['country'] ) ) {
+			$where[]  = 'country = %s';
+			$params[] = strtoupper( substr( sanitize_text_field( (string) $args['country'] ), 0, 2 ) );
+		}
+
+		$params[] = $limit;
+		$params[] = $offset;
+
+		$sql = "SELECT * FROM {$table} WHERE " . implode( ' AND ', $where ) . ' ORDER BY id DESC LIMIT %d OFFSET %d';
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL
-		return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} ORDER BY id DESC LIMIT %d OFFSET %d", $limit, $offset ), ARRAY_A );
+		return $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A );
 	}
 
 	public static function count() {
@@ -307,6 +365,20 @@ class Amplifi_Consent_Log {
 		$table = self::table();
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
 		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
+	}
+
+	/**
+	 * Permanently delete every consent-log row for a given visitor_id. Used by
+	 * the DSAR "delete this visitor's records" admin action and the matching
+	 * REST route. Returns the number of rows deleted.
+	 */
+	public static function delete_by_visitor( $visitor_id ) {
+		global $wpdb;
+		$visitor_id = preg_replace( '/[^a-zA-Z0-9\-]/', '', substr( (string) $visitor_id, 0, 64 ) );
+		if ( '' === $visitor_id ) {
+			return 0;
+		}
+		return (int) $wpdb->delete( self::table(), array( 'visitor_id' => $visitor_id ) );
 	}
 
 	/* ---------------- helpers ---------------- */
@@ -359,5 +431,137 @@ class Amplifi_Consent_Log {
 		// hash (default) — salted with WP AUTH_SALT so it's site-unique, non-reversible.
 		$salt = defined( 'AUTH_SALT' ) ? AUTH_SALT : 'acconsent';
 		return hash( 'sha256', $ip . '|' . $salt );
+	}
+
+	/**
+	 * Best-effort ISO-3166-1 alpha-2 country code from Cloudflare's
+	 * CF-IPCountry header. Only trusted when the `trust_proxy` setting is on
+	 * (mirroring the existing IP-trust gating pattern elsewhere in this
+	 * plugin) — an untrusted origin can't be handed a spoofable geo header.
+	 * Cloudflare's value can also be "XX" (unknown) or "T1" (Tor) for special
+	 * cases; we don't over-validate, just cap at 2 chars.
+	 */
+	private static function client_country() {
+		if ( empty( $_SERVER['HTTP_CF_IPCOUNTRY'] ) ) {
+			return '';
+		}
+		$settings = Amplifi_Consent_Store::get_settings();
+		if ( empty( $settings['trust_proxy'] ) ) {
+			return '';
+		}
+		return strtoupper( substr( sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_IPCOUNTRY'] ) ), 0, 2 ) );
+	}
+
+	/**
+	 * Lightweight regex-based extraction of browser name+major-version and OS
+	 * family from a raw User-Agent string, for the 'minimal' ua_mode. Enough
+	 * to debug a disputed consent (which browser/OS the visitor used) without
+	 * retaining the full fingerprintable UA string.
+	 */
+	private static function minimize_user_agent( $ua ) {
+		$browser = 'Unknown';
+		$os      = 'Unknown';
+		if ( preg_match( '/Edg\/([\d.]+)/', $ua, $m ) ) {
+			$browser = 'Edge ' . strtok( $m[1], '.' );
+		} elseif ( preg_match( '/OPR\/([\d.]+)/', $ua, $m ) ) {
+			$browser = 'Opera ' . strtok( $m[1], '.' );
+		} elseif ( preg_match( '/Chrome\/([\d.]+)/', $ua, $m ) && false === strpos( $ua, 'Edg/' ) ) {
+			$browser = 'Chrome ' . strtok( $m[1], '.' );
+		} elseif ( preg_match( '/Firefox\/([\d.]+)/', $ua, $m ) ) {
+			$browser = 'Firefox ' . strtok( $m[1], '.' );
+		} elseif ( preg_match( '/Version\/([\d.]+).*Safari/', $ua, $m ) ) {
+			$browser = 'Safari ' . strtok( $m[1], '.' );
+		}
+		if ( preg_match( '/Windows NT ([\d.]+)/', $ua ) ) {
+			$os = 'Windows';
+		} elseif ( preg_match( '/Mac OS X/', $ua ) ) {
+			$os = 'macOS';
+		} elseif ( preg_match( '/Android/', $ua ) ) {
+			$os = 'Android';
+		} elseif ( preg_match( '/iPhone|iPad|iOS/', $ua ) ) {
+			$os = 'iOS';
+		} elseif ( preg_match( '/CrOS/', $ua ) ) {
+			$os = 'ChromeOS';
+		} elseif ( preg_match( '/Linux/', $ua ) ) {
+			$os = 'Linux';
+		}
+		return $browser . ' / ' . $os;
+	}
+
+	/**
+	 * Capture the request User-Agent per the configured ua_mode setting:
+	 * 'full' (raw string, truncated to 255 chars), 'minimal' (browser+OS only
+	 * — the default; enough to debug a disputed consent without keeping the
+	 * fingerprintable full string), or 'none' (don't store it at all).
+	 */
+	public static function capture_user_agent() {
+		$settings = Amplifi_Consent_Store::get_settings();
+		$mode     = isset( $settings['ua_mode'] ) ? $settings['ua_mode'] : 'minimal';
+		if ( 'none' === $mode || empty( $_SERVER['HTTP_USER_AGENT'] ) ) {
+			return '';
+		}
+		$raw = substr( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ), 0, 255 );
+		if ( 'full' === $mode ) {
+			return $raw;
+		}
+		return self::minimize_user_agent( $raw );
+	}
+
+	/* ---------------- write-failure alerting (C4) ---------------- */
+
+	/**
+	 * Note a genuine consent-log write failure (NOT a duplicate-jti replay —
+	 * those are expected and never alert). Accumulates a running count/first/
+	 * last-failed-at/last-error in a single option, and — once the failure
+	 * count reaches ALERT_THRESHOLD — emails the site admin, at most once per
+	 * day, so a persistent DB problem is actually noticed instead of silently
+	 * dropping consent records forever.
+	 */
+	private static function note_write_failure( $error_msg ) {
+		$alert = get_option( self::ALERT_OPT, array() );
+		$now   = time();
+		$alert['count']           = isset( $alert['count'] ) ? ( (int) $alert['count'] + 1 ) : 1;
+		$alert['first_failed_at'] = isset( $alert['first_failed_at'] ) ? $alert['first_failed_at'] : $now;
+		$alert['last_failed_at']  = $now;
+		$alert['last_error']      = substr( (string) $error_msg, 0, 500 );
+		update_option( self::ALERT_OPT, $alert, false );
+		if ( $alert['count'] >= self::ALERT_THRESHOLD ) {
+			$last_emailed = isset( $alert['emailed_at'] ) ? (int) $alert['emailed_at'] : 0;
+			if ( ( $now - $last_emailed ) > DAY_IN_SECONDS ) {
+				self::send_failure_email( $alert );
+				$alert['emailed_at'] = $now;
+				update_option( self::ALERT_OPT, $alert, false );
+			}
+		}
+	}
+
+	/** Clear the standing failure alert once a write succeeds again. */
+	private static function clear_failure_alert() {
+		if ( get_option( self::ALERT_OPT, false ) ) {
+			delete_option( self::ALERT_OPT );
+		}
+	}
+
+	/** Email the site admin that consent-log writes have been failing. */
+	private static function send_failure_email( $alert ) {
+		$to = get_option( 'admin_email' );
+		if ( ! $to ) {
+			return;
+		}
+		/* translators: %s: site name */
+		$subject = sprintf( __( '[%s] amplifi.consent: consent-log writes are failing', 'amplifi-consent' ), get_bloginfo( 'name' ) );
+		$body    = sprintf(
+			"The cookie-consent banner on %s is showing to visitors, but the server-side\nconsent record has failed to write %d time(s) since %s.\n\nThis means consent choices are NOT being recorded server-side right now.\n\nLast error: %s\n\nCheck amplifi.studio > Consent > Consent Log, and your database user's ALTER\nTABLE permission (the plugin self-heals its schema automatically when it can).",
+			home_url(),
+			$alert['count'],
+			gmdate( 'Y-m-d H:i:s', $alert['first_failed_at'] ) . ' UTC',
+			$alert['last_error']
+		);
+		wp_mail( $to, $subject, $body );
+	}
+
+	/** Current standing failure alert, or null when none is active. */
+	public static function get_alert() {
+		return get_option( self::ALERT_OPT, null );
 	}
 }

@@ -58,7 +58,7 @@ class Amplifi_Consent_Store {
 			'toast_accepted'  => __( 'Preferences saved — thanks!', 'amplifi-consent' ),
 			'toast_rejected'  => __( 'Tracking declined. Only essential cookies are active.', 'amplifi-consent' ),
 			'consent_days'    => 180,
-			'accent_color'    => '#055c5f',
+			'accent_color'    => '#4db6ac',
 			'position'        => 'bottom', // bottom | center
 			'enabled'         => true,
 			// Disclosure (shown on the banner before any choice).
@@ -68,7 +68,14 @@ class Amplifi_Consent_Store {
 			// Consent record / proof.
 			'policy_version'  => '1', // bump to force re-consent on policy change.
 			'ip_mode'         => 'truncate', // truncate (data-min default) | hash | none.
-			'retention_days'  => 0, // 0 = keep forever; any positive value is floored at 730 days (CCPA 24-month minimum).
+			// Retention ceiling: 3 years (1095 days) by default for NEW installs, so
+			// an operator doesn't accidentally ship "keep forever" out of the box.
+			// 0 (keep forever) remains available as an explicit admin choice; any
+			// other positive value is still floored at 730 days (CCPA 24-month
+			// record-keeping minimum, §7101) in save_settings() below. Existing
+			// sites keep whatever value they already saved — this default only
+			// applies the first time the option is created.
+			'retention_days'  => 1095,
 			// Behind a trusted reverse proxy / CDN (Cloudflare): derive the real
 			// client IP from CF-Connecting-IP / X-Forwarded-For for rate-limiting.
 			// OFF by default — XFF is client-spoofable on a direct-connect origin.
@@ -89,6 +96,17 @@ class Amplifi_Consent_Store {
 			// CCPA/CPRA one-click "Do Not Sell or Share" opt-out link.
 			'do_not_sell'     => true,
 			'dns_label'       => __( 'Do Not Sell or Share My Personal Information', 'amplifi-consent' ),
+			// CCPA §1798.121 "Limit the Use of My Sensitive Personal Information".
+			// Reinstated (v1.4.0 removed a half-wired version of this) — this time
+			// it is ACTUALLY wired to unconditional blocking of any script/host an
+			// admin flags as handling SPI (see sensitive_pi / spi_hosts), not just a
+			// cosmetic toggle that opened the preferences modal.
+			'limit_spi_enabled' => true,
+			'limit_spi_label'   => __( 'Limit the Use of My Sensitive Personal Information', 'amplifi-consent' ),
+			// User-Agent capture mode for the consent log: 'minimal' (default) stores
+			// only browser name+major-version and OS family (enough to debug a
+			// disputed consent without keeping the full fingerprintable UA string).
+			'ua_mode'         => 'minimal', // full | minimal | none.
 		);
 	}
 
@@ -97,27 +115,54 @@ class Amplifi_Consent_Store {
 	 * src>, <img>, or <iframe> pointing at one of these hosts that was NOT added
 	 * through the managed-scripts store is neutralized until consent.
 	 *
-	 * Each line is `host|category` — the category the tracker is released under,
-	 * so granting Analytics does NOT release Marketing/ad pixels and vice-versa.
-	 * A bare `host` (no `|category`) defaults to `marketing`, the strictest
-	 * opt-in bucket, so an unclassified tracker fails safe (requires the most
-	 * explicit consent rather than leaking on a narrower grant).
+	 * Each line is `host|category|sale|spi` — only `host` is required; the
+	 * remaining segments are optional and default to their safe value when
+	 * omitted:
+	 *   - category: the consent bucket the tracker is released under, so
+	 *     granting Analytics does NOT release Marketing/ad pixels and vice-
+	 *     versa. A bare `host` (no `|category`) defaults to `marketing`, the
+	 *     strictest opt-in bucket, so an unclassified tracker fails safe.
+	 *   - sale: `1` marks this host as constituting a "sale/share" of personal
+	 *     information under CCPA/CPRA (e.g. third-party analytics/session-
+	 *     replay tools that disclose data to a third party — see the Sephora
+	 *     enforcement action) EVEN THOUGH it may be bucketed under a category
+	 *     other than Marketing. GPC / "Do Not Sell" additionally blocks any
+	 *     host flagged `sale=1` regardless of category grant. Defaults to `0`.
+	 *   - spi: `1` marks this host as handling Sensitive Personal Information
+	 *     (CCPA §1798.121) — permanently blocked whenever "Limit the Use of
+	 *     Sensitive PI" is enabled, independent of any category grant.
+	 *     Defaults to `0` (SPI use is business-specific; a generic plugin
+	 *     shouldn't guess which vendor handles it for a given site).
 	 */
 	public static function default_blocklist() {
 		return implode( "\n", array(
 			// Tag managers can load anything → strictest bucket.
 			'googletagmanager.com|marketing',
-			// Analytics / product measurement / session replay.
-			'google-analytics.com|analytics',
-			'analytics.google.com|analytics',
-			'clarity.ms|analytics',
-			'hotjar.com|analytics',
-			'static.hotjar.com|analytics',
-			'cdn.segment.com|analytics',
-			'openreplay.com|analytics',
+			// Analytics / product measurement / session replay. Flagged sale=1:
+			// these tools disclose visitor data to a third party (the vendor),
+			// which can constitute a "sale/share" under CCPA/CPRA regardless of
+			// the site's internal "analytics" category label (Sephora action).
+			'google-analytics.com|analytics|1',
+			'analytics.google.com|analytics|1',
+			'clarity.ms|analytics|1',
+			'hotjar.com|analytics|1',
+			'static.hotjar.com|analytics|1',
+			'cdn.segment.com|analytics|1',
+			'openreplay.com|analytics|1',
+			'fullstory.com|analytics|1',
+			'logr-ingest.io|analytics|1',       // LogRocket ingest
+			'cdn.logr-ingest.io|analytics|1',
+			'mouseflow.com|analytics|1',
+			'smartlook.com|analytics|1',
+			'rec.smartlook.com|analytics|1',
+			'quantummetric.com|analytics|1',
 			// Advertising / remarketing / B2B de-anonymization → marketing.
 			'connect.facebook.net|marketing',
 			'facebook.com/tr|marketing',
+			// NOTE: snap.licdn.com is LinkedIn infrastructure (their insight/
+			// conversion tag), NOT Snapchat, despite the "snap" prefix — do not
+			// confuse with the real Snapchat pixel entries below (tr.snapchat.com
+			// / sc-static.net).
 			'snap.licdn.com|marketing',
 			'px.ads.linkedin.com|marketing',
 			'bat.bing.com|marketing',
@@ -133,14 +178,34 @@ class Amplifi_Consent_Store {
 			's.pinimg.com|marketing',
 			'pixel.reddit.com|marketing',
 			'alb.reddit.com|marketing',
+			// Snapchat pixel tracking (the ACTUAL Snapchat host — distinct from
+			// snap.licdn.com above, which despite its "snap" prefix is LinkedIn's
+			// infrastructure, not Snapchat; kept separate here to avoid the naming
+			// trap the audit flagged).
+			'tr.snapchat.com|marketing|1',
+			'sc-static.net|marketing|1',
+			// Sales/marketing engagement chat widgets → marketing (they are
+			// lead-gen/CRM platforms, not passive support tooling).
+			'widget.intercom.io|marketing',      // Intercom is a sales/marketing engagement platform
+			'js.intercomcdn.com|marketing',
+			'js.driftt.com|marketing',           // Drift
+			// Pure customer-support chat widgets — functional, not ad-tech.
+			'embed.tawk.to|functional',          // pure support chat widgets, not ad-tech
+			'static.zdassets.com|functional',    // Zendesk Chat/widget
+			'assets.zendesk.com|functional',
+			'static.olark.com|functional',
+			'client.crisp.chat|functional',
 		) );
 	}
 
 	/**
-	 * Parse a `host|category` blocklist string into an ordered list of
-	 * [ 'host' => string, 'category' => string ]. A line without a category
-	 * defaults to 'marketing' (strictest opt-in). Only the gated, opt-in
-	 * categories are valid release targets; anything else coerces to marketing.
+	 * Parse a `host|category|sale|spi` blocklist string into an ordered list of
+	 * [ 'host' => string, 'category' => string, 'sale' => bool, 'spi' => bool ].
+	 * A line without a category defaults to 'marketing' (strictest opt-in).
+	 * Only the gated, opt-in categories are valid release targets; anything
+	 * else coerces to marketing. The `sale` and `spi` segments are optional
+	 * trailing flags (1/0), defaulting to false when omitted, so 2-, 3-, and
+	 * 4-segment lines are all handled gracefully.
 	 */
 	public static function parse_blocklist( $raw ) {
 		$valid = array( 'functional', 'analytics', 'marketing' );
@@ -151,7 +216,7 @@ class Amplifi_Consent_Store {
 			if ( '' === $line ) {
 				continue;
 			}
-			$parts = explode( '|', $line, 2 );
+			$parts = explode( '|', $line, 4 );
 			$host  = trim( strtolower( $parts[0] ) );
 			if ( '' === $host ) {
 				continue;
@@ -160,7 +225,9 @@ class Amplifi_Consent_Store {
 			if ( ! in_array( $cat, $valid, true ) ) {
 				$cat = 'marketing';
 			}
-			$out[] = array( 'host' => $host, 'category' => $cat );
+			$sale = isset( $parts[2] ) ? ( '1' === trim( $parts[2] ) ) : false;
+			$spi  = isset( $parts[3] ) ? ( '1' === trim( $parts[3] ) ) : false;
+			$out[] = array( 'host' => $host, 'category' => $cat, 'sale' => $sale, 'spi' => $spi );
 		}
 		return $out;
 	}
@@ -196,6 +263,7 @@ class Amplifi_Consent_Store {
 				case 'autoblock':
 				case 'do_not_sell':
 				case 'trust_proxy':
+				case 'limit_spi_enabled':
 					$clean[ $key ] = (bool) $settings[ $key ];
 					break;
 				case 'position':
@@ -203,6 +271,9 @@ class Amplifi_Consent_Store {
 					break;
 				case 'ip_mode':
 					$clean[ $key ] = in_array( $settings[ $key ], array( 'hash', 'truncate', 'none' ), true ) ? $settings[ $key ] : $default;
+					break;
+				case 'ua_mode':
+					$clean[ $key ] = in_array( $settings[ $key ], array( 'full', 'minimal', 'none' ), true ) ? $settings[ $key ] : 'minimal';
 					break;
 				case 'privacy_url':
 					$clean[ $key ] = esc_url_raw( $settings[ $key ], array( 'http', 'https' ) );
@@ -227,9 +298,11 @@ class Amplifi_Consent_Store {
 					$clean[ $key ] = ( 0 === $rd ) ? 0 : max( 730, $rd );
 					break;
 				case 'blocklist':
-					// Newline-separated `host|category` list; keep host-ish tokens
-					// and an optional pipe-delimited category. parse_blocklist()
-					// validates the category later, so preserve the pipe here.
+					// Newline-separated `host|category|sale|spi` list; keep
+					// host-ish tokens and up to 3 optional pipe-delimited
+					// segments (category, sale flag, spi flag). parse_blocklist()
+					// validates/defaults each segment later, so preserve all of
+					// them here rather than truncating to just `host|category`.
 					$lines = preg_split( '/[\r\n]+/', (string) $settings[ $key ] );
 					$out   = array();
 					foreach ( (array) $lines as $line ) {
@@ -237,15 +310,32 @@ class Amplifi_Consent_Store {
 						if ( '' === $line ) {
 							continue;
 						}
-						$parts = explode( '|', $line, 2 );
+						$parts = explode( '|', $line, 4 );
 						$h     = trim( $parts[0] );
 						$h     = preg_replace( '#^https?://#', '', $h );
 						$h     = preg_replace( '#[^a-z0-9\.\-/_]#', '', $h );
 						if ( '' === $h ) {
 							continue;
 						}
-						$cat = isset( $parts[1] ) ? preg_replace( '#[^a-z]#', '', trim( $parts[1] ) ) : '';
-						$out[] = '' !== $cat ? $h . '|' . $cat : $h;
+						$segs  = array( $h );
+						$cat   = isset( $parts[1] ) ? preg_replace( '#[^a-z]#', '', trim( $parts[1] ) ) : '';
+						$sale  = isset( $parts[2] ) ? preg_replace( '#[^01]#', '', trim( $parts[2] ) ) : '';
+						$spi   = isset( $parts[3] ) ? preg_replace( '#[^01]#', '', trim( $parts[3] ) ) : '';
+						// Only append a segment if it (or a later one) is non-empty,
+						// so we don't pad every line out to 4 segments needlessly —
+						// but if a LATER segment is present, earlier ones must be
+						// filled (even if blank) to keep positions aligned.
+						if ( '' !== $spi ) {
+							$segs[] = $cat;
+							$segs[] = ( '' !== $sale ) ? $sale : '0';
+							$segs[] = $spi;
+						} elseif ( '' !== $sale ) {
+							$segs[] = $cat;
+							$segs[] = $sale;
+						} elseif ( '' !== $cat ) {
+							$segs[] = $cat;
+						}
+						$out[] = implode( '|', $segs );
 					}
 					$clean[ $key ] = implode( "\n", array_values( array_unique( $out ) ) );
 					break;
@@ -273,6 +363,12 @@ class Amplifi_Consent_Store {
 	 * tracker is added), a returning visitor's stored consent is treated as
 	 * stale and they are re-prompted instead of silently auto-releasing the new
 	 * tracker. Closes the GDPR "consent not specific" / silent-re-release hole.
+	 *
+	 * Also folds in the CURRENT blocklist (host, category, sale flag, spi flag)
+	 * and whether auto-block is on: a change to WHICH unmanaged trackers are
+	 * gated, or to a host's sale/spi flags, is just as "not specific" a change
+	 * as adding a managed script — so it must also invalidate stored consent
+	 * and re-prompt, not silently start/stop gating a tracker.
 	 */
 	public static function catalog_hash() {
 		$parts = array();
@@ -291,7 +387,19 @@ class Amplifi_Consent_Store {
 			$legal[] = $id . ':' . $snap['version'];
 		}
 		sort( $legal );
-		return substr( hash( 'sha256', self::policy_version() . '|' . implode( '|', $parts ) . '|' . implode( '|', $legal ) ), 0, 16 );
+
+		// Blocklist + autoblock state. Includes the sale/spi flags so a
+		// category/sale/spi-only change to an existing host ALSO invalidates
+		// stored consent, not just adding/removing hosts.
+		$s  = self::get_settings();
+		$bl = array();
+		foreach ( self::parse_blocklist( isset( $s['blocklist'] ) ? $s['blocklist'] : '' ) as $entry ) {
+			$bl[] = $entry['host'] . ':' . $entry['category'] . ':' . ( $entry['sale'] ? '1' : '0' ) . ':' . ( $entry['spi'] ? '1' : '0' );
+		}
+		sort( $bl );
+		$bl_blob = ( ! empty( $s['autoblock'] ) ? '1' : '0' ) . '|' . implode( '|', $bl );
+
+		return substr( hash( 'sha256', self::policy_version() . '|' . implode( '|', $parts ) . '|' . implode( '|', $legal ) . '|' . $bl_blob ), 0, 16 );
 	}
 
 	/* ---------------- Managed scripts ---------------- */
@@ -321,6 +429,14 @@ class Amplifi_Consent_Store {
 			'placement' => isset( $s['placement'] ) && in_array( $s['placement'], $placements, true ) ? $s['placement'] : 'head',
 			'code'      => isset( $s['code'] ) ? (string) $s['code'] : '',
 			'enabled'   => isset( $s['enabled'] ) ? (bool) $s['enabled'] : true,
+			// CCPA/CPRA: this script's data flow constitutes a "sale/share" of
+			// personal information — GPC / "Do Not Sell" will withhold it even
+			// if its category is otherwise granted. See H1 (Sephora action).
+			'sale_share'   => isset( $s['sale_share'] ) ? (bool) $s['sale_share'] : false,
+			// CCPA §1798.121: this script handles Sensitive Personal
+			// Information — permanently withheld (independent of any category
+			// grant) whenever "Limit the Use of Sensitive PI" is enabled.
+			'sensitive_pi' => isset( $s['sensitive_pi'] ) ? (bool) $s['sensitive_pi'] : false,
 		);
 	}
 
@@ -380,6 +496,82 @@ class Amplifi_Consent_Store {
 		return array_values( $clean );
 	}
 
+	/**
+	 * Known-cookie duration lookup. `document.cookie` (the scanner's only
+	 * client-side view) CANNOT read a cookie's expiry — JS sees name=value only.
+	 * Commercial CMPs solve this with a maintained cookie-knowledge database;
+	 * this is a focused version covering the common first-party trackers so the
+	 * catalog auto-fills a human-readable duration instead of leaving it blank.
+	 * Matching is by exact name first, then by prefix (e.g. `_ga_` containers).
+	 *
+	 * @param string $name Cookie name.
+	 * @return string Human-readable duration, or '' if unknown.
+	 */
+	public static function lookup_cookie_duration( $name ) {
+		$name = (string) $name;
+
+		// Exact-name map.
+		$exact = array(
+			'_ga'        => '2 years',   // Google Analytics client id
+			'_gid'       => '24 hours',  // GA session id
+			'_gat'       => '1 minute',  // GA throttle
+			'__utma'     => '2 years',
+			'__utmb'     => '30 minutes',
+			'__utmc'     => 'session',
+			'__utmz'     => '6 months',
+			'__utmt'     => '10 minutes',
+			'_gcl_au'    => '3 months',  // Google Ads conversion linker
+			'_clck'      => '1 year',    // Microsoft Clarity user id
+			'_clsk'      => '1 day',     // Microsoft Clarity session
+			'CLID'       => '1 year',    // Clarity (clarity.ms domain)
+			'ANONCHK'    => '10 minutes',
+			'MUID'       => '1 year',    // Microsoft / Bing
+			'SM'         => 'session',
+			'_fbp'       => '3 months',  // Meta Pixel browser id
+			'_fbc'       => '3 months',  // Meta Pixel click id
+			'fr'         => '3 months',  // Facebook
+			'_hjSessionUser' => '1 year',      // Hotjar
+			'_hjSession'     => '30 minutes',  // Hotjar
+			'_hjid'          => '1 year',
+			'_hjIncludedInSessionSample' => '2 minutes',
+			'_hjAbsoluteSessionInProgress' => '30 minutes',
+			'IDE'        => '1 year',    // DoubleClick
+			'test_cookie' => '15 minutes',
+			'li_sugr'    => '3 months',  // LinkedIn
+			'bcookie'    => '1 year',    // LinkedIn browser id
+			'lidc'       => '1 day',     // LinkedIn
+			'UserMatchHistory' => '30 days',
+			'AnalyticsSyncHistory' => '30 days',
+			'_pin_unauth' => '1 year',   // Pinterest
+			'_scid'      => '13 months', // Snapchat
+			'_tt_enable_cookie' => '13 months', // TikTok
+			'_ttp'       => '13 months', // TikTok
+			'ajs_user_id'      => '1 year',   // Segment
+			'ajs_anonymous_id' => '1 year',   // Segment
+		);
+		if ( isset( $exact[ $name ] ) ) {
+			return $exact[ $name ];
+		}
+
+		// Prefix map (GA4 measurement-id containers etc.).
+		$prefix = array(
+			'_ga_'      => '2 years',    // GA4 per-property container: _ga_XXXXXXXX
+			'_gac_'     => '3 months',   // Google Ads
+			'_gcl_'     => '3 months',
+			'_uetsid'   => '1 day',      // Bing UET session
+			'_uetvid'   => '13 months',  // Bing UET visitor
+			'__Secure-' => 'varies',
+			'_hjSession_' => '30 minutes',
+		);
+		foreach ( $prefix as $p => $dur ) {
+			if ( 0 === strncmp( $name, $p, strlen( $p ) ) ) {
+				return $dur;
+			}
+		}
+
+		return '';
+	}
+
 	/** Merge newly-detected cookies into the catalog without clobbering categorizations already made. */
 	public static function merge_detected_cookies( $detected, $script_id ) {
 		$existing = array();
@@ -392,21 +584,33 @@ class Amplifi_Consent_Store {
 				continue;
 			}
 			if ( isset( $existing[ $name ] ) ) {
-				// Keep the admin's categorization; just refresh domain/script linkage.
+				// Keep the admin's categorization; just refresh domain/script linkage
+				// and backfill a known duration if it was left blank.
 				if ( empty( $existing[ $name ]['script_id'] ) ) {
 					$existing[ $name ]['script_id'] = sanitize_key( $script_id );
 				}
 				if ( empty( $existing[ $name ]['domain'] ) && ! empty( $d['domain'] ) ) {
 					$existing[ $name ]['domain'] = sanitize_text_field( $d['domain'] );
 				}
+				if ( empty( $existing[ $name ]['duration'] ) ) {
+					$auto = self::lookup_cookie_duration( $name );
+					if ( '' !== $auto ) {
+						$existing[ $name ]['duration'] = $auto;
+					}
+				}
 				continue;
 			}
+			// New cookie: use the detected duration if the client supplied one,
+			// otherwise auto-fill from the known-cookie table.
+			$duration = isset( $d['duration'] ) && '' !== $d['duration']
+				? $d['duration']
+				: self::lookup_cookie_duration( $name );
 			$existing[ $name ] = self::sanitize_cookie( array(
 				'name'      => $name,
 				'category'  => '', // unset → defaults to 'unclassified' (withheld from disclosure until an admin reviews).
 				'script_id' => $script_id,
 				'domain'    => isset( $d['domain'] ) ? $d['domain'] : '',
-				'duration'  => isset( $d['duration'] ) ? $d['duration'] : '',
+				'duration'  => $duration,
 			) );
 		}
 		update_option( self::OPT_COOKIES, array_values( $existing ) );

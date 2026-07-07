@@ -4,7 +4,7 @@ Tags: cookie consent, gdpr, ccpa, privacy, consent log, gpc, consent mode
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.8.0
+Stable tag: 1.9.1
 License: MIT
 
 Cookie consent that withholds your tracking scripts until consent, keeps a best-effort server-side record of each choice, honors GPC, and can auto-block unmanaged trackers.
@@ -129,6 +129,39 @@ excludes tracker hosts at the server. These are known limitations of every
 JavaScript-based consent blocker, not specific to this plugin.
 
 == Changelog ==
+
+= 1.9.1 =
+* Fix: the "Do Not Sell or Share" / "Limit Sensitive PI" opt-out buttons now
+  have proper spacing (10px gap) instead of relying on a single whitespace
+  character between the two `<button>` tags.
+* Removed the standalone persistent floating "Do Not Sell or Share" button
+  next to the cookie-preferences FAB. The opt-out control is only shown
+  where a visitor is actually reviewing/making privacy choices — inside the
+  initial consent popup and the revisit/preferences modal — not as an
+  always-visible floating element. The `[amplifi-do-not-sell]` shortcode is
+  unaffected and still works anywhere on the site.
+* CCPA/CPRA "sale/share" scoping (H1): GPC / "Do Not Sell" now also blocks
+  specific third-party analytics/session-replay tools flagged as involving
+  disclosure to a third party (a "sale/share"), independent of the Marketing
+  category grant — closing the gap highlighted by the Sephora enforcement
+  action.
+* CCPA §1798.121 "Limit the Use of My Sensitive Personal Information" (H2):
+  reinstated as a real, wired control (a prior version removed this for
+  being cosmetic). Scripts/hosts flagged as Sensitive PI are withheld
+  unconditionally whenever the setting is enabled, independent of any
+  category grant.
+* Robustness (C1): the network shim that gates unmanaged trackers is no
+  longer printed via a `wp_head` action — it's now spliced as the absolute
+  first thing inside `<head>` during the output-buffer pass, which starts
+  on `send_headers` (before `template_redirect`). This closes a gap where a
+  raw tracker `<script>` hardcoded into a theme's header.php BEFORE its own
+  `wp_head()` call could execute completely ungated.
+* Robustness (H6): the 2MB output-buffer size cap now applies only to the
+  `<body>` portion of the page — `<head>`, where the vast majority of
+  tracker tags live and where the network shim must land regardless of page
+  size, is always fully processed.
+* Disclosure (M5): consent records may be mirrored to a webhook (a data
+  processor), disclosed on the banner/modal when a webhook is configured.
 
 = 1.8.0 =
 * Accessibility (WCAG 2.1 AA): the banner is now a labelled region that receives

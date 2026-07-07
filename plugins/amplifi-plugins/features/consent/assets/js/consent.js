@@ -46,12 +46,16 @@
     } catch (e) { return null; }
   }
 
-  function writeConsent(categories) {
+  function writeConsent(categories, saleShareOptOut) {
     var days = parseInt(S.consent_days, 10) || 180;
     var data = {
       ts: now(),
       expires: now() + days * 24 * 60 * 60 * 1000,
       categories: categories,
+      // H1: CCPA/CPRA "sale/share" opt-out — independent of (in addition to)
+      // the ordinary category grants. True whenever GPC is active or the
+      // visitor clicked "Do Not Sell".
+      sale_share_opt_out: !!saleShareOptOut,
       policy_version: CFG.policy_version,
       catalog_hash: CFG.catalog_hash
     };
@@ -84,6 +88,12 @@
   // enabled, force-deny all opt-in categories regardless of stored/clicked state.
   function gpcActive() {
     return !!(S.gpc_enabled && navigator && navigator.globalPrivacyControl === true);
+  }
+
+  // H1: whether the CURRENT stored consent carries a sale/share opt-out
+  // (GPC active at the time it was written, or "Do Not Sell" was clicked).
+  function saleShareOptOut(consent) {
+    return !!(consent && consent.sale_share_opt_out);
   }
 
   /* ---------------- script release (the core withholding mechanism) ---------------- */
@@ -132,8 +142,16 @@
     });
   }
 
-  function releaseTemplate(tpl) {
+  function releaseTemplate(tpl, saleOptOut) {
     if (tpl.getAttribute('data-acconsent-released') === '1') return;
+    // H1: a sale/share-flagged managed script stays withheld while the
+    // visitor has opted out, even if its (possibly narrower) category was
+    // otherwise granted.
+    var id = tpl.getAttribute('data-acconsent-id');
+    if (saleOptOut && id && CFG.sale_share_scripts && CFG.sale_share_scripts.indexOf(id) !== -1) return;
+    // H2: a Sensitive-PI-flagged managed script is withheld UNCONDITIONALLY
+    // while limit_spi_enabled is on, independent of any category grant.
+    if (S.limit_spi_enabled && id && CFG.spi_scripts && CFG.spi_scripts.indexOf(id) !== -1) return;
     tpl.setAttribute('data-acconsent-released', '1');
     var frag;
     // The gated body is base64-encoded (so a "</template>" inside the snippet
@@ -161,11 +179,18 @@
 
   // Release auto-blocked UNMANAGED tags (data-acconsent-blocked). Restores
   // whichever attribute was deferred (src/href/srcset) for the node's category.
-  function releaseBlocked(granted) {
+  function releaseBlocked(granted, saleOptOut) {
     var nodes = document.querySelectorAll('[data-acconsent-blocked]');
     Array.prototype.forEach.call(nodes, function (node) {
       var cat = node.getAttribute('data-acconsent-blocked') || 'analytics';
       if (!granted[cat]) return;
+      var src = node.getAttribute('data-acconsent-src') || '';
+      // H1: a host flagged sale=1 in the blocklist stays withheld while the
+      // visitor has opted out, even if its category was otherwise granted.
+      if (saleOptOut && src && CFG.sale_share_hosts && CFG.sale_share_hosts.some(function (h) { return src.toLowerCase().indexOf(h) !== -1; })) return;
+      // H2: a host flagged spi=1 is withheld UNCONDITIONALLY while
+      // limit_spi_enabled is on, independent of any category grant.
+      if (S.limit_spi_enabled && src && CFG.spi_hosts && CFG.spi_hosts.some(function (h) { return src.toLowerCase().indexOf(h) !== -1; })) return;
       if (node.getAttribute('data-acconsent-released') === '1') return;
       node.setAttribute('data-acconsent-released', '1');
       var tag = node.tagName.toLowerCase();
@@ -175,12 +200,11 @@
       }
       // img / iframe / link / source pixel: restore the deferred attribute.
       var attr = node.getAttribute('data-acconsent-attr') || 'src';
-      var src = node.getAttribute('data-acconsent-src');
       if (src) node.setAttribute(attr, src);
     });
   }
 
-  function applyConsent(granted) {
+  function applyConsent(granted, saleOptOut) {
     // Lift the network-API block FIRST so the shim's granted-map is current
     // before we materialize deferred scripts/pixels. If we released first, the
     // still-active shim would re-block any external src we set (re-stashing it
@@ -189,11 +213,17 @@
     if (typeof window.__acconsentReleaseNetwork === 'function') {
       window.__acconsentReleaseNetwork(granted);
     }
+    // H1: keep the shim's sale/share block state consistent with what we're
+    // about to release, BEFORE releasing anything, same ordering rationale
+    // as __acconsentReleaseNetwork above.
+    if (typeof window.__acconsentSetSaleShareOptOut === 'function') {
+      window.__acconsentSetSaleShareOptOut(!!saleOptOut);
+    }
     document.querySelectorAll('template.acconsent-gated').forEach(function (tpl) {
       var cat = tpl.getAttribute('data-acconsent-category') || 'analytics';
-      if (granted[cat]) releaseTemplate(tpl);
+      if (granted[cat]) releaseTemplate(tpl, saleOptOut);
     });
-    releaseBlocked(granted);
+    releaseBlocked(granted, saleOptOut);
     updateConsentMode(granted);
   }
 
@@ -252,13 +282,17 @@
       .catch(function () { return null; });
   }
 
-  function consentBody(event, categories, source, token) {
+  function consentBody(event, categories, source, token, sensitivePiLimited) {
     return JSON.stringify({
       visitor_id: visitorId(),
       event: event,
       categories: categories,
       source: source || 'banner',
-      token: token || ''
+      token: token || '',
+      // H2: purely an audit-record assertion — release-blocking of SPI items
+      // is unconditional and independent of this flag (see releaseTemplate/
+      // releaseBlocked). This just records that the right was exercised.
+      sensitive_pi_limited: !!sensitivePiLimited
     });
   }
 
@@ -277,10 +311,10 @@
   // event (GPC→accept, a preferences change) transparently fetches a fresh one
   // instead of getting a 409 replay rejection.
   var tokenSpent = false;
-  function recordServer(event, categories, source) {
+  function recordServer(event, categories, source, sensitivePiLimited) {
     if (!CFG.rest_url) return;
     var send = function (token) {
-      return postConsent(consentBody(event, categories, source, token));
+      return postConsent(consentBody(event, categories, source, token, sensitivePiLimited));
     };
     // Last-ditch fallback when a normal fetch can't complete (e.g. the page is
     // being torn down). sendBeacon can't set headers, but the token rides in the
@@ -293,7 +327,7 @@
       try {
         if (token && !tokenSpent && navigator.sendBeacon) {
           navigator.sendBeacon(CFG.rest_url,
-            new Blob([consentBody(event, categories, source, token)], { type: 'application/json' }));
+            new Blob([consentBody(event, categories, source, token, sensitivePiLimited)], { type: 'application/json' }));
           tokenSpent = true;
         }
       } catch (e2) {}
@@ -372,7 +406,7 @@
         bits.push('<span class="acconsent-legal-ref">' + escapeHtml(d.title) + ' ' + escapeHtml(d.version) + '</span>');
       }
     });
-    if (!bits.length && !S.do_not_sell) return '';
+    if (!bits.length && !S.do_not_sell && !S.limit_spi_enabled && !CFG.webhook_active) return '';
     var html = '';
     if (bits.length) {
       html += '<div class="acconsent-legal-links">' + bits.join(' · ') + '</div>';
@@ -384,7 +418,21 @@
     if (S.do_not_sell && S.dns_label) {
       html += '<div class="acconsent-optout-links">' +
         '<button type="button" class="acconsent-btn acconsent-btn-outline acconsent-optout-btn" data-acconsent-donotsell>' +
-        escapeHtml(S.dns_label) + '</button></div>';
+        escapeHtml(S.dns_label) + '</button>';
+      // H2: CCPA §1798.121 "Limit the Use of My Sensitive Personal
+      // Information" — a real, reinstated control (removed in v1.4.0 for
+      // being cosmetic; this time it's wired to unconditional script/host
+      // blocking, and this button records that the right was exercised).
+      if (S.limit_spi_enabled && S.limit_spi_label) {
+        html += ' <button type="button" class="acconsent-btn acconsent-btn-outline acconsent-optout-btn" data-acconsent-limitspi>' +
+          escapeHtml(S.limit_spi_label) + '</button>';
+      }
+      html += '</div>';
+    }
+    // M5: disclose that consent records may also be mirrored to a webhook
+    // (a data processor), which may be located in a different country.
+    if (CFG.webhook_active && S.webhook_disclosure) {
+      html += '<div class="acconsent-webhook-disclosure">' + escapeHtml(S.webhook_disclosure) + '</div>';
     }
     return html;
   }
@@ -592,18 +640,22 @@
 
   function escClose(e) { if (e.key === 'Escape') closeModal(); }
 
-  function commit(categories, event, toastMsg, source) {
+  function commit(categories, event, toastMsg, source, sensitivePiLimited) {
     // GPC GUARD: an active Global Privacy Control signal is a legally-binding
     // sale/share opt-out (CCPA §1798.135). The user may still opt INTO analytics
     // /functional via the modal, but marketing (sale/share) is forced denied and
     // can never be re-enabled in-session by an "Accept all" click.
+    // H1: GPC also forces the sale-share opt-out flag true (independent of the
+    // marketing category itself — see writeConsent()/applyConsent()).
+    var saleOptOut = false;
     if (gpcActive()) {
       categories = Object.assign({}, categories, { marketing: false });
+      saleOptOut = true;
       if (event === 'grant') { event = 'update'; }
     }
-    writeConsent(categories);
-    applyConsent(grantedSet({ categories: categories }));
-    recordServer(event, categories, source);
+    writeConsent(categories, saleOptOut);
+    applyConsent(grantedSet({ categories: categories }), saleOptOut);
+    recordServer(event, categories, source, sensitivePiLimited);
     removeBanner();
     // If a choice was committed from INSIDE the open modal (e.g. the Do-Not-Sell
     // button, which lives in both banner and modal), close the modal first — that
@@ -624,12 +676,40 @@
   function saveChoices(cats) { commit(cats, 'update', S.toast_accepted, 'manage'); }
 
   // One-click CCPA "Do Not Sell or Share": deny marketing (sale/share) immediately
-  // and record the opt-out. Other categories keep their current state.
+  // and record the opt-out. Other categories keep their current state. H1: the
+  // INVARIANT is sale_share_opt_out must end up true in localStorage whenever
+  // this is clicked (or GPC is active — handled inside commit() above) and
+  // false otherwise (e.g. after a plain Accept All with no GPC). We can't
+  // route this through commit()'s categories-only signature and still set the
+  // flag when GPC is NOT active, so set it directly here via a second
+  // writeConsent()/applyConsent() call matching commit()'s own sequencing.
   function doNotSell() {
     var cur = grantedSet(readConsent() || { categories: {} });
     cur.marketing = false;
     cur.necessary = true;
-    commit(cur, 'deny', S.toast_rejected, 'do_not_sell');
+    writeConsent(cur, true);
+    applyConsent(grantedSet({ categories: cur }), true);
+    recordServer('deny', cur, 'do_not_sell');
+    removeBanner();
+    if (modalOpen) {
+      closeModal();
+    } else {
+      var fab = document.querySelector('.acconsent-fab');
+      if (fab) { try { fab.focus(); } catch (e) {} }
+    }
+    if (S.toast_rejected) toast(S.toast_rejected);
+  }
+
+  // H2: "Limit the Use of My Sensitive Personal Information" (CCPA §1798.121).
+  // Release-blocking of SPI-flagged scripts/hosts is UNCONDITIONAL whenever
+  // limit_spi_enabled is on (see releaseTemplate()/releaseBlocked() above) —
+  // clicking this button doesn't change WHAT gets blocked, it exercises and
+  // RECORDS the statutory right for the audit trail.
+  function limitSensitivePI() {
+    var consent = readConsent();
+    var categories = (consent && consent.categories) || fullGrant(false);
+    recordServer('update', categories, 'limit_spi', true);
+    if (S.limit_spi_label) toast(S.limit_spi_label);
   }
 
   /* ---------------- boot ---------------- */
@@ -646,6 +726,8 @@
     document.addEventListener('click', function (e) {
       var dns = e.target.closest('[data-acconsent-donotsell]');
       if (dns) { e.preventDefault(); doNotSell(); return; }
+      var spi = e.target.closest('[data-acconsent-limitspi]');
+      if (spi) { e.preventDefault(); limitSensitivePI(); return; }
       var t = e.target.closest('[data-acconsent-open]');
       if (t) { e.preventDefault(); openModal(); }
     });
@@ -656,8 +738,11 @@
     // timestamp meaningful.
     if (gpcActive()) {
       var denied = fullGrant(false);
-      writeConsent(denied);
-      applyConsent(grantedSet({ categories: denied }));
+      // H1: GPC is itself a sale/share opt-out signal (CCPA §1798.135) —
+      // record it on the stored consent and apply it to the network shim,
+      // same as an explicit "Do Not Sell" click.
+      writeConsent(denied, true);
+      applyConsent(grantedSet({ categories: denied }), true);
       var gpcMark = 'acconsent_gpc_' + CFG.policy_version + '_' + CFG.catalog_hash;
       var alreadyLogged = false;
       try { alreadyLogged = !!window.localStorage.getItem(gpcMark); } catch (e) {}
@@ -670,7 +755,7 @@
 
     var consent = readConsent();
     if (consent) {
-      applyConsent(grantedSet(consent));
+      applyConsent(grantedSet(consent), saleShareOptOut(consent));
     } else {
       // First visit OR stale (version changed): nothing released, show banner.
       showBanner();

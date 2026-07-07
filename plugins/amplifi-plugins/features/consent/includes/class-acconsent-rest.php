@@ -48,6 +48,26 @@ class Amplifi_Consent_Rest {
 				return current_user_can( 'manage_options' );
 			},
 		) );
+
+		// DSAR lookup/erasure — look up (or permanently delete) every
+		// consent-log row for one visitor_id, for a real Data Subject Access
+		// Request workflow without hand-crafting SQL/curl.
+		register_rest_route( self::NS, '/visitor/(?P<visitor_id>[a-zA-Z0-9\-]+)', array(
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( __CLASS__, 'get_visitor' ),
+				'permission_callback' => function () {
+					return current_user_can( 'manage_options' );
+				},
+			),
+			array(
+				'methods'             => 'DELETE',
+				'callback'            => array( __CLASS__, 'delete_visitor' ),
+				'permission_callback' => function () {
+					return current_user_can( 'manage_options' );
+				},
+			),
+		) );
 	}
 
 	/**
@@ -56,6 +76,13 @@ class Amplifi_Consent_Rest {
 	 * needs to render + decide.
 	 */
 	public static function get_config() {
+		// L3: a lightweight, more-generous-than-/consent rate limit — this
+		// endpoint is legitimately called on every uncached page load per
+		// visitor, so the ceiling is high, but an unbounded GET is still an
+		// amplification/DoS surface worth capping.
+		if ( ! self::config_rate_ok() ) {
+			return new WP_Error( 'acconsent_rate', 'Too many requests.', array( 'status' => 429 ) );
+		}
 		// This response sets a per-visitor cookie and mints a unique token, so it
 		// MUST never be cached by a page cache / CDN (a stale token would 403 and
 		// force a refresh for many visitors). Send explicit no-store headers.
@@ -139,23 +166,28 @@ class Amplifi_Consent_Rest {
 		if ( empty( $token_data['vh'] ) || ! $expected_vh || ! hash_equals( (string) $token_data['vh'], $expected_vh ) ) {
 			return new WP_Error( 'acconsent_vid', 'Consent token not bound to this visitor.', array( 'status' => 403 ) );
 		}
-		// SINGLE-USE pre-filter: a fast cache/transient check rejects an
-		// obvious replay before we do any work. The DB UNIQUE key on `jti`
-		// (below, in record()) is the AUTHORITATIVE atomic guard — it holds
-		// even with no object cache and under true concurrency — so this is
-		// only an optimization, not the security boundary. Burn AFTER the vh
-		// check so a mismatched-cookie attempt can't waste a legit token.
-		if ( isset( $token_data['j'] ) && ! self::consume_jti( $token_data['j'] ) ) {
-			return new WP_Error( 'acconsent_replay', 'Consent token already used.', array( 'status' => 409 ) );
-		}
 		// Subject id is ALWAYS the server-issued first-party cookie (guaranteed
 		// non-empty here: the vh check above passed, which requires the cookie).
 		$visitor = $cookie_vid;
 
 		// Rate-limit ALWAYS on IP (a client-chosen visitor_id alone is forgeable
 		// and rotatable); the visitor id only adds per-visitor granularity.
+		// L2: checked BEFORE jti consumption below, so a rate-limited request
+		// never burns a legitimate single-use token — a client that gets 429'd
+		// can retry with the SAME token instead of losing it to the rate limit.
 		if ( ! self::rate_ok( $visitor ) ) {
 			return new WP_Error( 'acconsent_rate', 'Too many requests.', array( 'status' => 429 ) );
+		}
+
+		// SINGLE-USE pre-filter: a fast cache/transient check rejects an
+		// obvious replay before we do any work. The DB UNIQUE key on `jti`
+		// (below, in record()) is the AUTHORITATIVE atomic guard — it holds
+		// even with no object cache and under true concurrency — so this is
+		// only an optimization, not the security boundary. Burn AFTER the vh
+		// AND rate-limit checks so neither a mismatched-cookie attempt nor a
+		// rate-limited request can waste a legit token.
+		if ( isset( $token_data['j'] ) && ! self::consume_jti( $token_data['j'] ) ) {
+			return new WP_Error( 'acconsent_replay', 'Consent token already used.', array( 'status' => 409 ) );
 		}
 
 		// Versions AND legal docs the visitor actually SAW come from the signed
@@ -167,12 +199,15 @@ class Amplifi_Consent_Rest {
 		if ( isset( $token_data['ls'] ) && is_array( $token_data['ls'] ) ) { $render_versions['legal_snapshot'] = $token_data['ls']; }
 
 		$receipt = Amplifi_Consent_Log::record( array(
-			'visitor_id' => $visitor,
-			'event'      => isset( $params['event'] ) ? $params['event'] : 'update',
-			'categories' => isset( $params['categories'] ) ? (array) $params['categories'] : array(),
-			'source'     => isset( $params['source'] ) ? $params['source'] : 'banner',
-			'rendered'   => $render_versions,
-			'jti'        => isset( $token_data['j'] ) ? (string) $token_data['j'] : '',
+			'visitor_id'            => $visitor,
+			'event'                 => isset( $params['event'] ) ? $params['event'] : 'update',
+			'categories'            => isset( $params['categories'] ) ? (array) $params['categories'] : array(),
+			'source'                => isset( $params['source'] ) ? $params['source'] : 'banner',
+			'rendered'              => $render_versions,
+			'jti'                   => isset( $token_data['j'] ) ? (string) $token_data['j'] : '',
+			// CCPA §1798.121 "Limit the Use of Sensitive PI" assertion (H2
+			// point 9/10) — a purely recorded assertion the right was exercised.
+			'sensitive_pi_limited'  => ! empty( $params['sensitive_pi_limited'] ),
 		) );
 
 		if ( is_wp_error( $receipt ) ) {
@@ -195,18 +230,29 @@ class Amplifi_Consent_Rest {
 	}
 
 	/**
-	 * Admin-only consent-log export. ?format=csv (default) or json.
+	 * Admin-only consent-log export. ?format=csv (default) or json. Supports
+	 * ?visitor_id=, ?date_from=, ?date_to= (Y-m-d), ?country=, and ?per_page=
+	 * (default 1000, capped 5000) so a DSAR / regulator export of a busy
+	 * site's full history doesn't require dozens of paginated requests.
 	 */
 	public static function get_export( $request ) {
-		$format = $request->get_param( 'format' );
-		$rows   = Amplifi_Consent_Log::query( array( 'limit' => 1000, 'offset' => max( 0, (int) $request->get_param( 'offset' ) ) ) );
+		$format   = $request->get_param( 'format' );
+		$per_page = $request->get_param( 'per_page' );
+		$rows     = Amplifi_Consent_Log::query( array(
+			'limit'      => $per_page ? max( 1, min( 5000, (int) $per_page ) ) : 1000,
+			'offset'     => max( 0, (int) $request->get_param( 'offset' ) ),
+			'visitor_id' => $request->get_param( 'visitor_id' ),
+			'date_from'  => $request->get_param( 'date_from' ),
+			'date_to'    => $request->get_param( 'date_to' ),
+			'country'    => $request->get_param( 'country' ),
+		) );
 
 		if ( 'json' === $format ) {
 			return rest_ensure_response( array( 'count' => count( $rows ), 'rows' => $rows ) );
 		}
 
 		// CSV.
-		$cols = array( 'id', 'receipt_id', 'visitor_id', 'event', 'categories', 'legal_snapshot', 'policy_version', 'catalog_hash', 'gpc', 'source', 'ip_hash', 'user_agent', 'url', 'created_gmt' );
+		$cols = array( 'id', 'receipt_id', 'visitor_id', 'event', 'categories', 'legal_snapshot', 'policy_version', 'catalog_hash', 'gpc', 'country', 'source', 'ip_hash', 'user_agent', 'url', 'created_gmt' );
 		$out  = implode( ',', $cols ) . "\n";
 		foreach ( (array) $rows as $r ) {
 			$line = array();
@@ -220,6 +266,28 @@ class Amplifi_Consent_Rest {
 		$resp->header( 'Content-Type', 'text/csv; charset=utf-8' );
 		$resp->header( 'Content-Disposition', 'attachment; filename="acconsent-log.csv"' );
 		return $resp;
+	}
+
+	/**
+	 * Admin-only DSAR lookup: every consent-log row for one visitor_id.
+	 */
+	public static function get_visitor( $request ) {
+		$visitor_id = $request->get_param( 'visitor_id' );
+		$rows       = Amplifi_Consent_Log::query( array( 'visitor_id' => $visitor_id, 'limit' => 1000 ) );
+		return rest_ensure_response( array(
+			'visitor_id' => $visitor_id,
+			'count'      => count( $rows ),
+			'rows'       => $rows,
+		) );
+	}
+
+	/**
+	 * Admin-only DSAR erasure: permanently delete every consent-log row for
+	 * one visitor_id. Returns the number of rows deleted.
+	 */
+	public static function delete_visitor( $request ) {
+		$n = Amplifi_Consent_Log::delete_by_visitor( $request->get_param( 'visitor_id' ) );
+		return rest_ensure_response( array( 'deleted' => $n ) );
 	}
 
 	/**
@@ -250,6 +318,16 @@ class Amplifi_Consent_Rest {
 			return false; // tighter per-visitor sub-limit.
 		}
 		return true;
+	}
+
+	/**
+	 * L3: a lightweight, more-generous-than-/consent rate limit for GET
+	 * /config. This endpoint is legitimately called on every uncached page
+	 * load per visitor (it sets the visitor cookie + mints a fresh token), so
+	 * the ceiling is high — this only guards against an unbounded flood.
+	 */
+	private static function config_rate_ok() {
+		return self::bump( 'cfg_ip_' . md5( self::client_ip() ), 300 ); // generous: legitimately called on every uncached page load per visitor.
 	}
 
 	/**
