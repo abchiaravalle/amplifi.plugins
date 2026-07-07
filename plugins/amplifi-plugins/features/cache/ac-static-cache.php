@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( defined( 'ACSC_VERSION' ) ) {
 	return;
 }
-define( 'ACSC_VERSION', '3.1.5' );
+define( 'ACSC_VERSION', '3.1.6' );
 define( 'ACSC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACSC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACSC_PLUGIN_FILE', __FILE__ );
