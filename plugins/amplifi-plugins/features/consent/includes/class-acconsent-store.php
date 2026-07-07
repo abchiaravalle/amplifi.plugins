@@ -704,8 +704,15 @@ class Amplifi_Consent_Store {
 	 * makes the doc's "current version" advance — and bumping any published
 	 * doc's version changes the catalog_hash() below, which forces returning
 	 * visitors to re-consent against the new policy text.
+	 *
+	 * $published_at is optional (defaults to now, in GMT MySQL format) — pass
+	 * an explicit historical date when migrating EXISTING legal content that
+	 * already carries its own stated effective date in the body text (e.g.
+	 * moving a page's HTML into this store verbatim). Stamping "now" on an
+	 * unchanged document is misleading: it implies the policy text changed
+	 * on the migration date when it did not.
 	 */
-	public static function publish_legal_version( $id, $version_label, $content ) {
+	public static function publish_legal_version( $id, $version_label, $content, $published_at = '' ) {
 		$docs = self::get_legal_docs();
 		$id   = sanitize_key( $id );
 		if ( ! isset( $docs[ $id ] ) ) {
@@ -719,7 +726,7 @@ class Amplifi_Consent_Store {
 		$docs[ $id ]['versions'][] = array(
 			'version'      => $label,
 			'content'      => wp_kses_post( $content ),
-			'published_at' => current_time( 'mysql', true ),
+			'published_at' => $published_at ? $published_at : current_time( 'mysql', true ),
 		);
 		update_option( self::OPT_LEGAL, $docs );
 		return $docs[ $id ];

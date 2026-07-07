@@ -1137,6 +1137,10 @@ gtag('consent','default',{
 			'slug'         => '',
 			'id'           => '',
 			'show_version' => 'true',
+			// Suppress the shortcode's own <h2> title when the page's own
+			// template already renders an <h1> for the page title (the
+			// common case) — avoids a visible duplicate heading.
+			'show_title'   => 'true',
 		), $atts, 'amplifi-legal-doc' );
 
 		$doc = '';
@@ -1153,8 +1157,10 @@ gtag('consent','default',{
 			return '';
 		}
 
-		$out  = '<div class="acconsent-legal-doc" data-doc="' . esc_attr( $doc['slug'] ) . '">';
-		$out .= '<h2 class="acconsent-legal-title">' . esc_html( $doc['title'] ) . '</h2>';
+		$out = '<div class="acconsent-legal-doc" data-doc="' . esc_attr( $doc['slug'] ) . '">';
+		if ( 'false' !== $atts['show_title'] ) {
+			$out .= '<h2 class="acconsent-legal-title">' . esc_html( $doc['title'] ) . '</h2>';
+		}
 		if ( 'false' !== $atts['show_version'] ) {
 			$date = isset( $cur['published_at'] ) ? mysql2date( get_option( 'date_format' ), $cur['published_at'] ) : '';
 			$out .= '<p class="acconsent-legal-meta">' . esc_html(
