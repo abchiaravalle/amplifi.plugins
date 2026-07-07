@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( defined( 'ACPODS_VERSION' ) ) {
 	return;
 }
-define( 'ACPODS_VERSION', '3.0.8' );
+define( 'ACPODS_VERSION', '3.1.3' );
 define( 'ACPODS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACPODS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACPODS_PLUGIN_FILE', __FILE__ );

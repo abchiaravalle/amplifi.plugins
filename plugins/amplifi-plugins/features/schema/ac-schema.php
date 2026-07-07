@@ -12,7 +12,7 @@ if ( defined( 'AMPLIFI_SCHEMA_VERSION' ) ) {
 	return;
 }
 
-define( 'AMPLIFI_SCHEMA_VERSION', '3.0.8' );
+define( 'AMPLIFI_SCHEMA_VERSION', '3.1.3' );
 define( 'AMPLIFI_SCHEMA_DB_VERSION', '1' );
 define( 'AMPLIFI_SCHEMA_FILE', __FILE__ );
 define( 'AMPLIFI_SCHEMA_PATH', plugin_dir_path( __FILE__ ) );
