@@ -4,7 +4,7 @@ Tags: cookie consent, gdpr, ccpa, privacy, consent log, gpc, consent mode
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.9.1
+Stable tag: 3.1.5
 License: MIT
 
 Cookie consent that withholds your tracking scripts until consent, keeps a best-effort server-side record of each choice, honors GPC, and can auto-block unmanaged trackers.
@@ -129,6 +129,31 @@ excludes tracker hosts at the server. These are known limitations of every
 JavaScript-based consent blocker, not specific to this plugin.
 
 == Changelog ==
+
+= 3.1.5 =
+Three real-site edge cases found by installing on a live client site
+(ascentialmls.com) with existing Marketo/GTM/gtag scripts already configured:
+* Fix: the plugin's own consent-config script (localized `window.ACCONSENT`
+  data) could be self-gated by the auto-block scanner, since that config
+  legitimately lists blocklisted hostnames as plain data. When that happened,
+  `window.ACCONSENT` never initialized client-side and the banner/FAB/modal
+  never appeared at all, even though managed scripts were correctly
+  configured. Own script tags (id="acconsent-*") are now excluded from the
+  auto-block scan.
+* Fix: the consent popup's root container is now forced to be a direct child
+  of `<body>` on every boot, and stays there via a MutationObserver — some
+  themes/plugins (off-canvas megamenus like mmenu, page-transition wrappers,
+  etc.) restructure the page DOM by wrapping body content in a new container,
+  which can carry a CSS `transform`/`will-change` that breaks `position:
+  fixed` for anything trapped inside it. This kept the popup correctly
+  anchored to the viewport even when the page's body structure changes
+  dynamically after page load.
+* Fix: button/FAB/close-button styling (border-radius, width, padding,
+  appearance) is now `!important`-protected against same-specificity theme
+  reset stylesheets and CSS frameworks (e.g. Bootstrap, hello-elementor's
+  reset.css) that target `[type="button"]`/`button` element selectors and
+  can silently override the consent UI's shape when they load later in the
+  cascade.
 
 = 1.9.1 =
 * Fix: the "Do Not Sell or Share" / "Limit Sensitive PI" opt-out buttons now
