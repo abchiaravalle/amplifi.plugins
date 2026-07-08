@@ -3,7 +3,7 @@
  * Plugin Name:       amplifi.plugins
  * Plugin URI:        https://amplifi.studio/
  * Description:       The complete amplifi.studio WordPress suite. Schema, SEO optimization, security, translation, sync, magic links, podcasts, static cache, and more.
- * Version:           3.1.10
+ * Version:           3.1.11
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Amplifi Studio
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AMPLIFI_PLUGINS_VERSION', '3.1.10' );
+define( 'AMPLIFI_PLUGINS_VERSION', '3.1.11' );
 define( 'AMPLIFI_PLUGINS_FILE', __FILE__ );
 define( 'AMPLIFI_PLUGINS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'AMPLIFI_PLUGINS_URL', plugin_dir_url( __FILE__ ) );
