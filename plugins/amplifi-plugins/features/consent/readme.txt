@@ -4,7 +4,7 @@ Tags: cookie consent, gdpr, ccpa, privacy, consent log, gpc, consent mode
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.1.5
+Stable tag: 3.1.11
 License: MIT
 
 Cookie consent that withholds your tracking scripts until consent, keeps a best-effort server-side record of each choice, honors GPC, and can auto-block unmanaged trackers.
@@ -129,6 +129,26 @@ excludes tracker hosts at the server. These are known limitations of every
 JavaScript-based consent blocker, not specific to this plugin.
 
 == Changelog ==
+
+= 3.1.11 =
+* Fix: managed-script release was silently broken for EVERY visitor on EVERY
+  site — `releaseTemplate()`'s base64-decode path read the gated payload from
+  `tpl.textContent`, but per the HTML spec a browser-parsed `<template>`
+  element's markup lives in the inert `.content` DocumentFragment, not in its
+  own `.textContent`/`.childNodes`. `tpl.textContent` is therefore ALWAYS the
+  empty string for a server-rendered gated template — every managed script
+  (GTM, Marketo Munchkin, etc.) stayed inert forever, even after "Accept all"
+  or Manage → Save granted every category. Now correctly reads the payload
+  from `tpl.content.textContent`. Found live on ascentialmls.com (GTM +
+  Munchkin never fired post-accept) but affects every site using Managed
+  Scripts, since those always render with `data-acconsent-enc="base64"`.
+* Fix (ascentialmls.com config only, not a code change): two managed scripts
+  (GTM container, Munchkin tracker) had been incorrectly flagged
+  `sale_share`/`sensitive_pi` — CCPA §1798.121-style unconditional withholding
+  meant for actual Sensitive-PI/sale-of-data flows (health, financial,
+  biometric, precise geolocation), not a standard analytics tag manager or
+  marketing tracker. Cleared both flags so the scripts gate purely on normal
+  category consent.
 
 = 3.1.5 =
 Three real-site edge cases found by installing on a live client site

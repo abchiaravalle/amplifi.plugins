@@ -157,9 +157,17 @@
     // The gated body is base64-encoded (so a "</template>" inside the snippet
     // can't break out of the inert container). Decode it into a real fragment.
     if (tpl.getAttribute('data-acconsent-enc') === 'base64') {
+      // BUG (fixed): a browser-parsed <template>'s markup lives in the inert
+      // `.content` DocumentFragment per spec, NOT in the element's own
+      // `.textContent`/`.childNodes` — `tpl.textContent` is ALWAYS the empty
+      // string for a template parsed from server-rendered HTML. Must read
+      // the base64 payload from `tpl.content.textContent` instead. (This bug
+      // made EVERY managed script's release silently no-op, since managed
+      // scripts always render with data-acconsent-enc="base64".)
+      var raw = tpl.content ? tpl.content.textContent : tpl.textContent;
       var decoded = '';
-      try { decoded = decodeURIComponent(escape(window.atob(tpl.textContent.trim()))); }
-      catch (e) { try { decoded = window.atob(tpl.textContent.trim()); } catch (e2) { decoded = ''; } }
+      try { decoded = decodeURIComponent(escape(window.atob(raw.trim()))); }
+      catch (e) { try { decoded = window.atob(raw.trim()); } catch (e2) { decoded = ''; } }
       var holder = document.createElement('template');
       holder.innerHTML = decoded;
       frag = holder.content.cloneNode(true);
