@@ -61,6 +61,20 @@
     };
     var ok = false;
     try { window.localStorage.setItem(KEY, JSON.stringify(data)); ok = true; } catch (e) {}
+    // Mirror the sale/share opt-out into a first-party cookie so the SERVER can
+    // honor it on the NEXT navigation BEFORE any JS runs (see PHP
+    // visitor_opted_out()) — this is what lets an opted-out returning visitor
+    // never receive the live Advanced-Consent-Mode Google tag in the first
+    // place, closing the head-emit-vs-footer-JS race at the source. Set to "1"
+    // when opted out; cleared (expired) otherwise so a later Accept re-enables.
+    try {
+      var maxAge = days * 24 * 60 * 60;
+      if (saleShareOptOut) {
+        document.cookie = 'acconsent_optout=1; Max-Age=' + maxAge + '; Path=/; SameSite=Lax';
+      } else {
+        document.cookie = 'acconsent_optout=; Max-Age=0; Path=/; SameSite=Lax';
+      }
+    } catch (e) {}
     return { data: data, persisted: ok };
   }
 
@@ -660,6 +674,17 @@
       categories = Object.assign({}, categories, { marketing: false });
       saleOptOut = true;
       if (event === 'grant') { event = 'update'; }
+    }
+    // CM/sale-share opt-out on an explicit denial: if the visitor has NOT
+    // granted analytics AND has NOT granted marketing, treat this as a
+    // sale/share opt-out too. This is what a plain "Reject all" is — and it is
+    // what persists the acconsent_optout cookie (see writeConsent()) so the
+    // SERVER withholds the live Advanced-Consent-Mode Google tag on the
+    // visitor's NEXT navigation, not just suppresses it client-side this time.
+    // A visitor who grants either bucket is opting in, so this stays false and
+    // CM keeps working for them.
+    if (!categories.analytics && !categories.marketing) {
+      saleOptOut = true;
     }
     writeConsent(categories, saleOptOut);
     applyConsent(grantedSet({ categories: categories }), saleOptOut);

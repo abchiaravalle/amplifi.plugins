@@ -4,7 +4,7 @@ Tags: cookie consent, gdpr, ccpa, privacy, consent log, gpc, consent mode
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.2.0
+Stable tag: 3.2.1
 License: MIT
 
 Cookie consent that withholds your tracking scripts until consent, keeps a best-effort server-side record of each choice, honors GPC, and can auto-block unmanaged trackers.
@@ -129,6 +129,30 @@ excludes tracker hosts at the server. These are known limitations of every
 JavaScript-based consent blocker, not specific to this plugin.
 
 == Changelog ==
+
+= 3.2.1 =
+* Compliance hardening of Advanced Consent Mode (from a blind multi-lens audit).
+  A visitor's sale/share OPT-OUT is now honored fully SERVER-SIDE, before the
+  CM Google tag is emitted — closing a race where the cookieless pre-consent
+  ping could fire for a GPC / Do-Not-Sell / prior-Reject visitor in the window
+  between the <head> tag emitting and consent.js booting in the footer.
+  - New visitor_opted_out(): true when GPC honoring is on and the request
+    carries Sec-GPC:1, OR a persisted first-party acconsent_optout cookie
+    records a prior Reject / Do-Not-Sell / GPC opt-out. When true, cm_active()
+    returns false for that request: the CM-flagged tag falls back to the inert
+    hard-gated <template> and the shim's CM allowlist is empty. No live Google
+    tag, no cookieless ping — decided before a byte of it is sent.
+  - The network shim's saleShareOptOut flag is now SEEDED from the server's
+    per-request opt-out decision (starts true for an opted-out visitor) instead
+    of defaulting false and only flipping after consent.js boots. cmAllowed()
+    also yields to saleShareOptOut, so a CM host is never allowed once opted out.
+  - consent.js mirrors the opt-out into the first-party acconsent_optout cookie
+    on every Reject / Do-Not-Sell / GPC event, so the server honors it on the
+    NEXT navigation with zero JS.
+  - Removed g.doubleclick.net (and any ad-exchange/remarketing host) from the
+    CM allowlist. Advanced Consent Mode now allowlists ONLY Google's own
+    analytics tag infrastructure (GTM loader + the *.google-analytics.com /
+    analytics.google.com collect endpoints) — never an advertising endpoint.
 
 = 3.2.0 =
 * Feature: Google Advanced Consent Mode. A managed Google tag (GTM / gtag /

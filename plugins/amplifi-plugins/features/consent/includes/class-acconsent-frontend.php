@@ -54,6 +54,24 @@ class Amplifi_Consent_Frontend {
 		// this control (render_banner() does not render a floating one).
 		add_shortcode( 'amplifi-do-not-sell', array( __CLASS__, 'do_not_sell_shortcode' ) );
 
+		// CACHE SAFETY for Advanced Consent Mode. The live-vs-hard-gated CM tag
+		// decision (see cm_active()/visitor_opted_out()) and the shim's opt-out
+		// seed are computed in PHP at render time. If a shared full-page cache
+		// (WP Engine/Cloudflare/WP Rocket/Varnish) stored a page rendered for a
+		// NON-opted-out visitor and then served that same HTML to a later
+		// GPC/opted-out visitor, PHP would never re-run and the server-side
+		// opt-out gate would be silently bypassed — the live Google tag would
+		// reach an opted-out visitor from cache. To prevent that, whenever the
+		// global consent_mode setting is on we mark CM-eligible responses
+		// non-shared-cacheable and vary them on the GPC signal + opt-out cookie.
+		// Hooked at send_headers priority 0 (before start_buffer at 1) so the
+		// headers are set before any output. Only fires when consent_mode is on,
+		// so a site not using Advanced Consent Mode is completely unaffected.
+		$cm_settings = Amplifi_Consent_Store::get_settings();
+		if ( ! empty( $cm_settings['enabled'] ) && ! empty( $cm_settings['consent_mode'] ) ) {
+			add_action( 'send_headers', array( __CLASS__, 'cache_headers' ), 0 );
+		}
+
 		// Auto-block UNMANAGED trackers (opt-in via settings).
 		if ( self::autoblock_on() ) {
 			add_filter( 'script_loader_tag', array( __CLASS__, 'gate_enqueued_script' ), 10, 3 );
@@ -269,6 +287,12 @@ class Amplifi_Consent_Frontend {
 		// flagged consent_mode — so a site not using CM behaves byte-identically
 		// to the hard-withholding default. See self::cm_hosts().
 		$cm_json = wp_json_encode( array_values( self::cm_hosts() ) );
+		// Seed the shim's saleShareOptOut flag from the SERVER's per-request
+		// opt-out decision (GPC header / persisted opt-out cookie), so the shim
+		// starts in the correct state at byte 0 rather than defaulting false and
+		// waiting for consent.js to boot — see visitor_opted_out() and the shim's
+		// saleShareOptOut docblock. 'true'/'false' as a bare JS literal.
+		$optout_json = self::visitor_opted_out() ? 'true' : 'false';
 				// NOTE: built via a NOWDOC + str_replace (not ob_start()/ob_get_clean())
 				// because this method is called from filter_buffer(), which is itself
 				// running as an ob_start() display-handler callback — PHP disallows
@@ -300,7 +324,27 @@ class Amplifi_Consent_Frontend {
 		  // sale/share or SPI opt-out below (compliance wins over modeling).
 		  var CM = __ACCONSENT_SHIM_CM__;
 		  var granted = { necessary: true };
-		  var saleShareOptOut = false; // set by consent.js via __acconsentSetSaleShareOptOut.
+		  // CACHE-SAFE opt-out determination. The server seeds its per-request
+		  // decision (__ACCONSENT_SHIM_OPTOUT__ — GPC header / persisted opt-out
+		  // cookie at render time), but on a FULL-PAGE-CACHED site that baked
+		  // value can be stale: a page rendered for an undecided visitor (seed
+		  // false) may be served from cache to a later GPC / opted-out visitor,
+		  // and PHP never re-runs. So we OR the server seed with LIVE client-side
+		  // signals read at runtime on THIS page load — which execute per-visitor
+		  // regardless of any cache in front of the origin. The shim is spliced as
+		  // the FIRST thing in <head> and installs its network guards before any
+		  // CM tag parses, so this runtime decision gates the actual gtm.js /
+		  // collect request even when the surrounding markup came from cache.
+		  function clientOptedOut(){
+		    // 1) GPC via the browser's own JS API (cache-independent, per-visitor).
+		    try { if (navigator && navigator.globalPrivacyControl === true) return true; } catch(e){}
+		    // 2) The first-party opt-out cookie consent.js writes on Reject /
+		    //    Do-Not-Sell / GPC (also what the server reads, but here we read it
+		    //    client-side so a cached page still honors it).
+		    try { if (/(?:^|;\s*)acconsent_optout=1(?:;|$)/.test(document.cookie)) return true; } catch(e){}
+		    return false;
+		  }
+		  var saleShareOptOut = ( __ACCONSENT_SHIM_OPTOUT__ ) || clientOptedOut();
 		  var spiLimited = true; // H2: SPI limitation is ON by default — see readme FAQ.
 		  function catFor(url){
 		    try { url = String(url).toLowerCase(); } catch(e){ return null; }
@@ -312,9 +356,43 @@ class Amplifi_Consent_Frontend {
 		    for (var i=0;i<list.length;i++){ if (url.indexOf(list[i]) !== -1) return true; }
 		    return false;
 		  }
+		  // Extract the hostname (authority) from a URL, lowercased. Used by the
+		  // CM allowlist so it matches on the ACTUAL host, not a substring that a
+		  // blocklisted tracker could embed in its path/query (e.g.
+		  // https://doubleclick.net/x?r=google-analytics.com must NOT be treated
+		  // as a Google host). Falls back to '' on a parse failure (→ no match).
+		  function hostOf(url){
+		    try {
+		      var u = new URL(String(url), location.href);
+		      return (u.hostname || '').toLowerCase();
+		    } catch(e){
+		      // Protocol-relative or malformed: best-effort authority slice.
+		      try {
+		        var s = String(url).toLowerCase().replace(/^[a-z]+:/, '').replace(/^\/\//, '');
+		        return s.split(/[\/?#]/)[0] || '';
+		      } catch(e2){ return ''; }
+		    }
+		  }
+		  // Host-anchored allowlist test: true only when the URL's real hostname
+		  // equals an allowlisted host or is a subdomain of it. NOT a substring
+		  // test — that's the anti-smuggling fix (a path/query embedding a Google
+		  // host string can't earn the pre-consent exemption).
+		  function hostAllowed(url, list){
+		    var h = hostOf(url);
+		    if (!h) return false;
+		    for (var i=0;i<list.length;i++){
+		      var a = String(list[i]).toLowerCase();
+		      if (h === a || h.slice(-(a.length + 1)) === ('.' + a)) return true;
+		    }
+		    return false;
+		  }
 		  function saleBlocked(url){ return saleShareOptOut && hostMatch(url, SALE); }
 		  function spiBlocked(url){ return spiLimited && hostMatch(url, SPI); }
-		  function cmAllowed(url){ return hostMatch(url, CM); }
+		  // A Consent-Mode host is allowed to load cookieless pre-consent ONLY
+		  // while the visitor has NOT opted out of sale/share, AND only when the
+		  // request's real HOSTNAME is an allowlisted Google host (host-anchored,
+		  // not substring — see hostAllowed). Once opted out, CM yields entirely.
+		  function cmAllowed(url){ return !saleShareOptOut && hostAllowed(url, CM); }
 		  function blocked(url){
 		    // A sale/share or SPI opt-out ALWAYS wins — even the cookieless
 		    // Consent-Mode ping is withheld once the visitor has opted out.
@@ -725,8 +803,8 @@ class Amplifi_Consent_Frontend {
 		ACCONSENT_NET_SHIM;
 
 				return str_replace(
-					array( '__ACCONSENT_SHIM_MAP__', '__ACCONSENT_SHIM_SALE__', '__ACCONSENT_SHIM_SPI__', '__ACCONSENT_SHIM_CM__' ),
-					array( $json, $sale_json, $spi_json, $cm_json ),
+					array( '__ACCONSENT_SHIM_MAP__', '__ACCONSENT_SHIM_SALE__', '__ACCONSENT_SHIM_SPI__', '__ACCONSENT_SHIM_CM__', '__ACCONSENT_SHIM_OPTOUT__' ),
+					array( $json, $sale_json, $spi_json, $cm_json, $optout_json ),
 					$template
 				);
 			}
@@ -809,10 +887,53 @@ gtag('consent','default',{
 		if ( empty( $s['consent_mode'] ) ) {
 			return false;
 		}
+		// CCPA/CPRA + GPC: if THIS visitor has opted out (GPC signal, or a
+		// persisted Do-Not-Sell / prior-reject choice), Advanced Consent Mode
+		// must NOT engage for them — the CM-flagged Google tag is emitted as an
+		// inert hard-gated <template> instead of loading live, and cm_hosts()
+		// returns empty so the network-shim allowlist is empty too. This closes
+		// the head-emit-vs-footer-JS race the shim's runtime saleShareOptOut
+		// flag could not (the flag flips only after consent.js boots in the
+		// footer, i.e. AFTER a <head> CM tag would already have pinged Google).
+		// Decided fully server-side, before a single byte of the CM tag is sent.
+		if ( self::visitor_opted_out() ) {
+			return false;
+		}
 		foreach ( Amplifi_Consent_Store::get_scripts() as $sc ) {
 			if ( ! empty( $sc['enabled'] ) && ! empty( $sc['consent_mode'] ) ) {
 				return true;
 			}
+		}
+		return false;
+	}
+
+	/**
+	 * Has THIS visitor opted out of sale/share (so Advanced Consent Mode's
+	 * cookieless pre-consent Google load must be withheld for them)? Evaluated
+	 * server-side, per request, so the decision is made BEFORE the CM tag is
+	 * emitted — not after JS boots. Returns true when EITHER:
+	 *  - GPC honoring is enabled AND the request carries `Sec-GPC: 1`; or
+	 *  - a persisted consent/opt-out cookie records a prior Reject or an
+	 *    explicit Do-Not-Sell / sale-share opt-out.
+	 * A returning visitor who accepted is NOT opted out (CM stays active for
+	 * them); a first-time visitor with no signal is NOT opted out (CM's whole
+	 * purpose is to model that un-decided visitor cookielessly).
+	 */
+	private static function visitor_opted_out() {
+		$s = Amplifi_Consent_Store::get_settings();
+		// 1) GPC request header — a legally valid opt-out signal (CCPA §1798.135).
+		if ( ! empty( $s['gpc_enabled'] )
+			&& isset( $_SERVER['HTTP_SEC_GPC'] )
+			&& '1' === (string) $_SERVER['HTTP_SEC_GPC'] ) {
+			return true;
+		}
+		// 2) A persisted opt-out recorded on a prior visit. consent.js mirrors
+		// the visitor's choice into a first-party cookie (acconsent_optout) set
+		// to "1" whenever they Reject all, opt out of Do-Not-Sell/sale-share, or
+		// are under an active GPC signal — so the server can honor it on the
+		// NEXT navigation before any JS runs. Absence = no recorded opt-out.
+		if ( isset( $_COOKIE['acconsent_optout'] ) && '1' === (string) $_COOKIE['acconsent_optout'] ) {
+			return true;
 		}
 		return false;
 	}
@@ -830,13 +951,17 @@ gtag('consent','default',{
 			return array();
 		}
 		// Consent-Mode-aware Google tag delivery hosts. GTM (googletagmanager)
-		// is the loader; the *.google-analytics.com / analytics.google.com /
-		// *.google.com collect endpoints are where the cookieless pings go.
+		// is the loader; the *.google-analytics.com / analytics.google.com
+		// collect endpoints are where the cookieless GA4 pings go. We deliberately
+		// do NOT include g.doubleclick.net or any ad-exchange/remarketing host:
+		// Advanced Consent Mode's legitimate purpose is cookieless ANALYTICS
+		// modeling, and an advertising endpoint firing pre-consent is a
+		// sale/share we will not allow. Only Google's own analytics tag
+		// infrastructure is ever allowlisted here.
 		$known = array(
 			'googletagmanager.com',
 			'google-analytics.com',
 			'analytics.google.com',
-			'g.doubleclick.net',
 			'region1.google-analytics.com',
 			'region1.analytics.google.com',
 		);
@@ -852,15 +977,15 @@ gtag('consent','default',{
 				}
 			}
 		}
-		// Always include the GA collect endpoints when GTM is present — GTM
-		// injects GA4, which pings *.google-analytics.com even though that host
-		// isn't literally in the container-loader snippet's text.
+		// Always include the GA analytics collect endpoints when GTM is present —
+		// GTM injects GA4, which pings *.google-analytics.com even though that
+		// host isn't literally in the container-loader snippet's text. (No ad
+		// hosts — see the $known comment above.)
 		if ( in_array( 'googletagmanager.com', $hosts, true ) ) {
 			$hosts[] = 'google-analytics.com';
 			$hosts[] = 'analytics.google.com';
 			$hosts[] = 'region1.google-analytics.com';
 			$hosts[] = 'region1.analytics.google.com';
-			$hosts[] = 'g.doubleclick.net';
 		}
 		return array_values( array_unique( $hosts ) );
 	}
@@ -943,6 +1068,45 @@ gtag('consent','default',{
 			return;
 		}
 		ob_start( array( __CLASS__, 'filter_buffer' ) );
+	}
+
+	/**
+	 * Make Advanced-Consent-Mode-eligible front-end responses safe against a
+	 * shared full-page cache serving one visitor's CM decision to another. Fires
+	 * on send_headers (priority 0) only when the global consent_mode setting is
+	 * on — see init(). Without this, a page cached for a non-opted-out visitor
+	 * (live Google tag baked in, shim seeded saleShareOptOut=false) could be
+	 * replayed to a later GPC / Do-Not-Sell / prior-Reject visitor whose opt-out
+	 * PHP never runs on a cache hit, defeating the entire server-side gate.
+	 *
+	 * We take the conservative, correct-by-construction route: mark the response
+	 * non-shared-cacheable (Cache-Control: private, no-store) and set the common
+	 * host/plugin "do not cache this page" sentinels, plus a Vary on the GPC
+	 * request header + the opt-out cookie so any cache that DOES key on them
+	 * still segments correctly. Skipped for admin/feed/JSON (same guard as
+	 * start_buffer) and when headers are already sent.
+	 */
+	public static function cache_headers() {
+		if ( is_admin() || is_feed() || is_robots() || headers_sent() ) {
+			return;
+		}
+		if ( function_exists( 'wp_is_json_request' ) && wp_is_json_request() ) {
+			return;
+		}
+		// Vary so a compliant cache keys on the two things the CM decision reads.
+		// (Appends rather than replaces any existing Vary.)
+		header( 'Vary: Sec-GPC, Cookie', false );
+		// Do not let a SHARED cache reuse this page across visitors. 'private'
+		// permits the visitor's OWN browser cache but forbids proxy/CDN/page
+		// caches from serving it to a different visitor; no-store is the belt.
+		header( 'Cache-Control: private, no-store, max-age=0' );
+		// Sentinels honored by the common WP page caches / CDNs so they skip
+		// storing this response at all (WP Engine, WP Rocket, LiteSpeed,
+		// Batcache/WP Super Cache, W3TC). Defining the constant is the canonical
+		// WP "don't full-page-cache me" signal.
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true );
+		}
 	}
 
 	/**
