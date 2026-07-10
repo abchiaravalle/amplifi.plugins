@@ -4,7 +4,7 @@ Tags: cookie consent, gdpr, ccpa, privacy, consent log, gpc, consent mode
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.1.11
+Stable tag: 3.2.0
 License: MIT
 
 Cookie consent that withholds your tracking scripts until consent, keeps a best-effort server-side record of each choice, honors GPC, and can auto-block unmanaged trackers.
@@ -129,6 +129,26 @@ excludes tracker hosts at the server. These are known limitations of every
 JavaScript-based consent blocker, not specific to this plugin.
 
 == Changelog ==
+
+= 3.2.0 =
+* Feature: Google Advanced Consent Mode. A managed Google tag (GTM / gtag /
+  GA4) can now be flagged "Consent Mode" on the Scripts tab so that — when the
+  global Consent Mode v2 setting is on — it loads LIVE but COOKIELESS before
+  consent (sending Google's anonymized "modeling pings", with the
+  gtag('consent','default',{…denied…}) block keeping every identifier off),
+  then upgrades to full tracking via gtag('consent','update') on accept. This
+  recovers the un-consented-traffic gap Google's own Consent Mode is designed
+  for, without firing any cookie pre-consent. Every OTHER managed script keeps
+  hard-withholding in an inert <template> exactly as before — CM is strictly
+  opt-in per script, and only meaningful for Consent-Mode-aware Google tags.
+* A CM-flagged tag is emitted inside a <div data-acconsent="cm"> marker (so the
+  server-side auto-block passes skip it) and its Google delivery hosts are added
+  to a client network-shim allowlist that lets the cookieless pings through
+  pre-consent. The allowlist YIELDS to GPC / "Do Not Sell" and "Limit Sensitive
+  PI" — a visitor opt-out still withholds even the cookieless ping, so the CCPA
+  sale/share and SPI protections are unchanged.
+* When the global Consent Mode setting is off, or no enabled script is flagged,
+  every new code path is inert and behaviour is byte-identical to 3.1.11.
 
 = 3.1.11 =
 * Fix: managed-script release was silently broken for EVERY visitor on EVERY
