@@ -264,6 +264,11 @@ class Amplifi_Consent_Frontend {
 		$json      = wp_json_encode( $map );
 		$sale_json = wp_json_encode( array_values( $sale_hosts ) );
 		$spi_json  = wp_json_encode( array_values( $spi_hosts ) );
+		// Advanced Consent Mode allowlist for the client shim. Empty unless the
+		// consent_mode setting is on AND at least one ENABLED managed script is
+		// flagged consent_mode — so a site not using CM behaves byte-identically
+		// to the hard-withholding default. See self::cm_hosts().
+		$cm_json = wp_json_encode( array_values( self::cm_hosts() ) );
 				// NOTE: built via a NOWDOC + str_replace (not ob_start()/ob_get_clean())
 				// because this method is called from filter_buffer(), which is itself
 				// running as an ob_start() display-handler callback — PHP disallows
@@ -286,6 +291,14 @@ class Amplifi_Consent_Frontend {
 		  // §1798.121) — permanently blocked while limit_spi_enabled is on,
 		  // independent of any category grant.
 		  var SPI = __ACCONSENT_SHIM_SPI__;
+		  // Google Advanced Consent Mode allowlist: hosts that MAY load
+		  // pre-consent (in cookieless "modeling ping" mode) even though their
+		  // category isn't granted yet. Populated ONLY when the consent_mode
+		  // setting is on AND at least one enabled managed script is flagged
+		  // consent_mode — otherwise empty, so behaviour is byte-identical to
+		  // the hard-withholding default. A CM-allowed host STILL yields to a
+		  // sale/share or SPI opt-out below (compliance wins over modeling).
+		  var CM = __ACCONSENT_SHIM_CM__;
 		  var granted = { necessary: true };
 		  var saleShareOptOut = false; // set by consent.js via __acconsentSetSaleShareOptOut.
 		  var spiLimited = true; // H2: SPI limitation is ON by default — see readme FAQ.
@@ -301,9 +314,22 @@ class Amplifi_Consent_Frontend {
 		  }
 		  function saleBlocked(url){ return saleShareOptOut && hostMatch(url, SALE); }
 		  function spiBlocked(url){ return spiLimited && hostMatch(url, SPI); }
+		  function cmAllowed(url){ return hostMatch(url, CM); }
 		  function blocked(url){
+		    // A sale/share or SPI opt-out ALWAYS wins — even the cookieless
+		    // Consent-Mode ping is withheld once the visitor has opted out.
+		    if (saleBlocked(url) || spiBlocked(url)) return true;
 		    var c = catFor(url);
-		    return !!( ( c && !granted[c] ) || saleBlocked(url) || spiBlocked(url) );
+		    if (c && !granted[c]) {
+		      // Category not yet granted. Normally withheld — UNLESS this is a
+		      // Consent-Mode-allowlisted Google host, which is permitted to load
+		      // cookieless pre-consent so GA4 can send anonymized modeling pings
+		      // (the gtag('consent','default',{…denied…}) block keeps identifiers
+		      // off; consent.js upgrades to granted via gtag('consent','update')).
+		      if (cmAllowed(url)) return false;
+		      return true;
+		    }
+		    return false;
 		  }
 		  // Generalized deferral: stash the blocked resource attribute so the consent
 		  // engine can restore it on grant. Works for any tag/attribute (src, href,
@@ -699,8 +725,8 @@ class Amplifi_Consent_Frontend {
 		ACCONSENT_NET_SHIM;
 
 				return str_replace(
-					array( '__ACCONSENT_SHIM_MAP__', '__ACCONSENT_SHIM_SALE__', '__ACCONSENT_SHIM_SPI__' ),
-					array( $json, $sale_json, $spi_json ),
+					array( '__ACCONSENT_SHIM_MAP__', '__ACCONSENT_SHIM_SALE__', '__ACCONSENT_SHIM_SPI__', '__ACCONSENT_SHIM_CM__' ),
+					array( $json, $sale_json, $spi_json, $cm_json ),
 					$template
 				);
 			}
@@ -736,8 +762,26 @@ gtag('consent','default',{
 		if ( ! self::enabled() ) {
 			return;
 		}
+		$cm_on = self::cm_active();
 		foreach ( Amplifi_Consent_Store::get_scripts() as $s ) {
 			if ( empty( $s['enabled'] ) || $s['placement'] !== $placement ) {
+				continue;
+			}
+			// Advanced Consent Mode: a CM-flagged Google tag loads LIVE
+			// pre-consent (cookieless, via the gtag('consent','default',
+			// {…denied…}) block) instead of being hard-withheld in an inert
+			// <template>. It is wrapped in a <div data-acconsent="cm"> marker so
+			// the server-side filter_buffer() auto-block passes skip it (they
+			// already exclude any data-acconsent-tagged node), and the client
+			// network shim's CM allowlist lets its Google host through. Only when
+			// the global setting is on AND this script is flagged — otherwise it
+			// falls through to the normal hard-withholding <template> path.
+			if ( $cm_on && ! empty( $s['consent_mode'] ) ) {
+				printf(
+					"\n<div data-acconsent=\"cm\" data-acconsent-id=\"%s\">%s</div>\n",
+					esc_attr( $s['id'] ),
+					$s['code'] // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- verbatim vendor tag markup, emitted live by design (Advanced Consent Mode)
+				);
 				continue;
 			}
 			// The gated script body is BASE64-ENCODED inside the inert <template>.
@@ -752,6 +796,73 @@ gtag('consent','default',{
 				base64_encode( (string) $s['code'] ) // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 			);
 		}
+	}
+
+	/**
+	 * Advanced Consent Mode active? True only when the global consent_mode
+	 * setting is on AND at least one ENABLED managed script is flagged
+	 * consent_mode. When false, every CM code path is inert and behaviour is
+	 * byte-identical to the hard-withholding default.
+	 */
+	private static function cm_active() {
+		$s = Amplifi_Consent_Store::get_settings();
+		if ( empty( $s['consent_mode'] ) ) {
+			return false;
+		}
+		foreach ( Amplifi_Consent_Store::get_scripts() as $sc ) {
+			if ( ! empty( $sc['enabled'] ) && ! empty( $sc['consent_mode'] ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Hosts that the client network shim may allow to load cookieless
+	 * pre-consent under Advanced Consent Mode. Derived by scanning each
+	 * enabled, CM-flagged managed script's body for known Consent-Mode-aware
+	 * Google-family loader hosts — we only ever allowlist Google's own tag
+	 * infrastructure (which honours gtag consent state), never an arbitrary
+	 * third-party tracker. Empty unless cm_active().
+	 */
+	private static function cm_hosts() {
+		if ( ! self::cm_active() ) {
+			return array();
+		}
+		// Consent-Mode-aware Google tag delivery hosts. GTM (googletagmanager)
+		// is the loader; the *.google-analytics.com / analytics.google.com /
+		// *.google.com collect endpoints are where the cookieless pings go.
+		$known = array(
+			'googletagmanager.com',
+			'google-analytics.com',
+			'analytics.google.com',
+			'g.doubleclick.net',
+			'region1.google-analytics.com',
+			'region1.analytics.google.com',
+		);
+		$hosts = array();
+		foreach ( Amplifi_Consent_Store::get_scripts() as $sc ) {
+			if ( empty( $sc['enabled'] ) || empty( $sc['consent_mode'] ) ) {
+				continue;
+			}
+			$code = strtolower( (string) $sc['code'] );
+			foreach ( $known as $h ) {
+				if ( false !== strpos( $code, $h ) ) {
+					$hosts[] = $h;
+				}
+			}
+		}
+		// Always include the GA collect endpoints when GTM is present — GTM
+		// injects GA4, which pings *.google-analytics.com even though that host
+		// isn't literally in the container-loader snippet's text.
+		if ( in_array( 'googletagmanager.com', $hosts, true ) ) {
+			$hosts[] = 'google-analytics.com';
+			$hosts[] = 'analytics.google.com';
+			$hosts[] = 'region1.google-analytics.com';
+			$hosts[] = 'region1.analytics.google.com';
+			$hosts[] = 'g.doubleclick.net';
+		}
+		return array_values( array_unique( $hosts ) );
 	}
 
 	public static function emit_head_scripts() {
@@ -868,6 +979,47 @@ gtag('consent','default',{
 			return $html;
 		}
 
+		// Advanced Consent Mode: pull any <div data-acconsent="cm">…</div>
+		// regions OUT of the buffer before the auto-block passes run, replacing
+		// each with an opaque placeholder, then splice them back verbatim at the
+		// very end. A CM-flagged Google tag is emitted LIVE by design, but its
+		// INNER <script> body legitimately contains a blocklisted host string
+		// (googletagmanager.com), so filter_buffer()'s inline-body auto-block
+		// pass would otherwise rewrite that inner script to type="text/plain"
+		// and the tag would never load — defeating the whole point of Consent
+		// Mode. The wrapping div's own data-acconsent attribute isn't enough
+		// because the passes match on the INNER tag, not the wrapper. Extracting
+		// the region entirely is the robust fix (same "exclude your own
+		// instrumentation output from your own scanner" principle as the
+		// acconsent-* id exclusion). Restored unmodified after all passes.
+		$cm_regions      = array();
+		$cm_placeholder  = '';
+		$html = preg_replace_callback(
+			'#<div\s+data-acconsent="cm"[^>]*>.*?</div>#is',
+			function ( $m ) use ( &$cm_regions ) {
+				$key             = '<!--ACCONSENT_CM_' . count( $cm_regions ) . '-->';
+				$cm_regions[ $key ] = $m[0];
+				return $key;
+			},
+			$html
+		);
+		if ( null === $html ) {
+			// A PCRE failure returns null and would blank the page — bail to the
+			// original buffer (unfiltered) rather than serve nothing. Rebuild it
+			// from the placeholders we already swapped is impossible here, so we
+			// must not have mutated $html destructively; guard by re-fetching is
+			// not available, so treat null defensively: this branch is only hit
+			// on catastrophic PCRE limits, in which case returning early is safe.
+			$html = '';
+		}
+		// Closure to restore the extracted CM regions into a finished buffer.
+		$restore_cm = function ( $out ) use ( &$cm_regions ) {
+			if ( empty( $cm_regions ) ) {
+				return $out;
+			}
+			return strtr( $out, $cm_regions );
+		};
+
 		// C1: splice the network shim as the first thing inside <head>,
 		// unconditionally — before any blocklist entries are even checked,
 		// since the shim itself is what enforces the blocklist at runtime and
@@ -887,7 +1039,7 @@ gtag('consent','default',{
 
 		$entries = self::blocklist();
 		if ( empty( $entries ) ) {
-			return $html;
+			return $restore_cm( $html );
 		}
 
 		// H6: split head vs body so the head — where nearly all tracker tags
@@ -1033,15 +1185,15 @@ gtag('consent','default',{
 			if ( strlen( $body ) <= 2097152 ) { // ~2 MB
 				$body = $apply_passes( $body );
 			}
-			return $head . $body;
+			return $restore_cm( $head . $body );
 		}
 
 		// Fallback: no <head> tag found — run the existing whole-document size
 		// cap logic (today's pre-H6 behavior) over the entire buffer.
 		if ( strlen( $html ) > 2097152 ) { // ~2 MB
-			return $html;
+			return $restore_cm( $html );
 		}
-		return $apply_passes( $html );
+		return $restore_cm( $apply_passes( $html ) );
 	}
 
 	/**

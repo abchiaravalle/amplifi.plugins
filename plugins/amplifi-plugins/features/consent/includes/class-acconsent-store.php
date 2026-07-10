@@ -453,6 +453,22 @@ class Amplifi_Consent_Store {
 			// Information — permanently withheld (independent of any category
 			// grant) whenever "Limit the Use of Sensitive PI" is enabled.
 			'sensitive_pi' => isset( $s['sensitive_pi'] ) ? (bool) $s['sensitive_pi'] : false,
+			// Google Advanced Consent Mode: when the global consent_mode setting
+			// is ON and this flag is set, the script is loaded LIVE pre-consent
+			// (instead of hard-withheld in an inert <template>) so a
+			// Consent-Mode-aware Google tag (GTM/gtag/GA4) can send cookieless,
+			// anonymized "modeling pings" while the gtag('consent','default',
+			// {…denied…}) block keeps every identifier off. On grant the JS
+			// fires gtag('consent','update',{…granted…}) to upgrade it to full
+			// tracking. The sale_share / sensitive_pi withholding above STILL
+			// applies at runtime (via the network shim's CM-allowlist bypass,
+			// which yields to GPC / Do-Not-Sell / Limit-SPI), so this does not
+			// weaken the CCPA opt-out protections — it only lets a Google tag
+			// model the un-consented gap the way Google's own Consent Mode does.
+			// Only meaningful for Google-family tags; a non-Consent-Mode-aware
+			// tracker flagged here would simply fire un-gated, so the admin UI
+			// documents that this is for Google tags.
+			'consent_mode' => isset( $s['consent_mode'] ) ? (bool) $s['consent_mode'] : false,
 		);
 	}
 

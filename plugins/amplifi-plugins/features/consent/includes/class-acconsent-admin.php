@@ -161,11 +161,12 @@ class Amplifi_Consent_Admin {
 			self::notice( __( 'Legal document deleted.', 'amplifi-consent' ) );
 		} elseif ( 'save_scripts' === $action ) {
 			$rows = isset( $_POST['scripts'] ) ? wp_unslash( $_POST['scripts'] ) : array();
-			// Normalize enabled/sale_share/sensitive_pi checkboxes (unchecked boxes don't post).
+			// Normalize enabled/sale_share/sensitive_pi/consent_mode checkboxes (unchecked boxes don't post).
 			foreach ( $rows as $i => $r ) {
 				$rows[ $i ]['enabled']      = isset( $r['enabled'] ) ? 1 : 0;
 				$rows[ $i ]['sale_share']   = isset( $r['sale_share'] ) ? 1 : 0;
 				$rows[ $i ]['sensitive_pi'] = isset( $r['sensitive_pi'] ) ? 1 : 0;
+				$rows[ $i ]['consent_mode'] = isset( $r['consent_mode'] ) ? 1 : 0;
 			}
 			Amplifi_Consent_Store::save_scripts( $rows );
 			self::notice( __( 'Scripts saved.', 'amplifi-consent' ) );
@@ -179,6 +180,7 @@ class Amplifi_Consent_Admin {
 				'enabled'      => 1,
 				'sale_share'   => isset( $_POST['new_sale_share'] ) ? 1 : 0,
 				'sensitive_pi' => isset( $_POST['new_sensitive_pi'] ) ? 1 : 0,
+				'consent_mode' => isset( $_POST['new_consent_mode'] ) ? 1 : 0,
 			);
 			Amplifi_Consent_Store::save_scripts( $scripts );
 			self::notice( __( 'Script added.', 'amplifi-consent' ) );
@@ -508,6 +510,7 @@ class Amplifi_Consent_Admin {
 		self::field_textarea( 'new_code', __( 'Script code', 'amplifi-consent' ), '', '<script>...</script>' );
 		echo '<div class="acconsent-field"><label><input type="checkbox" name="new_sale_share" value="1"> ' . esc_html__( 'Constitutes sale/sharing of personal info (CCPA) — withheld under GPC/"Do Not Sell" even if its category is granted', 'amplifi-consent' ) . '</label></div>';
 		echo '<div class="acconsent-field"><label><input type="checkbox" name="new_sensitive_pi" value="1"> ' . esc_html__( 'Handles sensitive personal information (CCPA §1798.121) — withheld unconditionally while "Limit Sensitive PI" is on', 'amplifi-consent' ) . '</label></div>';
+		echo '<div class="acconsent-field"><label><input type="checkbox" name="new_consent_mode" value="1"> ' . esc_html__( 'Google Advanced Consent Mode — load this Google tag (GTM/GA4) live but cookieless before consent, then upgrade on accept (requires the global Consent Mode v2 setting on; Google tags only)', 'amplifi-consent' ) . '</label></div>';
 		submit_button( __( 'Add script', 'amplifi-consent' ), 'primary', 'submit', false );
 		echo '</form>';
 
@@ -521,7 +524,7 @@ class Amplifi_Consent_Admin {
 		wp_nonce_field( self::NONCE );
 		echo '<input type="hidden" name="acconsent_action" value="save_scripts">';
 		echo '<h2>' . esc_html__( 'Managed scripts', 'amplifi-consent' ) . '</h2>';
-		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'On', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Label', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Category', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Placement', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Code', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Sale/share', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Sensitive PI', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Scan', 'amplifi-consent' ) . '</th><th></th></tr></thead><tbody>';
+		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'On', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Label', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Category', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Placement', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Code', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Sale/share', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Sensitive PI', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Consent Mode', 'amplifi-consent' ) . '</th><th>' . esc_html__( 'Scan', 'amplifi-consent' ) . '</th><th></th></tr></thead><tbody>';
 		foreach ( $scripts as $i => $s ) {
 			echo '<tr class="acconsent-script-row">';
 			echo '<td><input type="hidden" name="scripts[' . $i . '][id]" value="' . esc_attr( $s['id'] ) . '"><input type="checkbox" name="scripts[' . $i . '][enabled]" value="1" ' . checked( $s['enabled'], true, false ) . '></td>';
@@ -540,6 +543,7 @@ class Amplifi_Consent_Admin {
 			echo '<td class="acconsent-code-cell"><textarea name="scripts[' . $i . '][code]">' . esc_textarea( $s['code'] ) . '</textarea></td>';
 			echo '<td><label title="' . esc_attr__( 'Constitutes sale/sharing of personal info (CCPA)', 'amplifi-consent' ) . '"><input type="checkbox" name="scripts[' . $i . '][sale_share]" value="1" ' . checked( ! empty( $s['sale_share'] ), true, false ) . '></label></td>';
 			echo '<td><label title="' . esc_attr__( 'Handles sensitive personal information (CCPA §1798.121)', 'amplifi-consent' ) . '"><input type="checkbox" name="scripts[' . $i . '][sensitive_pi]" value="1" ' . checked( ! empty( $s['sensitive_pi'] ), true, false ) . '></label></td>';
+			echo '<td><label title="' . esc_attr__( 'Google Advanced Consent Mode: load this Google tag (GTM/GA4) LIVE but cookieless before consent, then upgrade on accept. Only for Consent-Mode-aware Google tags; requires the global Consent Mode v2 setting to be on.', 'amplifi-consent' ) . '"><input type="checkbox" name="scripts[' . $i . '][consent_mode]" value="1" ' . checked( ! empty( $s['consent_mode'] ), true, false ) . '></label></td>';
 			echo '<td><button type="button" class="button acconsent-scan-btn" data-script-id="' . esc_attr( $s['id'] ) . '">' . esc_html__( 'Scan cookies', 'amplifi-consent' ) . '</button><div class="acconsent-scan-result" data-for="' . esc_attr( $s['id'] ) . '"></div></td>';
 			echo '<td><button type="submit" class="button-link-delete" name="acconsent_inline_delete" value="' . esc_attr( $s['id'] ) . '" formaction="" onclick="return false;" style="display:none"></button></td>';
 			echo '</tr>';
