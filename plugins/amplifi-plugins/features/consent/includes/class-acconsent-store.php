@@ -143,12 +143,22 @@ class Amplifi_Consent_Store {
 		return implode( "\n", array(
 			// Tag managers can load anything → strictest bucket.
 			'googletagmanager.com|marketing',
-			// Analytics / product measurement / session replay. Flagged sale=1:
-			// these tools disclose visitor data to a third party (the vendor),
-			// which can constitute a "sale/share" under CCPA/CPRA regardless of
-			// the site's internal "analytics" category label (Sephora action).
-			'google-analytics.com|analytics|1',
-			'analytics.google.com|analytics|1',
+			// GA4 / Google measurement. NOT flagged sale=1. Under Google
+			// Consent Mode (which this plugin emits — ad_storage/analytics_storage
+			// default=denied), a GA4 hit is a cookieless, identifier-free
+			// modeling ping, which is NOT a "sale/share" under CCPA/CPRA — the
+			// sale=1 flag was hard-blocking GA4 for every GPC/Do-Not-Sell visitor
+			// (the sale-opt-out check wins over the Consent Mode allowlist by
+			// design), silently zeroing GA4 for that whole traffic slice. GA4's
+			// opt-out compliance is enforced by Consent Mode (ad_storage denied),
+			// not by a hard network block. Session-recorders below KEEP sale=1
+			// because they capture and disclose actual session content/PII.
+			'google-analytics.com|analytics',
+			'analytics.google.com|analytics',
+			// Session replay / product analytics that capture and disclose actual
+			// visitor session content to a third party (the vendor) → genuine
+			// "sale/share" under CCPA/CPRA regardless of the "analytics" label
+			// (Sephora action). These stay hard-blocked under opt-out.
 			'clarity.ms|analytics|1',
 			'hotjar.com|analytics|1',
 			'static.hotjar.com|analytics|1',
