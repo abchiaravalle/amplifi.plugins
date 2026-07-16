@@ -4,7 +4,7 @@ Tags: cookie consent, gdpr, ccpa, privacy, consent log, gpc, consent mode
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.2.0
+Stable tag: 3.2.1
 License: MIT
 
 Cookie consent that withholds your tracking scripts until consent, keeps a best-effort server-side record of each choice, honors GPC, and can auto-block unmanaged trackers.
@@ -129,6 +129,23 @@ excludes tracker hosts at the server. These are known limitations of every
 JavaScript-based consent blocker, not specific to this plugin.
 
 == Changelog ==
+
+= 3.2.1 =
+* Fix: GA4 / Google Analytics measurement hosts (google-analytics.com,
+  analytics.google.com) are no longer flagged as a CCPA "sale/share" in the
+  default blocklist. They previously carried sale=1, which — because the
+  network shim's sale-opt-out check wins over the Consent Mode allowlist by
+  design — hard-blocked every GA4 hit for any GPC / "Do Not Sell" visitor,
+  silently zeroing GA4 for that traffic slice even with Advanced Consent Mode
+  on. A GA4 hit under Consent Mode is a cookieless, identifier-free modeling
+  ping; its opt-out compliance is enforced by Consent Mode (ad_storage denied),
+  not by a hard network block. Session-replay / product-analytics vendors that
+  capture and disclose actual session content (Clarity, Hotjar, FullStory,
+  Segment, Smartlook, Mouseflow, LogRocket, Quantum Metric, OpenReplay) KEEP
+  sale=1 — those are genuine sale/share flows. NOTE: this changes only the
+  seed default for NEWLY-activated sites; a site provisioned before 3.2.1 has
+  its blocklist stored in acconsent_settings and must be updated per-site (drop
+  the |1 sale flag from the two google-analytics lines in the saved blocklist).
 
 = 3.2.0 =
 * Feature: Google Advanced Consent Mode. A managed Google tag (GTM / gtag /
