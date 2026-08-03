@@ -53,10 +53,14 @@ class Amplifi_Consent_Frontend {
 		// it. Footer is therefore the default.
 		//
 		// Priority 99, deliberately LATE: the auto-rendered row must lose to a
-		// shortcode placement anywhere on the page, including a footer widget
-		// area or block-theme footer template part that renders on wp_footer
-		// itself at a priority above ours. At 20 a widget hooked at 30 would
-		// print a SECOND copy of both controls. See $optout_rendered.
+		// shortcode placement anywhere in the page BODY, which is rendered
+		// before wp_footer fires at all. Running late also lets it lose to
+		// most footer widget areas / block-theme footer template parts, which
+		// render earlier in wp_footer. It does NOT beat a shortcode hooked to
+		// wp_footer at a priority ABOVE 99 — that one runs after us and would
+		// still duplicate. Placement is tracked per control, so a shortcode
+		// that prints only one of the two leaves the other to this row.
+		// See $optout_rendered_dns / $optout_rendered_spi.
 		add_action( 'wp_footer', array( __CLASS__, 'render_footer_optout' ), 99 );
 		add_action( 'wp_footer', array( __CLASS__, 'render_banner' ), 50 );
 
@@ -68,8 +72,14 @@ class Amplifi_Consent_Frontend {
 		// "a font size and color that is at least the approximate size or
 		// color as other links next to it"). Using these INSTEAD of the
 		// auto-rendered footer row is the better placement when the theme has
-		// a real footer link row — set optout_placement to 'banner' or use the
-		// `auto` attribute below to avoid rendering the controls twice.
+		// a real footer link row — no setting change is needed, and no `auto`
+		// attribute exists: whichever controls a shortcode prints are recorded
+		// per control, and render_footer_optout() then emits only the ones
+		// still missing (or nothing at all, if a shortcode placed both).
+		// Do NOT set optout_placement to 'banner' to "avoid duplicates" — that
+		// suppresses the footer row but makes the JS render the controls in the
+		// banner instead, which both duplicates them and puts the §7013/§7014
+		// controls back in a location the regulations do not accept.
 		add_shortcode( 'amplifi-do-not-sell', array( __CLASS__, 'do_not_sell_shortcode' ) );
 		add_shortcode( 'amplifi-limit-spi', array( __CLASS__, 'limit_spi_shortcode' ) );
 		add_shortcode( 'amplifi-optout-links', array( __CLASS__, 'optout_links_shortcode' ) );
@@ -1255,15 +1265,24 @@ gtag('consent','default',{
 	}
 
 	/**
-	 * Should the auto-rendered footer opt-out row print on this request?
+	 * Which opt-out controls has a shortcode ALREADY printed on this request?
 	 *
-	 * Suppressed when a shortcode has ALREADY printed the same controls
-	 * earlier in the page (a theme footer widget / nav item), so the site
-	 * never shows two "Do Not Sell" buttons. wp_footer fires after the
-	 * template body, so by the time render_footer_optout() runs, any
-	 * shortcode in the page content has already set the flag.
+	 * Tracked PER CONTROL, not as one shared boolean. The two controls are
+	 * independent rights (§7013 sale/share opt-out vs. §7014 limit-SPI), and
+	 * an editor may reasonably place only one shortcode — e.g. just
+	 * [amplifi-do-not-sell] in a footer widget. With a single shared flag
+	 * that partial placement suppressed the WHOLE auto-rendered row, so the
+	 * "Limit the Use of My Sensitive Personal Information" control rendered
+	 * nowhere on the site: a control §7014(c) requires in the header or
+	 * footer would silently vanish because of an unrelated shortcode.
+	 *
+	 * wp_footer fires after the template body, so by the time
+	 * render_footer_optout() runs, any shortcode in the page content has
+	 * already recorded what it printed, and the auto row emits only the
+	 * remainder.
 	 */
-	private static $optout_rendered = false;
+	private static $optout_rendered_dns = false;
+	private static $optout_rendered_spi = false;
 
 	private static function optout_placement() {
 		$s = Amplifi_Consent_Store::get_settings();
@@ -1300,13 +1319,20 @@ gtag('consent','default',{
 	 * standard. Inheriting type from the surrounding footer clears that floor
 	 * — it does not by itself establish conspicuousness.
 	 */
-	private static function optout_controls_html( $context = 'footer' ) {
+	private static function optout_controls_html( $context = 'footer', $skip_rendered = false ) {
 		if ( ! self::enabled() ) {
 			return '';
 		}
 		$s   = Amplifi_Consent_Store::get_settings();
 		$dns = ! empty( $s['do_not_sell'] ) && ! empty( $s['dns_label'] );
 		$spi = ! empty( $s['limit_spi_enabled'] ) && ! empty( $s['limit_spi_label'] );
+		// The auto-rendered row passes $skip_rendered so it emits only the
+		// controls a shortcode has NOT already printed. A shortcode placing
+		// one control must not delete the other from the whole site.
+		if ( $skip_rendered ) {
+			$dns = $dns && ! self::$optout_rendered_dns;
+			$spi = $spi && ! self::$optout_rendered_spi;
+		}
 		if ( ! $dns && ! $spi ) {
 			return '';
 		}
@@ -1336,21 +1362,24 @@ gtag('consent','default',{
 	 * theme has one, prefer dropping [amplifi-do-not-sell] /
 	 * [amplifi-limit-spi] straight into it so the controls inherit the
 	 * neighbouring links' font size and color — that is literally the
-	 * §7003(c) test. Placing a shortcode anywhere in the page suppresses
-	 * this row automatically (no duplicate controls).
+	 * §7003(c) test. A shortcode's placement is recorded per control, so this
+	 * row emits only the controls no shortcode has already printed (and
+	 * nothing at all when a shortcode placed both).
 	 */
 	public static function render_footer_optout() {
-		if ( ! self::enabled() || self::$optout_rendered ) {
+		if ( ! self::enabled() ) {
 			return;
 		}
 		if ( 'banner' === self::optout_placement() ) {
 			return;
 		}
-		$controls = self::optout_controls_html( 'footer' );
+		// Emit only what a shortcode has not already placed on this page.
+		$controls = self::optout_controls_html( 'footer', true );
 		if ( '' === $controls ) {
 			return;
 		}
-		self::$optout_rendered = true;
+		self::$optout_rendered_dns = true;
+		self::$optout_rendered_spi = true;
 		// NOTE the accessible name: deliberately NOT "Your Privacy Choices".
 		// That exact phrase (and "Your California Privacy Choices") is the
 		// RESERVED title of the §7015 Alternative Opt-out Link, which must be a
@@ -1378,7 +1407,7 @@ gtag('consent','default',{
 		if ( empty( $s['do_not_sell'] ) || empty( $s['dns_label'] ) ) {
 			return '';
 		}
-		self::$optout_rendered = true;
+		self::$optout_rendered_dns = true;
 		return sprintf(
 			'<button type="button" class="acconsent-optout-btn acconsent-optout-btn-footer" data-acconsent-donotsell>%s</button>',
 			esc_html( $s['dns_label'] )
@@ -1399,7 +1428,7 @@ gtag('consent','default',{
 		if ( empty( $s['limit_spi_enabled'] ) || empty( $s['limit_spi_label'] ) ) {
 			return '';
 		}
-		self::$optout_rendered = true;
+		self::$optout_rendered_spi = true;
 		return sprintf(
 			'<button type="button" class="acconsent-optout-btn acconsent-optout-btn-footer" data-acconsent-limitspi>%s</button>',
 			esc_html( $s['limit_spi_label'] )
@@ -1423,7 +1452,8 @@ gtag('consent','default',{
 		if ( '' === $controls ) {
 			return '';
 		}
-		self::$optout_rendered = true;
+		self::$optout_rendered_dns = true;
+		self::$optout_rendered_spi = true;
 		return sprintf(
 			'<span class="acconsent-footer-optout" role="group" aria-label="%s">%s</span>',
 			esc_attr__( 'Privacy opt-out controls', 'amplifi-consent' ),
