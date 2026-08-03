@@ -4,7 +4,7 @@ Tags: cookie consent, gdpr, ccpa, privacy, consent log, gpc, consent mode
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.3.0
+Stable tag: 3.3.2
 License: MIT
 
 Cookie consent that withholds your tracking scripts until consent, keeps a best-effort server-side record of each choice, honors GPC, and can auto-block unmanaged trackers.
@@ -130,6 +130,32 @@ JavaScript-based consent blocker, not specific to this plugin.
 
 == Changelog ==
 
+= 3.3.2 =
+* Fix: placing only ONE opt-out shortcode silently removed the other control
+  from the entire site. `[amplifi-do-not-sell]` and `[amplifi-limit-spi]` both
+  set a single shared "already rendered" flag, so a footer widget containing
+  just `[amplifi-do-not-sell]` suppressed the whole auto-rendered footer row —
+  and the §7014(c) "Limit the Use of My Sensitive Personal Information" control,
+  which the regulations require in the header or footer, rendered nowhere.
+  Placement is now tracked per control, and the auto row emits only the controls
+  a shortcode has not already printed.
+* Docs: corrected three statements in the source comments and this readme that
+  described behaviour the code does not implement — the wp_footer priority-99
+  rationale was stated backwards (a later priority loses to earlier hooks, not
+  to later ones), an `auto` shortcode attribute was documented but never
+  existed, and setting `optout_placement` to `banner` was suggested as a way to
+  avoid duplicate controls when it actually re-renders them in the banner.
+
+= 3.3.1 =
+* Fix: renamed `assets/js/consent.js` to `assets/js/consent-v2.js` so a plugin
+  update actually reaches visitors. Admin Site Enhancements'
+  `disable_resource_version_number` feature strips the `?ver=` query string at
+  PHP_INT_MAX priority; with a CDN serving `max-age=31536000` on the resulting
+  bare asset URL, the pre-update file stays pinned for up to a year. On a live
+  site this left 3.3.0's footer placement and banner-padding fix inert after a
+  successful update. The stylesheet already used this `-vN` filename convention;
+  the script now matches it.
+
 = 3.3.0 =
 * Change (DEFAULT BEHAVIOUR): the "Do Not Sell or Share My Personal Information"
   and "Limit the Use of My Sensitive Personal Information" controls now render
@@ -154,11 +180,14 @@ JavaScript-based consent blocker, not specific to this plugin.
 * New shortcodes: `[amplifi-limit-spi]` (the §7014 control, which previously
   had no shortcode at all) and `[amplifi-optout-links]` (both controls in one
   wrapper). `[amplifi-do-not-sell]` is unchanged in name and behaviour.
-  Placing ANY of the three suppresses the auto-rendered footer row, so the
-  controls can never appear twice on a page. The auto row is hooked at
-  wp_footer priority 99 specifically so a shortcode in a footer widget area or
-  a block-theme footer template part — which can render at a priority above
-  ours — still wins the dedupe.
+  Placement is tracked PER CONTROL: whichever controls a shortcode prints are
+  recorded, and the auto-rendered footer row then emits only the ones still
+  missing (or nothing, if a shortcode placed both). Placing just
+  `[amplifi-do-not-sell]` therefore does NOT delete the §7014 limit-SPI control
+  from the site. The auto row is hooked at wp_footer priority 99 so it loses to
+  a shortcode in the page body and to most footer widget areas / block-theme
+  footer template parts; a shortcode hooked to wp_footer at a priority above 99
+  runs after the row and is the one case it cannot dedupe against.
 * Fix: the consent banner is `position: fixed` at the bottom of the viewport
   and was PHYSICALLY COVERING the footer opt-out controls — measured with
   `document.elementFromPoint()` at the button's own centre, the topmost
