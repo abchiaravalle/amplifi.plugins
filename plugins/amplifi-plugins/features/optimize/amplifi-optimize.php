@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( defined( 'AMPLIFI_OPTIMIZE_VERSION' ) ) {
 	return;
 }
-define( 'AMPLIFI_OPTIMIZE_VERSION', '3.2.1' );
+define( 'AMPLIFI_OPTIMIZE_VERSION', '3.3.0' );
 define( 'AMPLIFI_OPTIMIZE_FILE', __FILE__ );
 define( 'AMPLIFI_OPTIMIZE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AMPLIFI_OPTIMIZE_URL', plugin_dir_url( __FILE__ ) );

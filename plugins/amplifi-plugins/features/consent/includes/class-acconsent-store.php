@@ -108,6 +108,19 @@ class Amplifi_Consent_Store {
 			// cosmetic toggle that opened the preferences modal.
 			'limit_spi_enabled' => true,
 			'limit_spi_label'   => __( 'Limit the Use of My Sensitive Personal Information', 'amplifi-consent' ),
+			// WHERE the two CCPA opt-out controls render. Default 'footer',
+			// because that is what the CPPA regulations actually specify:
+			// CCR tit.11 §7013(c) (Do Not Sell or Share) and §7014(c) (Limit the
+			// Use) each require a conspicuous link "located at either the header
+			// or footer of the business's internet homepage(s)". §7026(a)(4)
+			// separately states a cookie banner "is not by itself an acceptable
+			// method for submitting requests to opt-out of sale/sharing", so the
+			// banner is the WRONG home for these — a persistent footer link is
+			// the compliant placement and is always reachable, including after
+			// the banner has been dismissed. 'banner' preserves the pre-3.3.0
+			// behaviour; 'both' renders in each place.
+			'optout_placement' => 'footer', // footer | banner | both.
+
 			// User-Agent capture mode for the consent log: 'minimal' (default) stores
 			// only browser name+major-version and OS family (enough to debug a
 			// disputed consent without keeping the full fingerprintable UA string).
@@ -300,6 +313,9 @@ class Amplifi_Consent_Store {
 					break;
 				case 'ua_mode':
 					$clean[ $key ] = in_array( $settings[ $key ], array( 'full', 'minimal', 'none' ), true ) ? $settings[ $key ] : 'minimal';
+					break;
+				case 'optout_placement':
+					$clean[ $key ] = in_array( $settings[ $key ], array( 'footer', 'banner', 'both' ), true ) ? $settings[ $key ] : $default;
 					break;
 				case 'privacy_url':
 					$clean[ $key ] = esc_url_raw( $settings[ $key ], array( 'http', 'https' ) );

@@ -145,13 +145,77 @@
 .acconsent-legal-links a { color: var(--acconsent-text); text-decoration: underline; }
 .acconsent-legal-ref { color: var(--acconsent-text-dim); }
 
-/* CCPA/CPRA one-click opt-out — a real button, not micro-text. Shown only
-   inside the initial banner and the revisit/preferences modal (legalLinksHtml()
-   in consent.js), never as a persistent floating element. Do Not Sell and
-   Limit-SPI can both render here, so give them a real gap instead of relying
-   on a single whitespace character between the two <button> tags. */
+/* CCPA/CPRA one-click opt-out inside the banner/modal. Only rendered when the
+   site sets optout_placement to 'banner' or 'both' — the DEFAULT placement is
+   the page footer (CCR tit.11 §7013(c)/§7014(c) require these links "at either
+   the header or footer of the business's internet homepage(s)", and §7026(a)(4)
+   says a cookie banner is not by itself an acceptable opt-out method). Do Not
+   Sell and Limit-SPI can both render here, so give them a real gap instead of
+   relying on a single whitespace character between the two <button> tags. */
 .acconsent-optout-links { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 14px; }
 .acconsent-optout-btn { font-size: 13px !important; }
+
+/* ---------- Footer opt-out row (DEFAULT placement for the CCPA controls) ----------
+   These are <button>s so a click can immediately effectuate the right, but in a
+   footer they must READ as links sitting alongside the theme's own footer links.
+   §7003(c)'s "conspicuous" test is RELATIVE — "a font size and color that is at
+   least the approximate size or color as other links next to it" — so every
+   type property here INHERITS from the surrounding footer rather than imposing
+   the widget's own palette. That means a dark footer and a light footer both
+   come out right with no per-site CSS.
+
+   Deliberately NOT !important-armoured the way the banner controls are: these
+   live inside the theme's own markup and SHOULD lose to a theme's footer link
+   styling, which is exactly what keeps them "similar in manner" to their
+   neighbours. The one exception is the reset of the UA button chrome, which
+   otherwise leaves an OS-native grey box in the middle of a footer link row. */
+.acconsent-footer-optout {
+  display: inline-flex; flex-wrap: wrap; align-items: center;
+  gap: 0.35em 1em;
+}
+.acconsent-optout-btn-footer {
+  -webkit-appearance: none !important; appearance: none !important;
+  background: none !important; border: 0 !important; border-radius: 0 !important;
+  margin: 0 !important; padding: 0 !important;
+  font: inherit !important; font-size: inherit !important; line-height: inherit !important;
+  color: inherit; text-align: left;
+  text-decoration: underline; text-underline-offset: 2px;
+  cursor: pointer;
+}
+.acconsent-optout-btn-footer:hover,
+.acconsent-optout-btn-footer:focus-visible { text-decoration: underline; opacity: 0.8; }
+.acconsent-optout-btn-footer:focus-visible {
+  outline: 2px solid currentColor; outline-offset: 2px;
+}
+
+/* The AUTO-rendered row only. wp_footer() usually fires AFTER the theme's own
+   <footer> element, so this lands at the very bottom of the document rather
+   than inside the theme's link row — it needs a little self-contained framing
+   so it doesn't read as an orphaned strip. A shortcode placement gets NONE of
+   this (no -auto class), because there the surrounding footer already supplies
+   the layout and any padding we added would fight it.
+
+   Because this row has NO adjacent links to inherit from (it is outside the
+   theme's footer), `color: inherit` here resolves against <body> — which on a
+   dark-footer theme can land dark-on-dark. currentColor is therefore forced to
+   a contrast-safe value ONLY on the auto row; the shortcode variant keeps pure
+   inheritance, which is what makes it "similar in manner" to its neighbours
+   and is why the shortcode is the recommended placement. */
+.acconsent-footer-optout-auto {
+  display: flex; justify-content: center; flex-wrap: wrap;
+  padding: 12px 16px;
+  font-size: 0.8125rem;
+  color: CanvasText;
+  background: Canvas;
+}
+.acconsent-footer-optout-auto .acconsent-optout-btn-footer { color: CanvasText; }
+
+/* Touch target: an inline text link is only ~20px tall, below the 44px WCAG
+   2.5.5 / 2.5.8 target guidance. Pad the hit area vertically without changing
+   the visual line height, so the control still reads as a text link. */
+@media (pointer: coarse) {
+  .acconsent-optout-btn-footer { padding: 12px 0 !important; }
+}
 
 /* ---------- Persistent floating preferences trigger (withdrawal path) ---------- */
 .acconsent-fab {
