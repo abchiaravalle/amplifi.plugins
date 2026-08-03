@@ -45,14 +45,34 @@ class Amplifi_Consent_Frontend {
 		add_action( 'wp_head', array( __CLASS__, 'emit_head_scripts' ), 1 );
 		add_action( 'wp_body_open', array( __CLASS__, 'emit_body_open_scripts' ), 1 );
 		add_action( 'wp_footer', array( __CLASS__, 'emit_footer_scripts' ), 1 );
+		// CCPA/CPRA opt-out controls in the page FOOTER (the default). CCR
+		// tit.11 §7013(c) and §7014(c) each require a conspicuous link
+		// "located at either the header or footer of the business's internet
+		// homepage(s)" — the banner is not one of the two named locations, and
+		// it also disappears after the first choice, taking the controls with
+		// it. Footer is therefore the default.
+		//
+		// Priority 99, deliberately LATE: the auto-rendered row must lose to a
+		// shortcode placement anywhere on the page, including a footer widget
+		// area or block-theme footer template part that renders on wp_footer
+		// itself at a priority above ours. At 20 a widget hooked at 30 would
+		// print a SECOND copy of both controls. See $optout_rendered.
+		add_action( 'wp_footer', array( __CLASS__, 'render_footer_optout' ), 99 );
 		add_action( 'wp_footer', array( __CLASS__, 'render_banner' ), 50 );
 
 		add_shortcode( 'amplifi-consent-manager', array( __CLASS__, 'shortcode' ) );
 		add_shortcode( 'amplifi-legal-doc', array( __CLASS__, 'legal_doc_shortcode' ) );
-		// A persistent, always-on-any-page Do-Not-Sell trigger, usable
-		// anywhere on the site — the only persistent/site-wide instance of
-		// this control (render_banner() does not render a floating one).
+		// Placeable opt-out controls, for dropping into a theme's real footer
+		// widget / nav menu so they inherit the styling of the links beside
+		// them (which is what §7003(c)'s "conspicuous" test actually measures:
+		// "a font size and color that is at least the approximate size or
+		// color as other links next to it"). Using these INSTEAD of the
+		// auto-rendered footer row is the better placement when the theme has
+		// a real footer link row — set optout_placement to 'banner' or use the
+		// `auto` attribute below to avoid rendering the controls twice.
 		add_shortcode( 'amplifi-do-not-sell', array( __CLASS__, 'do_not_sell_shortcode' ) );
+		add_shortcode( 'amplifi-limit-spi', array( __CLASS__, 'limit_spi_shortcode' ) );
+		add_shortcode( 'amplifi-optout-links', array( __CLASS__, 'optout_links_shortcode' ) );
 
 		// Auto-block UNMANAGED trackers (opt-in via settings).
 		if ( self::autoblock_on() ) {
@@ -79,7 +99,7 @@ class Amplifi_Consent_Frontend {
 		if ( ! self::enabled() ) {
 			return;
 		}
-		wp_register_style( 'acconsent', ACCONSENT_PLUGIN_URL . 'assets/css/consent-v3.css', array(), ACCONSENT_VERSION );
+		wp_register_style( 'acconsent', ACCONSENT_PLUGIN_URL . 'assets/css/consent-v4.css', array(), ACCONSENT_VERSION );
 		wp_register_script( 'acconsent', ACCONSENT_PLUGIN_URL . 'assets/js/consent.js', array(), ACCONSENT_VERSION, true );
 
 		$settings   = Amplifi_Consent_Store::get_settings();
@@ -161,6 +181,7 @@ class Amplifi_Consent_Frontend {
 				'dns_label'         => $settings['dns_label'],
 				'limit_spi_enabled' => (bool) $settings['limit_spi_enabled'],
 				'limit_spi_label'   => $settings['limit_spi_label'],
+				'optout_placement'  => self::optout_placement(),
 				'webhook_active'    => $webhook_active,
 				'webhook_disclosure' => __( 'Consent records may also be sent to a data processor configured by this site, which may be located in a different country.', 'amplifi-consent' ),
 				// Visitor-facing strings that live only in the JS — passed here so
@@ -1226,24 +1247,179 @@ gtag('consent','default',{
 	}
 
 	/**
-	 * [amplifi-do-not-sell] — a persistent, clearly-labeled site-wide
-	 * "Do Not Sell or Share My Personal Information" link/button (CCPA/CPRA),
-	 * usable anywhere on the site (footer, nav, a dedicated page). This is
-	 * the ONLY persistent/site-wide opt-out control — render_banner() does
-	 * not render one; the equivalent control there only appears inside the
-	 * initial consent popup and the revisit/preferences modal.
+	 * Should the auto-rendered footer opt-out row print on this request?
+	 *
+	 * Suppressed when a shortcode has ALREADY printed the same controls
+	 * earlier in the page (a theme footer widget / nav item), so the site
+	 * never shows two "Do Not Sell" buttons. wp_footer fires after the
+	 * template body, so by the time render_footer_optout() runs, any
+	 * shortcode in the page content has already set the flag.
+	 */
+	private static $optout_rendered = false;
+
+	private static function optout_placement() {
+		$s = Amplifi_Consent_Store::get_settings();
+		$p = isset( $s['optout_placement'] ) ? $s['optout_placement'] : 'footer';
+		return in_array( $p, array( 'footer', 'banner', 'both' ), true ) ? $p : 'footer';
+	}
+
+	/**
+	 * The two CCPA/CPRA opt-out controls as markup, or '' when both are off.
+	 *
+	 * Rendered as <button> (not <a href>) deliberately: clicking must
+	 * immediately effectuate the right in-page — CCR tit.11 §7013(a) and
+	 * §7014(a) both contemplate a link that "will either have the immediate
+	 * effect of" applying the opt-out "or lead the consumer to a webpage
+	 * where the consumer can learn about and make that choice". This build
+	 * takes the immediate-effect path, so there is no destination URL to
+	 * link to.
+	 *
+	 * CAVEAT worth knowing before relying on this: Civil Code §1798.135(a)
+	 * and §7026(a) both say "link", and a <button> is not one — it has no
+	 * href, does not appear in a screen reader's link rotor, cannot be
+	 * bookmarked or deep-linked, and is INERT if JavaScript is disabled or
+	 * blocked (the handler is a delegated listener in consent.js). §7004(a)(5)
+	 * requires opt-out methods be "tested to ensure that they are functional";
+	 * a visible control that silently does nothing is the case it is aimed at.
+	 * A future revision should render a real <a href> to a dedicated opt-out
+	 * page and progressively enhance it into an immediate-effect click.
+	 *
+	 * The buttons carry link-ish styling in the footer context so they sit
+	 * alongside a theme's other footer links. §7003(c)'s operative test is
+	 * that a conspicuous link "shall appear in a similar manner as other
+	 * similarly-posted links"; the font-size/color sentence that follows is
+	 * prefaced "For example" and is an illustrative FLOOR, not the whole
+	 * standard. Inheriting type from the surrounding footer clears that floor
+	 * — it does not by itself establish conspicuousness.
+	 */
+	private static function optout_controls_html( $context = 'footer' ) {
+		if ( ! self::enabled() ) {
+			return '';
+		}
+		$s   = Amplifi_Consent_Store::get_settings();
+		$dns = ! empty( $s['do_not_sell'] ) && ! empty( $s['dns_label'] );
+		$spi = ! empty( $s['limit_spi_enabled'] ) && ! empty( $s['limit_spi_label'] );
+		if ( ! $dns && ! $spi ) {
+			return '';
+		}
+		$cls  = 'footer' === $context ? ' acconsent-optout-btn-footer' : '';
+		$html = '';
+		if ( $dns ) {
+			$html .= sprintf(
+				'<button type="button" class="acconsent-optout-btn%s" data-acconsent-donotsell>%s</button>',
+				esc_attr( $cls ),
+				esc_html( $s['dns_label'] )
+			);
+		}
+		if ( $spi ) {
+			$html .= sprintf(
+				'<button type="button" class="acconsent-optout-btn%s" data-acconsent-limitspi>%s</button>',
+				esc_attr( $cls ),
+				esc_html( $s['limit_spi_label'] )
+			);
+		}
+		return $html;
+	}
+
+	/**
+	 * Auto-rendered footer opt-out row (default placement).
+	 *
+	 * This is a FALLBACK for themes with no obvious footer link row. If the
+	 * theme has one, prefer dropping [amplifi-do-not-sell] /
+	 * [amplifi-limit-spi] straight into it so the controls inherit the
+	 * neighbouring links' font size and color — that is literally the
+	 * §7003(c) test. Placing a shortcode anywhere in the page suppresses
+	 * this row automatically (no duplicate controls).
+	 */
+	public static function render_footer_optout() {
+		if ( ! self::enabled() || self::$optout_rendered ) {
+			return;
+		}
+		if ( 'banner' === self::optout_placement() ) {
+			return;
+		}
+		$controls = self::optout_controls_html( 'footer' );
+		if ( '' === $controls ) {
+			return;
+		}
+		self::$optout_rendered = true;
+		// NOTE the accessible name: deliberately NOT "Your Privacy Choices".
+		// That exact phrase (and "Your California Privacy Choices") is the
+		// RESERVED title of the §7015 Alternative Opt-out Link, which must be a
+		// SINGLE link carrying the CPPA's opt-out icon and leading to a page
+		// offering both rights. Naming this group that would advertise a §7015
+		// link we do not implement.
+		printf(
+			'<div class="acconsent-footer-optout acconsent-footer-optout-auto" role="group" aria-label="%s">%s</div>',
+			esc_attr__( 'Privacy opt-out controls', 'amplifi-consent' ),
+			$controls // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from esc_html'd labels in optout_controls_html().
+		);
+	}
+
+	/**
+	 * [amplifi-do-not-sell] — the CCPA/CPRA "Do Not Sell or Share My
+	 * Personal Information" control, placeable in a footer widget, nav menu,
+	 * or a dedicated page. Placing it suppresses the auto-rendered footer
+	 * row so the control never appears twice.
 	 */
 	public static function do_not_sell_shortcode( $atts ) {
 		if ( ! self::enabled() ) {
 			return '';
 		}
 		$s = Amplifi_Consent_Store::get_settings();
-		if ( empty( $s['do_not_sell'] ) ) {
+		if ( empty( $s['do_not_sell'] ) || empty( $s['dns_label'] ) ) {
 			return '';
 		}
+		self::$optout_rendered = true;
 		return sprintf(
-			'<button type="button" class="acconsent-btn acconsent-btn-outline acconsent-optout-btn" data-acconsent-donotsell>%s</button>',
+			'<button type="button" class="acconsent-optout-btn acconsent-optout-btn-footer" data-acconsent-donotsell>%s</button>',
 			esc_html( $s['dns_label'] )
+		);
+	}
+
+	/**
+	 * [amplifi-limit-spi] — the CCPA §1798.121 "Limit the Use of My
+	 * Sensitive Personal Information" control. Same placement rules as
+	 * [amplifi-do-not-sell]; per CCR §7014(c) it belongs in the header or
+	 * footer, not buried in a banner.
+	 */
+	public static function limit_spi_shortcode( $atts ) {
+		if ( ! self::enabled() ) {
+			return '';
+		}
+		$s = Amplifi_Consent_Store::get_settings();
+		if ( empty( $s['limit_spi_enabled'] ) || empty( $s['limit_spi_label'] ) ) {
+			return '';
+		}
+		self::$optout_rendered = true;
+		return sprintf(
+			'<button type="button" class="acconsent-optout-btn acconsent-optout-btn-footer" data-acconsent-limitspi>%s</button>',
+			esc_html( $s['limit_spi_label'] )
+		);
+	}
+
+	/**
+	 * [amplifi-optout-links] — both controls in one wrapper, for dropping a
+	 * complete opt-out group into a footer.
+	 *
+	 * NOT the §7015 "Alternative Opt-out Link", and deliberately NOT named or
+	 * labeled after it. §7015(b) reserves the titles "Your Privacy Choices"
+	 * and "Your California Privacy Choices" for a SINGLE combined link that
+	 * "shall include" the CPPA's opt-out icon and lead to a §7015(c) webpage
+	 * offering both rights. This shortcode renders the two separate
+	 * §7013/§7014 controls side by side — the other permitted arrangement,
+	 * and the statutory default per §7013(d)/§7014(d) ("in lieu of").
+	 */
+	public static function optout_links_shortcode( $atts ) {
+		$controls = self::optout_controls_html( 'footer' );
+		if ( '' === $controls ) {
+			return '';
+		}
+		self::$optout_rendered = true;
+		return sprintf(
+			'<span class="acconsent-footer-optout" role="group" aria-label="%s">%s</span>',
+			esc_attr__( 'Privacy opt-out controls', 'amplifi-consent' ),
+			$controls
 		);
 	}
 

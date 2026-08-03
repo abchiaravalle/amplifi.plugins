@@ -351,6 +351,29 @@ class Amplifi_Consent_Admin {
 		self::field_text( 'settings[limit_spi_label]', __( '"Limit the Use of Sensitive PI" button label', 'amplifi-consent' ), isset( $s['limit_spi_label'] ) ? $s['limit_spi_label'] : 'Limit the Use of My Sensitive Personal Information' );
 		echo '<p class="acconsent-muted">' . esc_html__( 'H2: flag a script/host as handling Sensitive Personal Information ("Sensitive PI" checkbox on the Scripts tab, or the fourth |spi segment on a blocklist line) to have it withheld UNCONDITIONALLY while this is on — independent of any category grant, including "Accept all." This right was removed in v1.4.0 for being cosmetic (a category no script could actually use); it is now wired to real, unconditional blocking.', 'amplifi-consent' ) . '</p>';
 
+		$placement = isset( $s['optout_placement'] ) ? $s['optout_placement'] : 'footer';
+		echo '<div class="acconsent-field"><label>' . esc_html__( 'Where the two opt-out controls appear', 'amplifi-consent' ) . '</label>';
+		echo '<select name="settings[optout_placement]">';
+		foreach ( array(
+			'footer' => __( 'Page footer (default — a location the CCPA regulations name)', 'amplifi-consent' ),
+			'banner' => __( 'Consent banner and preferences modal only (NOT compliant on its own — see below)', 'amplifi-consent' ),
+			'both'   => __( 'Both the footer and the banner', 'amplifi-consent' ),
+		) as $val => $label ) {
+			printf(
+				'<option value="%s"%s>%s</option>',
+				esc_attr( $val ),
+				selected( $placement, $val, false ),
+				esc_html( $label )
+			);
+		}
+		echo '</select></div>';
+		echo '<p class="acconsent-muted">' . esc_html__( 'CCR tit.11 §7013(c) and §7014(c) each require a conspicuous link "located at either the header or footer of the business\'s internet homepage(s)". The consent banner is not one of the two named locations, and it disappears after the visitor\'s first choice — so "banner only" leaves the site with no compliant link at all. Place', 'amplifi-consent' ) . ' <code>[amplifi-do-not-sell]</code> ' . esc_html__( 'and', 'amplifi-consent' ) . ' <code>[amplifi-limit-spi]</code> ' . esc_html__( '(or', 'amplifi-consent' ) . ' <code>[amplifi-optout-links]</code> ' . esc_html__( 'for both at once) directly into your theme\'s footer link row: §7003(c) asks that the link "appear in a similar manner as other similarly-posted links", and these inherit type from whatever surrounds them. Any of those shortcodes suppresses the auto-rendered row, so the controls never appear twice. The auto-rendered row is only a fallback — wp_footer() usually fires AFTER the theme\'s footer element, so it lands at the very bottom of the page with no adjacent links to be similar to. CHECK IT ON YOUR THEME. This plugin renders the two separate links; the single combined "Your Privacy Choices" link under §7015 is a different arrangement and requires the CPPA opt-out icon.', 'amplifi-consent' ) . '</p>';
+
+		echo '<div class="acconsent-field"><p class="acconsent-muted"><strong>' . esc_html__( 'Two things this plugin does NOT do for you — both are required and neither is automatic:', 'amplifi-consent' ) . '</strong></p><ol class="acconsent-muted">';
+		echo '<li>' . esc_html__( 'Because clicking these controls takes effect immediately rather than opening a dedicated page, §7013(e)(1) and §7014(e)(1) require the Notice of Right to Opt-out and the Notice of Right to Limit to live IN YOUR PRIVACY POLICY. Each must describe the right and give instructions for every method of exercising it (§7013(f), §7014(f)). §7013(h) bars a business from selling or sharing personal information collected while no such notice was posted.', 'amplifi-consent' ) . '</li>';
+		echo '<li>' . esc_html__( '§7026(a) requires TWO OR MORE methods for opt-out-of-sale/sharing requests, and §7027(b) requires two or more for limit requests. This link plus a Global Privacy Control signal satisfies the sale/sharing side when GPC honoring is on above. GPC is a sale/share signal only — it does NOT count toward the limit right, so a second method for that (an email address, a form, a phone number) must be offered and documented in your privacy policy.', 'amplifi-consent' ) . '</li>';
+		echo '</ol></div>';
+
 		echo '<h2>' . esc_html__( 'Google Consent Mode v2', 'amplifi-consent' ) . '</h2>';
 		self::field_checkbox( 'settings[consent_mode]', __( 'Push Consent Mode v2 defaults (all denied) before tags, and update on choice', 'amplifi-consent' ), $s['consent_mode'] );
 

@@ -395,6 +395,18 @@
     });
   }
 
+  // Do the CCPA opt-out controls belong INSIDE the banner/modal on this site?
+  // Default placement is 'footer' (see class-acconsent-store.php for the
+  // regulatory reasoning); the banner only carries them when the site has
+  // explicitly chosen 'banner' or 'both'. Unknown/missing values fall back to
+  // 'footer' so an older saved settings row can't accidentally re-enable the
+  // banner copy of the controls and produce two of each on the page.
+  function showBannerOptouts() {
+    var p = S.optout_placement || 'footer';
+    if (p !== 'banner' && p !== 'both') return false;
+    return !!((S.do_not_sell && S.dns_label) || (S.limit_spi_enabled && S.limit_spi_label));
+  }
+
   // Disclosure line: privacy link + legal-doc version links, shown on the banner
   // and modal BEFORE any choice (informed consent).
   function legalLinksHtml() {
@@ -414,28 +426,30 @@
         bits.push('<span class="acconsent-legal-ref">' + escapeHtml(d.title) + ' ' + escapeHtml(d.version) + '</span>');
       }
     });
-    if (!bits.length && !S.do_not_sell && !S.limit_spi_enabled && !CFG.webhook_active) return '';
+    if (!bits.length && !showBannerOptouts() && !CFG.webhook_active) return '';
     var html = '';
     if (bits.length) {
       html += '<div class="acconsent-legal-links">' + bits.join(' · ') + '</div>';
     }
-    // CCPA/CPRA "Do Not Sell or Share" — a genuine ONE-CLICK opt-out: it
-    // immediately denies sale/share (marketing) and records the opt-out, with
-    // no modal hunt. A real clickable button (outline/secondary style), not a
-    // buried micro-text link.
-    if (S.do_not_sell && S.dns_label) {
-      html += '<div class="acconsent-optout-links">' +
-        '<button type="button" class="acconsent-btn acconsent-btn-outline acconsent-optout-btn" data-acconsent-donotsell>' +
-        escapeHtml(S.dns_label) + '</button>';
-      // H2: CCPA §1798.121 "Limit the Use of My Sensitive Personal
-      // Information" — a real, reinstated control (removed in v1.4.0 for
-      // being cosmetic; this time it's wired to unconditional script/host
-      // blocking, and this button records that the right was exercised).
+    // CCPA/CPRA "Do Not Sell or Share" + §1798.121 "Limit the Use of My
+    // Sensitive Personal Information".
+    //
+    // These render in the FOOTER by default (optout_placement), because CCR
+    // tit.11 §7013(c) / §7014(c) require them "at either the header or footer
+    // of the business's internet homepage(s)", and §7026(a)(4) says a cookie
+    // banner is not by itself an acceptable opt-out method. They only appear
+    // here when the site has opted into 'banner' or 'both' placement.
+    if (showBannerOptouts()) {
+      var oi = '';
+      if (S.do_not_sell && S.dns_label) {
+        oi += '<button type="button" class="acconsent-btn acconsent-btn-outline acconsent-optout-btn" data-acconsent-donotsell>' +
+          escapeHtml(S.dns_label) + '</button>';
+      }
       if (S.limit_spi_enabled && S.limit_spi_label) {
-        html += ' <button type="button" class="acconsent-btn acconsent-btn-outline acconsent-optout-btn" data-acconsent-limitspi>' +
+        oi += ' <button type="button" class="acconsent-btn acconsent-btn-outline acconsent-optout-btn" data-acconsent-limitspi>' +
           escapeHtml(S.limit_spi_label) + '</button>';
       }
-      html += '</div>';
+      if (oi) html += '<div class="acconsent-optout-links">' + oi + '</div>';
     }
     // M5: disclose that consent records may also be mirrored to a webhook
     // (a data processor), which may be located in a different country.
@@ -580,9 +594,47 @@
 
   /* ---------------- actions ---------------- */
 
+  // The banner is position:fixed at the bottom of the viewport, so it sits ON
+  // TOP of the very region the footer opt-out controls occupy — a visitor who
+  // scrolls to the bottom finds the "Do Not Sell or Share" button covered and
+  // physically unclickable until they make a consent choice first. That is the
+  // §7004(a)(4)(A) fact pattern ("requiring the consumer to click through
+  // disruptive screens before they are able to submit a request to opt-out").
+  //
+  // Fix: while the banner is up, reserve exactly its height as extra bottom
+  // padding on <body>, so the end of the document scrolls clear above it.
+  // Measured from the live element (not a guess) and re-measured on resize,
+  // because the banner's height changes with viewport width as its buttons
+  // wrap. Removed entirely when the banner goes away.
+  var bannerPadTarget = null;
+
+  function syncBannerPadding() {
+    var b = root && root.querySelector('.acconsent-banner');
+    if (!b) {
+      if (bannerPadTarget) {
+        bannerPadTarget.style.removeProperty('padding-bottom');
+        bannerPadTarget = null;
+      }
+      document.documentElement.classList.remove('acconsent-banner-open');
+      return;
+    }
+    document.documentElement.classList.add('acconsent-banner-open');
+    var h = Math.ceil(b.getBoundingClientRect().height);
+    if (!h) return;
+    bannerPadTarget = document.body;
+    // Add to whatever the theme already sets rather than replacing it.
+    var base = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+    if (bannerPadTarget.dataset.acconsentBasePad === undefined) {
+      bannerPadTarget.dataset.acconsentBasePad = String(base);
+    }
+    var origin = parseFloat(bannerPadTarget.dataset.acconsentBasePad) || 0;
+    bannerPadTarget.style.setProperty('padding-bottom', (origin + h) + 'px', 'important');
+  }
+
   function removeBanner() {
     var b = root.querySelector('.acconsent-banner');
     if (b) b.parentNode.removeChild(b);
+    syncBannerPadding();
   }
 
   function showBanner() {
@@ -592,6 +644,12 @@
     // Move focus into the banner so screen-reader / keyboard users are told a
     // consent choice is required and land on it (announces name + role).
     requestAnimationFrame(function () { try { b.focus(); } catch (e) {} });
+    // Reserve the banner's footprint AFTER layout so the measurement is real.
+    requestAnimationFrame(syncBannerPadding);
+    if (!showBanner._resizeBound) {
+      showBanner._resizeBound = true;
+      window.addEventListener('resize', syncBannerPadding);
+    }
   }
 
   function focusable(container) {
@@ -716,6 +774,29 @@
   function limitSensitivePI() {
     var consent = readConsent();
     var categories = (consent && consent.categories) || fullGrant(false);
+    // Persist LOCALLY first. recordServer() is a network call; if it fails
+    // (offline, blocked, 4xx) a click that only called it would have zero
+    // effect and leave no trace, while still showing the visitor a success
+    // toast. §7014(a) contemplates the click having an immediate effect, so
+    // the local record has to be written unconditionally and synchronously.
+    // spiLimited is already ON by default in the network shim, so this
+    // exercises and records the right rather than changing what is blocked —
+    // but it must be recorded even when the server never hears about it.
+    try {
+      var raw = window.localStorage.getItem('acconsent_v1');
+      var blob = raw ? JSON.parse(raw) : null;
+      if (!blob) {
+        blob = { categories: categories, ts: Date.now(), expires: Date.now() + (S.consent_days || 180) * 86400000 };
+      }
+      blob.limit_spi = true;
+      blob.limit_spi_ts = Date.now();
+      blob.policy_version = CFG.policy_version;
+      blob.catalog_hash = CFG.catalog_hash;
+      window.localStorage.setItem('acconsent_v1', JSON.stringify(blob));
+    } catch (e) {}
+    if (typeof window.__acconsentSetSpiLimited === 'function') {
+      try { window.__acconsentSetSpiLimited(true); } catch (e) {}
+    }
     recordServer('update', categories, 'limit_spi', true);
     if (S.limit_spi_label) toast(S.limit_spi_label);
   }

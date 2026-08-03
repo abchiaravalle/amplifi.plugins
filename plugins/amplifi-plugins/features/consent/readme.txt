@@ -4,7 +4,7 @@ Tags: cookie consent, gdpr, ccpa, privacy, consent log, gpc, consent mode
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.2.1
+Stable tag: 3.3.0
 License: MIT
 
 Cookie consent that withholds your tracking scripts until consent, keeps a best-effort server-side record of each choice, honors GPC, and can auto-block unmanaged trackers.
@@ -129,6 +129,106 @@ excludes tracker hosts at the server. These are known limitations of every
 JavaScript-based consent blocker, not specific to this plugin.
 
 == Changelog ==
+
+= 3.3.0 =
+* Change (DEFAULT BEHAVIOUR): the "Do Not Sell or Share My Personal Information"
+  and "Limit the Use of My Sensitive Personal Information" controls now render
+  in the page FOOTER instead of inside the consent banner and preferences
+  modal. This is what the CPPA regulations actually specify. CCR tit.11
+  §7013(c) (sale/share) and §7014(c) (limit sensitive PI) each require a
+  conspicuous link "located at either the header or footer of the business's
+  internet homepage(s)", and §7026(a)(4) states that a cookie banner "is not by
+  itself an acceptable method for submitting requests to opt-out of
+  sale/sharing because cookies concern the collection of personal information
+  and not the sale or sharing of personal information." A footer placement is
+  also permanently reachable — the banner disappears after the first choice,
+  taking the opt-out controls with it, which the old placement did.
+* New setting: US / CCPA -> "Where the two opt-out controls appear" —
+  `footer` (default), `banner` (the pre-3.3.0 behaviour), or `both`. EXISTING
+  SITES ARE MIGRATED ON UPGRADE: get_settings() array_merges the saved
+  acconsent_settings row over the defaults, and a row written before 3.3.0 has
+  no optout_placement key at all, so it resolves to the new `footer` default
+  immediately — no admin action required, and no duplicate controls (verified
+  on a clean install by deleting the key from the saved option). If you want
+  the old placement, set it explicitly to `banner`.
+* New shortcodes: `[amplifi-limit-spi]` (the §7014 control, which previously
+  had no shortcode at all) and `[amplifi-optout-links]` (both controls in one
+  wrapper). `[amplifi-do-not-sell]` is unchanged in name and behaviour.
+  Placing ANY of the three suppresses the auto-rendered footer row, so the
+  controls can never appear twice on a page. The auto row is hooked at
+  wp_footer priority 99 specifically so a shortcode in a footer widget area or
+  a block-theme footer template part — which can render at a priority above
+  ours — still wins the dedupe.
+* Fix: the consent banner is `position: fixed` at the bottom of the viewport
+  and was PHYSICALLY COVERING the footer opt-out controls — measured with
+  `document.elementFromPoint()` at the button's own centre, the topmost
+  element was the banner, so the button could not be clicked at all until the
+  visitor made a consent choice first. That is the §7004(a)(4)(A) fact pattern
+  ("requiring the consumer to click through disruptive screens before they are
+  able to submit a request to opt-out"). While the banner is up, its measured
+  height is now reserved as extra bottom padding on `<body>` (re-measured on
+  resize, removed when the banner goes), so the end of the document scrolls
+  clear above it.
+* Fix: "Limit the Use of My Sensitive Personal Information" now writes its
+  `limit_spi` record to localStorage synchronously BEFORE calling the server.
+  Previously the click did nothing but fire a network request and a success
+  toast — if that request failed, the visitor saw confirmation of an action
+  that left no trace anywhere.
+* The accessible name of the opt-out group is "Privacy opt-out controls", NOT
+  "Your Privacy Choices". §7015(b) reserves that exact phrase (and "Your
+  California Privacy Choices") for the single combined Alternative Opt-out
+  Link, which must carry the CPPA opt-out icon and lead to a §7015(c) page.
+  Using it as a label would advertise a §7015 link this plugin does not
+  implement. The shortcode is `[amplifi-optout-links]` for the same reason.
+* Placement guidance: prefer dropping the shortcodes directly into your theme's
+  existing footer link row. §7003(c)'s operative test is that a conspicuous
+  link "shall appear in a similar manner as other similarly-posted links"; the
+  font-size-and-color sentence that follows it is prefaced "For example" and is
+  an illustrative floor, not the whole standard. The shortcode-placed controls
+  inherit type from whatever surrounds them, which clears that floor with no
+  per-site CSS. The auto-rendered row is only a FALLBACK: `wp_footer()` usually
+  fires AFTER the theme's own `<footer>`, so it lands at the very bottom of the
+  document with no adjacent links to be similar to — it forces a contrast-safe
+  colour of its own for that reason, but check it against your theme.
+* Stylesheet is now `assets/css/consent-v4.css` (filename bumped so CDNs and
+  page caches cannot serve the previous file; `consent-v3.css` is removed).
+* Not implemented, deliberately: the §7015 "Alternative Opt-out Link" — the
+  single combined link titled exactly "Your Privacy Choices" or "Your
+  California Privacy Choices". That arrangement additionally requires the
+  CPPA's official opt-out icon adjacent to the title ("shall include"), so it
+  is a separate feature rather than a relabel of the above.
+* TWO OBLIGATIONS THIS PLUGIN CANNOT SATISFY FOR YOU. Posting the links is
+  necessary but not sufficient, and neither of these is automatic:
+  1. Because clicking the controls takes effect immediately rather than
+     opening a dedicated page, §7013(e)(1) and §7014(e)(1) require the Notice
+     of Right to Opt-out and the Notice of Right to Limit to live IN YOUR
+     PRIVACY POLICY — "If clicking on the ... link immediately effectuates the
+     consumer's right to opt-out of sale/sharing ... the business shall provide
+     the notice within its privacy policy." Each notice needs the §7013(f) /
+     §7014(f) content: a description of the right and instructions for every
+     method of exercising it. §7013(h) bars selling or sharing personal
+     information collected during any period when no such notice was posted.
+  2. §7026(a) requires TWO OR MORE designated methods for opt-out-of-sale/
+     sharing requests, and §7027(b) requires two or more for limit requests.
+     The link plus an honored Global Privacy Control signal covers the
+     sale/sharing side. GPC is a sale/share signal only (§7025(b)) and does
+     NOT count toward the limit right, so a second method for that — an email
+     address, a form, a phone number — has to be offered and documented.
+  The admin screen now states both of these next to the placement setting.
+* Known limitation, stated plainly: these controls are `<button>` elements, not
+  `<a href>` links. Civil Code §1798.135(a) and §7026(a) both say "link", and a
+  button has no href, is absent from a screen reader's link rotor, cannot be
+  bookmarked or deep-linked, and is inert if JavaScript is blocked. §7004(a)(5)
+  requires opt-out methods be "tested to ensure that they are functional." A
+  future revision should render a real link to a dedicated opt-out page and
+  progressively enhance it into an immediate-effect click.
+* Reminder (unchanged, but relevant when deciding whether to show these at
+  all): §7013(g) and §7014(g) exempt a business from posting each link if it
+  does not sell/share (resp. only uses sensitive PI for the §7027(m) purposes)
+  AND says so in its privacy policy. Note that "share" under Civil Code
+  §1798.140 covers cross-context behavioral advertising with or without money
+  changing hands, so a site running ad-network remarketing tags generally
+  cannot rely on the §7013(g) exemption.
 
 = 3.2.1 =
 * Fix: GA4 / Google Analytics measurement hosts (google-analytics.com,
