@@ -99,8 +99,16 @@ class Amplifi_Consent_Frontend {
 		if ( ! self::enabled() ) {
 			return;
 		}
+		// NOTE: both asset filenames carry an explicit -vN suffix that is bumped
+		// on every shipped change. Do NOT rely on the `ver` query string for
+		// cache busting: plugins in the wild (e.g. Admin Site Enhancements'
+		// "disable_resource_version_number") strip `?ver=` at PHP_INT_MAX
+		// priority, after which a CDN serving `max-age=31536000` on the bare URL
+		// pins the old file for a year. Renaming the file is the only bust that
+		// survives that combination. Verified live on a client site 2026-08-03,
+		// where a stale consent.js kept running for hours after a plugin update.
 		wp_register_style( 'acconsent', ACCONSENT_PLUGIN_URL . 'assets/css/consent-v4.css', array(), ACCONSENT_VERSION );
-		wp_register_script( 'acconsent', ACCONSENT_PLUGIN_URL . 'assets/js/consent.js', array(), ACCONSENT_VERSION, true );
+		wp_register_script( 'acconsent', ACCONSENT_PLUGIN_URL . 'assets/js/consent-v2.js', array(), ACCONSENT_VERSION, true );
 
 		$settings   = Amplifi_Consent_Store::get_settings();
 		$categories = Amplifi_Consent_Store::categories();
