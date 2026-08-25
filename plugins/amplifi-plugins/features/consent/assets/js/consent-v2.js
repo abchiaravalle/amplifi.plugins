@@ -601,34 +601,98 @@
   // §7004(a)(4)(A) fact pattern ("requiring the consumer to click through
   // disruptive screens before they are able to submit a request to opt-out").
   //
-  // Fix: while the banner is up, reserve exactly its height as extra bottom
-  // padding on <body>, so the end of the document scrolls clear above it.
+  // Fix: while the banner is up, reserve exactly its height of extra room at
+  // the end of the document, so the end of the document scrolls clear above it.
   // Measured from the live element (not a guess) and re-measured on resize,
   // because the banner's height changes with viewport width as its buttons
   // wrap. Removed entirely when the banner goes away.
-  var bannerPadTarget = null;
+  //
+  // That reserved room is a real ELEMENT appended after the theme's content,
+  // NOT `padding-bottom` on <body>. Padding on <body> looks equivalent but is
+  // not: padding is inside the body box, so the reserved band is painted by
+  // the BODY background, and per CSS 3.11 the body background also propagates
+  // to the canvas. On a light-<body> site sitting under a dark theme footer
+  // that band renders as a bright seam below the footer — and the obvious
+  // "fix" for the seam (forcing the body background dark while the banner is
+  // up) is worse: it repaints the canvas behind EVERY transparent region of
+  // EVERY page, so any section that relies on the body background showing
+  // through turns dark and its dark text goes invisible until the visitor
+  // makes a consent choice. Real production incident (asctmprd, 2026-08-25):
+  // the /leadership grid went black-on-black for un-consented visitors.
+  //
+  // A spacer element cannot do that. It paints only its own box, we colour it
+  // to match whatever the theme actually paints at the bottom of the document,
+  // and the body/canvas background is never touched — so the seam disappears
+  // on light AND dark themes with no per-site CSS.
+  var bannerSpacer = null;
+
+  function opaqueBg(cs) {
+    if (cs.backgroundImage && cs.backgroundImage !== 'none') return true;
+    var m = cs.backgroundColor && cs.backgroundColor.match(/rgba?\(([^)]+)\)/);
+    if (!m) return false;
+    var parts = m[1].split(',').map(parseFloat);
+    return (parts.length > 3 ? parts[3] : 1) > 0.05;
+  }
+
+  // Colour of whatever the theme paints LAST in normal flow — the footer on a
+  // conventional layout, or our own auto-rendered opt-out row when a site has
+  // styled it. Picked by geometry (bottom-most wide painted box) rather than a
+  // selector guess, so it works on any theme. Falls back to the body/canvas
+  // colour, which is the pre-existing behaviour.
+  function trailingPaintedBg() {
+    var best = '';
+    var maxBottom = -Infinity;
+    var nodes = document.body.querySelectorAll('*');
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      if (el === bannerSpacer || el === root || (root && root.contains(el))) continue;
+      if (el.classList && el.classList.contains('acconsent-fab')) continue;
+      var cs = getComputedStyle(el);
+      // Fixed/sticky chrome floats over the page; it is not what the document
+      // ends with, so it must not decide the spacer colour.
+      if (cs.position === 'fixed' || cs.position === 'sticky') continue;
+      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+      if (!opaqueBg(cs)) continue;
+      var r = el.getBoundingClientRect();
+      if (r.width < 200 || r.height < 8) continue;
+      var bottom = r.bottom + window.scrollY;
+      if (bottom > maxBottom) { maxBottom = bottom; best = cs.backgroundColor; }
+    }
+    if (best) return best;
+    var bodyCs = getComputedStyle(document.body);
+    return opaqueBg(bodyCs) ? bodyCs.backgroundColor
+      : getComputedStyle(document.documentElement).backgroundColor;
+  }
 
   function syncBannerPadding() {
     var b = root && root.querySelector('.acconsent-banner');
     if (!b) {
-      if (bannerPadTarget) {
-        bannerPadTarget.style.removeProperty('padding-bottom');
-        bannerPadTarget = null;
+      if (bannerSpacer && bannerSpacer.parentNode) {
+        bannerSpacer.parentNode.removeChild(bannerSpacer);
       }
+      bannerSpacer = null;
       document.documentElement.classList.remove('acconsent-banner-open');
       return;
     }
     document.documentElement.classList.add('acconsent-banner-open');
     var h = Math.ceil(b.getBoundingClientRect().height);
     if (!h) return;
-    bannerPadTarget = document.body;
-    // Add to whatever the theme already sets rather than replacing it.
-    var base = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
-    if (bannerPadTarget.dataset.acconsentBasePad === undefined) {
-      bannerPadTarget.dataset.acconsentBasePad = String(base);
+    var fresh = false;
+    if (!bannerSpacer) {
+      bannerSpacer = document.createElement('div');
+      bannerSpacer.className = 'acconsent-banner-spacer';
+      bannerSpacer.setAttribute('aria-hidden', 'true');
+      fresh = true;
     }
-    var origin = parseFloat(bannerPadTarget.dataset.acconsentBasePad) || 0;
-    bannerPadTarget.style.setProperty('padding-bottom', (origin + h) + 'px', 'important');
+    // Colour is resolved once per banner appearance, not on every resize tick:
+    // this walks the document and syncBannerPadding() is a resize handler.
+    // Measured BEFORE the spacer enters the DOM so it can never sample itself.
+    var bg = fresh ? trailingPaintedBg() : '';
+    if (bannerSpacer.parentNode !== document.body) {
+      document.body.appendChild(bannerSpacer);
+    }
+    bannerSpacer.style.setProperty('height', h + 'px', 'important');
+    if (bg) bannerSpacer.style.setProperty('background', bg, 'important');
   }
 
   function removeBanner() {

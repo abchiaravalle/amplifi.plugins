@@ -210,6 +210,19 @@
 }
 .acconsent-footer-optout-auto .acconsent-optout-btn-footer { color: CanvasText; }
 
+/* Reserved room for the fixed banner (see syncBannerPadding() in consent.js).
+   A real element rather than padding on <body>: padding lives inside the body
+   box, so it is painted by the body background — which CSS also propagates to
+   the canvas — and any attempt to recolour that band therefore recolours the
+   whole page behind every transparent section. This element paints only itself.
+   Its height and background are set inline from JS (measured live); everything
+   here is just neutral framing so a theme's `div` rules can't distort it. */
+.acconsent-banner-spacer {
+  display: block; width: 100%;
+  margin: 0 !important; padding: 0 !important; border: 0 !important;
+  flex: none; pointer-events: none;
+}
+
 /* Touch target: an inline text link is only ~20px tall, below the 44px WCAG
    2.5.5 / 2.5.8 target guidance. Pad the hit area vertically without changing
    the visual line height, so the control still reads as a text link. */
