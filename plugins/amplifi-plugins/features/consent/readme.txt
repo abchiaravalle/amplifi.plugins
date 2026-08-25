@@ -4,7 +4,7 @@ Tags: cookie consent, gdpr, ccpa, privacy, consent log, gpc, consent mode
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.3.3
+Stable tag: 3.3.4
 License: MIT
 
 Cookie consent that withholds your tracking scripts until consent, keeps a best-effort server-side record of each choice, honors GPC, and can auto-block unmanaged trackers.
@@ -129,6 +129,40 @@ excludes tracker hosts at the server. These are known limitations of every
 JavaScript-based consent blocker, not specific to this plugin.
 
 == Changelog ==
+
+= 3.3.4 =
+* Fix: the banner-room reservation introduced in 3.3.3 sampled a background
+  colour by scanning for the bottom-most painted element, and that scan could
+  pick an element that is not painted where it claims to be — a list inside an
+  `overflow:auto` scroller reports a rect far past the end of the document. On
+  one production page it selected a translucent list item and painted the
+  reserved band near-white directly beneath a black footer: the same seam the
+  release was meant to remove. No colour is sampled any more. The room is added
+  as padding on the element that already paints the bottom of the document, so
+  that element's own background covers the band and the colour matches by
+  construction — nothing to get stale on a dark-mode toggle, and nothing to
+  mis-parse in `oklch()`/`lab()`/`color()` themes. Where no such element can be
+  extended, the fallback spacer is explicitly transparent rather than coloured.
+* Fix: with the banner positioned centre, the measured height was the full
+  viewport (the centred banner is a full-viewport scrim), so 3.3.3 would append
+  a viewport-tall band. Centre mode now reserves nothing — a full-viewport scrim
+  cannot be escaped by reserving room, so the reservation bought nothing anyway.
+* Fix: if the banner measured zero height on the first frame (deferred
+  stylesheet, render-blocking CSS race, backgrounded tab), no room was ever
+  reserved and there was no retry — a silent §7004(a)(4)(A) failure. A
+  ResizeObserver now drives the reservation, which also covers reflows the
+  resize event cannot see (web-font swap, button rows re-wrapping).
+* Fix: the reservation is verified to have actually lengthened the document
+  rather than assumed, and falls back automatically if a fixed-height or
+  clipped container swallowed it.
+* Fix: pages shorter than the viewport no longer get a reservation at all —
+  nothing is covered there, and the band would have hung in mid-page whitespace.
+* Hardened: spacer CSS armoured against unqualified theme rules that could
+  delete or shrink it; spacer re-anchored to `<body>` if a theme re-parents it;
+  resize handling coalesced to one pass per frame and the observer narrowed to
+  direct children of `<body>`; a re-entry guard prevents a double-loaded script
+  from reserving the room twice; the modal's scroll-lock now restores the prior
+  value instead of clearing it.
 
 = 3.3.3 =
 * Fix: on sites with a dark footer, the room reserved for the banner rendered
