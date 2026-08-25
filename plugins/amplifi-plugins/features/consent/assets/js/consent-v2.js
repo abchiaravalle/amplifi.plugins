@@ -17,6 +17,14 @@
   'use strict';
 
   if (typeof window.ACCONSENT === 'undefined') return;
+
+  // Re-entry guard. This plugin cache-busts by CHANGING THE SCRIPT FILENAME, so
+  // a stale full-page/CDN cache can serve two generations of this file on one
+  // render. Each would otherwise install its own MutationObserver, its own
+  // delegated click listener, and its own banner-room reservation.
+  if (window.__acconsentBooted) return;
+  window.__acconsentBooted = true;
+
   var CFG = window.ACCONSENT;
   var S = CFG.settings;
   var KEY = CFG.storage_key || 'acconsent_v1';
@@ -622,83 +630,246 @@
   //
   // A spacer element cannot do that. It paints only its own box, we colour it
   // to match whatever the theme actually paints at the bottom of the document,
-  // and the body/canvas background is never touched — so the seam disappears
-  // on light AND dark themes with no per-site CSS.
-  var bannerSpacer = null;
+  // and the body/canvas background is never touched.
+  //
+  // The room is added as extra `padding-bottom` on whatever element already
+  // paints the bottom of the document — the theme footer on a conventional
+  // layout, or our own auto-rendered opt-out row when that is last. Extending
+  // that element stretches ITS OWN background over the reserved band, so the
+  // colour matches by construction. No colour is ever sampled or copied, which
+  // is what makes this robust: nothing to get stale when the visitor toggles
+  // dark mode, nothing to mis-parse in oklch()/lab()/color() themes, and no
+  // possibility of painting a wrong-coloured band.
+  //
+  // If no such element can be found or extending it does not actually lengthen
+  // the document (fixed-height footer, hostile theme CSS), we fall back to an
+  // explicitly TRANSPARENT spacer element. Transparent is the safe default: it
+  // shows the canvas, exactly as the old body-padding did, so the fallback can
+  // never be wrong-coloured either — it just doesn't hide the seam.
+  var bannerSpacer = null;   // fallback reservation (transparent)
+  var bannerRO = null;       // ResizeObserver on the live banner
+  var padHost = null;        // element whose padding we extended
+  var padHostPrev = null;    // its previous inline padding-bottom {value, priority}
+  var padHostBase = 0;       // its padding-bottom before we touched it, in px
 
-  function opaqueBg(cs) {
-    if (cs.backgroundImage && cs.backgroundImage !== 'none') return true;
-    var m = cs.backgroundColor && cs.backgroundColor.match(/rgba?\(([^)]+)\)/);
-    if (!m) return false;
-    var parts = m[1].split(',').map(parseFloat);
-    return (parts.length > 3 ? parts[3] : 1) > 0.05;
-  }
-
-  // Colour of whatever the theme paints LAST in normal flow — the footer on a
-  // conventional layout, or our own auto-rendered opt-out row when a site has
-  // styled it. Picked by geometry (bottom-most wide painted box) rather than a
-  // selector guess, so it works on any theme. Falls back to the body/canvas
-  // colour, which is the pre-existing behaviour.
-  function trailingPaintedBg() {
-    var best = '';
-    var maxBottom = -Infinity;
-    var nodes = document.body.querySelectorAll('*');
-    for (var i = 0; i < nodes.length; i++) {
-      var el = nodes[i];
-      if (el === bannerSpacer || el === root || (root && root.contains(el))) continue;
-      if (el.classList && el.classList.contains('acconsent-fab')) continue;
-      var cs = getComputedStyle(el);
-      // Fixed/sticky chrome floats over the page; it is not what the document
-      // ends with, so it must not decide the spacer colour.
-      if (cs.position === 'fixed' || cs.position === 'sticky') continue;
-      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
-      if (!opaqueBg(cs)) continue;
-      var r = el.getBoundingClientRect();
-      if (r.width < 200 || r.height < 8) continue;
-      var bottom = r.bottom + window.scrollY;
-      if (bottom > maxBottom) { maxBottom = bottom; best = cs.backgroundColor; }
+  // Alpha of a computed background-color. Handles legacy rgb()/rgba() AND the
+  // modern syntaxes browsers now preserve in computed values (oklch(), lab(),
+  // color(display-p3 …)) rather than normalising to rgb() — Tailwind v4 and a
+  // growing number of block themes emit those, and a naive rgba() regex reads
+  // every one of them as "no background".
+  function bgAlpha(c) {
+    if (!c || c === 'transparent') return 0;
+    var m = c.match(/^rgba?\(\s*([^)]+)\)/i);
+    if (m) {
+      var p = m[1].split(/[\s,\/]+/).filter(function (s) { return s !== ''; });
+      return p.length > 3 ? parseFloat(p[3]) : 1;
     }
-    if (best) return best;
-    var bodyCs = getComputedStyle(document.body);
-    return opaqueBg(bodyCs) ? bodyCs.backgroundColor
-      : getComputedStyle(document.documentElement).backgroundColor;
+    // oklch(L C H / A), color(srgb r g b / a), lab(L a b / A) …
+    var slash = c.match(/\/\s*([0-9.]+)(%?)\s*\)\s*$/);
+    if (slash) {
+      return slash[2] ? parseFloat(slash[1]) / 100 : parseFloat(slash[1]);
+    }
+    return 1;
   }
 
-  function syncBannerPadding() {
-    var b = root && root.querySelector('.acconsent-banner');
-    if (!b) {
-      if (bannerSpacer && bannerSpacer.parentNode) {
-        bannerSpacer.parentNode.removeChild(bannerSpacer);
+  function inFlow(cs) {
+    return cs.position === 'static' || cs.position === 'relative';
+  }
+
+  function isOurs(el) {
+    if (!el) return false;
+    if (el === bannerSpacer || el === root) return true;
+    if (root && root.contains(el)) return true;
+    return !!(el.classList && el.classList.contains('acconsent-fab'));
+  }
+
+  // The element that paints the very bottom of the document.
+  //
+  // Found by walking DOWN the last-in-flow-child chain (what the document
+  // visually ends with) and then back UP to the nearest ancestor that actually
+  // paints an opaque colour. Deliberately NOT a geometry contest over every
+  // node: ranking elements by getBoundingClientRect().bottom picks up boxes
+  // that are not painted where they claim to be — a list inside an
+  // overflow:auto scroller reports a rect far past the end of the document and
+  // wins, which is how a translucent list item ended up colouring the band on
+  // a production store-locator page. Following the flow chain can only ever
+  // reach elements that genuinely end the document, and costs O(depth) rather
+  // than a getComputedStyle call on every node in the page.
+  function trailingPaintedHost() {
+    var node = document.body;
+    var guard = 0;
+    while (node && guard++ < 300) {
+      var next = null;
+      for (var i = node.children.length - 1; i >= 0; i--) {
+        var c = node.children[i];
+        if (isOurs(c)) continue;
+        var ccs = getComputedStyle(c);
+        // Out-of-flow boxes (fixed/sticky/absolute chrome, off-canvas panels,
+        // stacked carousel slides) do not end the document.
+        if (!inFlow(ccs)) continue;
+        if (ccs.display === 'none' || ccs.visibility === 'hidden') continue;
+        if (parseFloat(ccs.opacity) < 0.05) continue;
+        if (!c.getClientRects().length) continue;
+        next = c;
+        break;
       }
-      bannerSpacer = null;
-      document.documentElement.classList.remove('acconsent-banner-open');
-      return;
+      if (!next) break;
+      node = next;
     }
-    document.documentElement.classList.add('acconsent-banner-open');
-    var h = Math.ceil(b.getBoundingClientRect().height);
-    if (!h) return;
-    var fresh = false;
+    // Climb to something that paints. Stop at <body>: extending the body is the
+    // very hazard this whole mechanism exists to avoid.
+    while (node && node !== document.body && node !== document.documentElement) {
+      var cs = getComputedStyle(node);
+      if (inFlow(cs) &&
+          (!cs.backgroundImage || cs.backgroundImage === 'none') &&
+          bgAlpha(cs.backgroundColor) >= 0.99) {
+        return node;
+      }
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  function releasePadHost() {
+    if (!padHost) return;
+    if (padHostPrev && padHostPrev.value) {
+      padHost.style.setProperty('padding-bottom', padHostPrev.value, padHostPrev.priority);
+    } else {
+      padHost.style.removeProperty('padding-bottom');
+    }
+    padHost = null;
+    padHostPrev = null;
+    padHostBase = 0;
+  }
+
+  function releaseSpacer() {
+    if (bannerSpacer && bannerSpacer.parentNode) {
+      bannerSpacer.parentNode.removeChild(bannerSpacer);
+    }
+    bannerSpacer = null;
+  }
+
+  function useSpacer(h) {
+    releasePadHost();
+    if (!bannerSpacer) {
+      // Adopt an orphan first: if consent.js is ever evaluated twice on one
+      // page, two closures must not each append their own band.
+      bannerSpacer = document.querySelector('.acconsent-banner-spacer');
+    }
     if (!bannerSpacer) {
       bannerSpacer = document.createElement('div');
       bannerSpacer.className = 'acconsent-banner-spacer';
       bannerSpacer.setAttribute('aria-hidden', 'true');
-      fresh = true;
+      bannerSpacer.setAttribute('role', 'presentation');
     }
-    // Colour is resolved once per banner appearance, not on every resize tick:
-    // this walks the document and syncBannerPadding() is a resize handler.
-    // Measured BEFORE the spacer enters the DOM so it can never sample itself.
-    var bg = fresh ? trailingPaintedBg() : '';
     if (bannerSpacer.parentNode !== document.body) {
       document.body.appendChild(bannerSpacer);
     }
     bannerSpacer.style.setProperty('height', h + 'px', 'important');
-    if (bg) bannerSpacer.style.setProperty('background', bg, 'important');
+  }
+
+  function syncBannerPadding() {
+    var b = root && root.querySelector('.acconsent-banner');
+    // Treat a banner that is present but not actually rendered (hidden by site
+    // CSS, display:none) as no banner, so we never strand a reservation.
+    if (b && (!b.getClientRects().length || getComputedStyle(b).display === 'none')) {
+      b = null;
+    }
+    if (!b) {
+      releaseSpacer();
+      releasePadHost();
+      document.documentElement.classList.remove('acconsent-banner-open');
+      return;
+    }
+
+    // Centre position is a full-viewport fixed scrim (.acconsent-pos-center is
+    // top:0;bottom:0), so getBoundingClientRect().height is the whole viewport,
+    // not the visible card. Reserving that much would append a viewport-tall
+    // band — and it would buy nothing, because a full-viewport scrim covers the
+    // footer controls wherever they scroll to. Reserve nothing here; making the
+    // controls reachable in centre mode needs the scrim itself to change, which
+    // is a separate fix.
+    if (b.classList.contains('acconsent-pos-center')) {
+      releaseSpacer();
+      releasePadHost();
+      document.documentElement.classList.remove('acconsent-banner-open');
+      return;
+    }
+
+    var h = Math.ceil(b.getBoundingClientRect().height);
+    // A zero measurement means layout is not settled yet. Do NOT mark the page
+    // as banner-open on the strength of a measurement we could not take; the
+    // ResizeObserver bound in showBanner() calls us back when it is real.
+    if (!h) return;
+
+    document.documentElement.classList.add('acconsent-banner-open');
+
+    // Nothing is covered if the document already ends above the banner, and on
+    // such a short page a reservation would just hang a band in mid-air.
+    var docH = document.documentElement.scrollHeight;
+    var ownH = 0;
+    if (padHost) ownH = h;
+    else if (bannerSpacer && bannerSpacer.parentNode) ownH = bannerSpacer.offsetHeight;
+    if ((docH - ownH) <= (window.innerHeight - h)) {
+      releaseSpacer();
+      releasePadHost();
+      return;
+    }
+
+    var host = padHost || trailingPaintedHost();
+    if (!host) {
+      useSpacer(h);
+      return;
+    }
+
+    if (host === padHost) {
+      // Already attached and verified — just resize. Re-running the
+      // did-it-lengthen check here would compare a document that ALREADY
+      // contains the reservation against itself and wrongly conclude the host
+      // swallowed the padding.
+      padHost.style.setProperty('padding-bottom', (padHostBase + h) + 'px', 'important');
+      return;
+    }
+
+    releaseSpacer();
+    releasePadHost();
+    padHost = host;
+    padHostPrev = {
+      value: host.style.getPropertyValue('padding-bottom'),
+      priority: host.style.getPropertyPriority('padding-bottom')
+    };
+    padHostBase = parseFloat(getComputedStyle(host).paddingBottom) || 0;
+
+    // Verify the extension actually lengthened the document rather than
+    // trusting that it did. A fixed-height or clipped host silently swallows
+    // padding, and a hostile theme rule can neutralise it — in either case the
+    // room would not exist and the opt-out controls would stay covered with no
+    // symptom. Measured on first attach only, against a document that does not
+    // yet contain the reservation.
+    var before = document.documentElement.scrollHeight;
+    padHost.style.setProperty('padding-bottom', (padHostBase + h) + 'px', 'important');
+    if (document.documentElement.scrollHeight < before + h - 2) {
+      releasePadHost();
+      useSpacer(h);
+    }
   }
 
   function removeBanner() {
     var b = root.querySelector('.acconsent-banner');
     if (b) b.parentNode.removeChild(b);
+    if (bannerRO) { bannerRO.disconnect(); bannerRO = null; }
     syncBannerPadding();
+  }
+
+  // Coalesce reservation work to one call per frame. syncBannerPadding reads
+  // layout and then writes style; `resize` fires continuously during a window
+  // drag and on every mobile URL-bar / soft-keyboard transition, so running it
+  // raw is read/write thrash at 60+Hz.
+  var syncQueued = false;
+  function queueSync() {
+    if (syncQueued) return;
+    syncQueued = true;
+    requestAnimationFrame(function () { syncQueued = false; syncBannerPadding(); });
   }
 
   function showBanner() {
@@ -710,9 +881,18 @@
     requestAnimationFrame(function () { try { b.focus(); } catch (e) {} });
     // Reserve the banner's footprint AFTER layout so the measurement is real.
     requestAnimationFrame(syncBannerPadding);
+    // A single rAF is not enough on its own: if the banner measures 0 on that
+    // frame (deferred stylesheet, render-blocking CSS race, backgrounded tab)
+    // there would be no retry and the room would silently never be reserved.
+    // A ResizeObserver covers that, plus every later reflow the resize event
+    // cannot see — web-font swap, the legal-links row wrapping, viewport change.
+    if (window.ResizeObserver) {
+      bannerRO = new ResizeObserver(queueSync);
+      bannerRO.observe(b);
+    }
     if (!showBanner._resizeBound) {
       showBanner._resizeBound = true;
-      window.addEventListener('resize', syncBannerPadding);
+      window.addEventListener('resize', queueSync);
     }
   }
 
@@ -742,7 +922,11 @@
     var overlay = buildModal(readConsent());
     root.appendChild(overlay);
     modalOpen = true;
-    document.documentElement.style.overflow = 'hidden'; // scroll-lock the page behind the modal.
+    // Scroll-lock the page behind the modal, remembering whatever the theme or
+    // another component had set so closing ours cannot unlock a scroll they
+    // still want locked (off-canvas menus and lightboxes set this too).
+    openModal._prevOverflow = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
     document.addEventListener('keydown', escClose);
     document.addEventListener('keydown', trapTab);
     // Move focus into the dialog so keyboard / screen-reader users land inside it.
@@ -754,7 +938,7 @@
     var o = root.querySelector('.acconsent-modal-overlay');
     if (o) o.parentNode.removeChild(o);
     modalOpen = false;
-    document.documentElement.style.overflow = ''; // release scroll-lock.
+    document.documentElement.style.overflow = openModal._prevOverflow || ''; // restore prior lock state.
     document.removeEventListener('keydown', escClose);
     document.removeEventListener('keydown', trapTab);
     // Restore focus to whatever opened the modal — but if that element was
@@ -899,6 +1083,16 @@
       if (fab && fab.parentNode !== document.body) {
         document.body.appendChild(fab);
       }
+      // The fallback spacer needs the same rescue. If a wrapper script sweeps
+      // it into a container with overflow:hidden or a fixed height, its height
+      // stops contributing to document scroll height and the reserved room
+      // silently vanishes — the exact compliance failure this mechanism
+      // exists to prevent. (padHost is deliberately NOT re-anchored: it is the
+      // theme's own element and moving it would rearrange the page.)
+      if (bannerSpacer && bannerSpacer.parentNode &&
+          bannerSpacer.parentNode !== document.body) {
+        document.body.appendChild(bannerSpacer);
+      }
     }
     anchorToBody();
     root.hidden = false;
@@ -912,7 +1106,12 @@
     // when the page's body structure changes dynamically after initial boot.
     if (window.MutationObserver) {
       var bodyGuard = new MutationObserver(anchorToBody);
-      bodyGuard.observe(document.body, { childList: true, subtree: true });
+      // childList on body ONLY — no subtree. The invariant is purely about
+      // DIRECT children of body, and a wrapper script re-parenting our nodes IS
+      // a childList mutation on body. subtree:true fired this callback on every
+      // insertion anywhere in the page (carousels, lazy-load, ad slots, chat
+      // widgets), each doing a full-document querySelector for the FAB.
+      bodyGuard.observe(document.body, { childList: true });
     }
 
     document.addEventListener('click', function (e) {

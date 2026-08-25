@@ -210,17 +210,40 @@
 }
 .acconsent-footer-optout-auto .acconsent-optout-btn-footer { color: CanvasText; }
 
-/* Reserved room for the fixed banner (see syncBannerPadding() in consent.js).
+/* Fallback reservation for the fixed banner (see syncBannerPadding() in
+   consent.js). Used only when the trailing painted element cannot be extended.
    A real element rather than padding on <body>: padding lives inside the body
    box, so it is painted by the body background — which CSS also propagates to
    the canvas — and any attempt to recolour that band therefore recolours the
-   whole page behind every transparent section. This element paints only itself.
-   Its height and background are set inline from JS (measured live); everything
-   here is just neutral framing so a theme's `div` rules can't distort it. */
+   whole page behind every transparent section. This element paints only itself,
+   and it is deliberately TRANSPARENT: it shows the canvas exactly as the old
+   body padding did, so it can never render as a wrong-coloured band. Height is
+   set inline from JS (measured live).
+
+   Armoured hard, because reserving this room is a legal requirement (CCPA
+   §7004(a)(4)(A) — the opt-out control must not be covered by the banner), and
+   a single unqualified theme rule like `div{max-width:1200px}` or
+   `body>div:last-child{display:none}` would otherwise silently delete it. */
 .acconsent-banner-spacer {
-  display: block; width: 100%;
-  margin: 0 !important; padding: 0 !important; border: 0 !important;
-  flex: none; pointer-events: none;
+  display: block !important;
+  position: static !important;
+  float: none !important;
+  clear: both !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  box-sizing: border-box !important;
+  flex: none !important;
+  grid-area: auto !important;
+  transform: none !important;
+  background: transparent !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* Touch target: an inline text link is only ~20px tall, below the 44px WCAG
