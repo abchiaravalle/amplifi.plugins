@@ -4,7 +4,7 @@ Tags: cookie consent, gdpr, ccpa, privacy, consent log, gpc, consent mode
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.3.4
+Stable tag: 3.3.5
 License: MIT
 
 Cookie consent that withholds your tracking scripts until consent, keeps a best-effort server-side record of each choice, honors GPC, and can auto-block unmanaged trackers.
@@ -129,6 +129,36 @@ excludes tracker hosts at the server. These are known limitations of every
 JavaScript-based consent blocker, not specific to this plugin.
 
 == Changelog ==
+
+= 3.3.5 =
+* Fix: the reserved room no longer tries to match the page's colour, because it
+  never needed to. The band sits exactly where a bottom-fixed banner paints, so
+  the banner covers it and its colour is never visible; it is now a plain
+  transparent block sized one pixel under the banner, which absorbs rounding so
+  not even a sliver can show. Three releases of colour-matching machinery are
+  deleted: 3.3.2's body padding (repainted the page canvas), 3.3.3's colour
+  sampling (picked a translucent colour from inside a scroller and painted a
+  near-white band under a black footer), and 3.3.4's padding of the theme's own
+  footer element. That last approach also mis-painted under
+  `background-clip: content-box` and whenever the element it found was narrower
+  than the viewport, and it mutated an element the plugin does not own — a
+  footer re-render, a third-party inline style write, or a `cloneNode()` could
+  each corrupt it or silently drop the reservation.
+* Fix: the short-page check used `documentElement.scrollHeight`, which the
+  browser clamps to the viewport height — a 101px page reports the full 700px on
+  a 700px window. That made the reserve and release branches disagree on
+  consecutive frames, inserting and removing a DOM node on every animation frame
+  indefinitely. It now measures the unclamped content height, with hysteresis at
+  the boundary so the two branches cannot contradict each other.
+* Fix: with the banner centred, the opt-out control is forced into the banner
+  card. A centred banner is a full-viewport scrim that covers the footer at every
+  scroll offset, so a footer-only opt-out could not be reached at all until the
+  visitor dismissed the consent UI — the click-through §7004(a)(4)(A) prohibits.
+  Reserving room cannot solve that, as there is no uncovered strip to scroll the
+  control into. Enforced in code rather than left to the admin UI, because either
+  setting can be changed independently and the failure is invisible from the
+  front end.
+* The modal's scroll-lock restore no longer keeps a stale value after closing.
 
 = 3.3.4 =
 * Fix: the banner-room reservation introduced in 3.3.3 sampled a background

@@ -1287,7 +1287,25 @@ gtag('consent','default',{
 	private static function optout_placement() {
 		$s = Amplifi_Consent_Store::get_settings();
 		$p = isset( $s['optout_placement'] ) ? $s['optout_placement'] : 'footer';
-		return in_array( $p, array( 'footer', 'banner', 'both' ), true ) ? $p : 'footer';
+		$p = in_array( $p, array( 'footer', 'banner', 'both' ), true ) ? $p : 'footer';
+
+		// Centre position is a full-viewport fixed scrim, so it covers the
+		// footer at EVERY scroll offset. A footer-only opt-out is therefore
+		// unreachable until the visitor dismisses the consent UI — the
+		// click-through §7004(a)(4)(A) prohibits. Reserving room cannot help:
+		// there is no uncovered strip to scroll the control into. The only
+		// placement that stays reachable is one inside the card itself, so
+		// force the control into the banner whenever the banner is centred.
+		//
+		// Asserted here rather than left to the admin UI on purpose: an
+		// operator can reach this combination by changing either setting
+		// independently, and the failure is silent from the front end.
+		$pos = isset( $s['position'] ) ? $s['position'] : 'bottom';
+		if ( 'center' === $pos && 'footer' === $p ) {
+			$p = 'both';
+		}
+
+		return $p;
 	}
 
 	/**
