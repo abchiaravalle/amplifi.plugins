@@ -4,7 +4,7 @@ Tags: cookie consent, gdpr, ccpa, privacy, consent log, gpc, consent mode
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.3.2
+Stable tag: 3.3.3
 License: MIT
 
 Cookie consent that withholds your tracking scripts until consent, keeps a best-effort server-side record of each choice, honors GPC, and can auto-block unmanaged trackers.
@@ -129,6 +129,20 @@ excludes tracker hosts at the server. These are known limitations of every
 JavaScript-based consent blocker, not specific to this plugin.
 
 == Changelog ==
+
+= 3.3.3 =
+* Fix: on sites with a dark footer, the room reserved for the banner rendered
+  as a bright seam under the footer, and the only available workaround for it
+  (recolouring the `<body>` background while the banner was up) turned whole
+  sections of the page dark, hiding dark text against the recoloured canvas
+  until the visitor accepted or rejected. The reserved room was `padding-bottom`
+  on `<body>`; padding sits inside the body box, so it is painted by the body
+  background, which CSS also propagates to the page canvas — recolouring it
+  repaints the page behind every transparent section, not just the strip under
+  the footer. The reservation is now a dedicated element appended after the
+  content, coloured from whatever the theme actually paints at the end of the
+  document. It paints only itself, the body background is never touched, and
+  light and dark themes both render correctly with no per-site CSS.
 
 = 3.3.2 =
 * Fix: placing only ONE opt-out shortcode silently removed the other control
