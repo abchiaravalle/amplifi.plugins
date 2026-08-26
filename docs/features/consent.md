@@ -102,7 +102,7 @@ these two hooks are bound to the feature file path, not the registered plugin fi
 | `includes/class-acconsent-rest.php` | `Amplifi_Consent_Rest` | REST routes, the signed single-use consent token (issue/verify/consume), the first-party `acconsent_vid` visitor cookie, rate limiting, CSV export with formula-injection neutralization. |
 | `includes/class-acconsent-webhook.php` | `Amplifi_Consent_Webhook` | Optional HMAC-SHA256-signed mirror of each receipt to an external endpoint, plus a blocking `test()` used by the admin. |
 | `includes/amplifi-framework.php` | — | Bundled copy of the shared amplifi.studio framework (menu, hub, updater). Not consent-specific. |
-| `uninstall.php` | — | Deletes all `acconsent_*` options, drops the log table, sweeps `_transient_acconsent_%`, and clears the purge cron. Included by the mega-plugin's root `uninstall.php`, which globs `features/*/uninstall.php`. |
+| `uninstall.php` | — | Deletes six `acconsent_*` options (**not** `acconsent_log_alert`, which is left orphaned), drops the log table, sweeps `_transient_acconsent_%`, and clears the purge cron. Included by the mega-plugin's root `uninstall.php`, which globs `features/*/uninstall.php`. |
 
 ### Hooks and priorities
 

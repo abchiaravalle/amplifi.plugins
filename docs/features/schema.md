@@ -76,7 +76,7 @@ Installer::maybe_upgrade();
 | `includes/frontend/class-head-output.php` | `Frontend\Head_Output` | `wp_head` emitter at the configured priority |
 | `includes/frontend/class-foreign-suppressor.php` | `Frontend\Foreign_Suppressor` | Per-vendor filters that drop overridden `@type`s |
 | `includes/migration/class-meta-importer.php` | `Migration\Meta_Importer` | One-shot import of `_ac_jsonld_data` and `ac_jsonld_settings` from amplifi.meta |
-| `includes/rest/class-rest-controller.php` | `Rest\Rest_Controller` | All 17 route registrations and their handlers (758 LOC) |
+| `includes/rest/class-rest-controller.php` | `Rest\Rest_Controller` | All 18 route registrations (26 method entries) and their handlers (758 LOC) |
 | `scripts/build-schema-index.php` | — | Rebuilds `schema-org-types.json` from `https://schema.org/version/latest/schemaorg-current-https.jsonld`. `REQUIRED_FOR_RICH_RESULTS` is a hand-maintained const in this script |
 
 `tests/` holds 11 PHPUnit test classes plus five HTML fixtures (`yoast-head.html`, `rankmath-head.html`, `seopress-head.html`, `aioseo-head.html`, `manual-head.html`). `tests/bootstrap.php` stubs `ABSPATH`, `AMPLIFI_SCHEMA_PATH`, and `ARRAY_A` and registers the autoloader — no WordPress test suite is required.

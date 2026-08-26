@@ -183,6 +183,8 @@ It is included by the suite-level `plugins/amplifi-plugins/uninstall.php`.
 
 ## Pitfalls
 
+- **Token creation and revocation are not CSRF-protected.** The file contains zero nonce calls across all 701 lines; `ocml_create_token` (`:72`) and `ocml_revoke_token` (`:80`) are gated on `manage_options` only, with no `check_admin_referer` / `wp_nonce_field`. A logged-in administrator visiting a hostile page can be made to mint or revoke a password-bypass token.
+
 - **Tokens are stored in plaintext despite the `_hashed_` meta key name.** Anyone with database read access, a `postmeta` export, or a backup file has working bypass links for every protected post. The key name is a leftover and is actively misleading.
 - **Client-controlled headers drive the IP log.** `HTTP_CLIENT_IP` and `HTTP_X_FORWARDED_FOR` are trusted unconditionally and preferred over `REMOTE_ADDR`, so a visitor can put any value in the audit log — and can feed an arbitrary string straight into the ip-api.com URL. Behind a proxy that does not strip these headers, the log is not evidence.
 - **Geolocation blocks the redirect.** Every magic-link use makes a synchronous `wp_remote_get` to `http://ip-api.com` before the redirect fires. If ip-api is slow or unreachable, the visitor waits for the default HTTP timeout. ip-api's free tier is also rate limited per source IP, so a busy site will start logging `Location lookup failed` for legitimate visits.

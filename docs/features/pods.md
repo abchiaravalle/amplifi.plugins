@@ -68,7 +68,7 @@ There are no AJAX actions and no REST routes. The admin page is registered throu
 
 Both registrations are idempotent — `register_cpt` returns early if `post_type_exists( 'podcast' )` and `register_taxonomy` returns early if `taxonomy_exists( 'acpods_category' )` — so a host site that already defines a `podcast` CPT keeps its own definition and amplifi.pods reads from it.
 
-`podcast`: `public`, `has_archive`, rewrite slug `podcasts`, `menu_icon` `dashicons-microphone`, `menu_position` 21, supports `title`, `editor`, `thumbnail`, `excerpt`, `show_in_rest`, `show_in_nav_menus`.
+`podcast`: `public`, `has_archive`, rewrite slug `podcasts`, `menu_icon` `dashicons-microphone`, `menu_position` 21, supports `title`, `editor`, `thumbnail`, `excerpt`; plus the sibling top-level args `show_in_rest` and `show_in_nav_menus` (not `supports` entries).
 
 `acpods_category`: hierarchical, `show_ui`, `show_admin_column`, `rewrite => false`. It is registered but is **not** used by the shortcode — there is no filter-by-category path in `render_shortcode`.
 

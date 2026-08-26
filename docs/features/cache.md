@@ -41,7 +41,7 @@ $this->log_file_path = $this->cache_dir . 'ppsc-debug.log';
 | `template_include` | **9999** | `capture_template_output` | Buffers the theme render, writes the cache file, echoes and `exit`s |
 | `register_activation_hook` | — | `activate_plugin` | Creates the directory, `.htaccess` and log file |
 
-The priorities are deliberate. Priority 1 runs before anything can emit output, so the no-cache headers are still sendable. Priority 100 runs *after* WordPress has processed the `wp-postpass_` cookie, so `post_password_required()` is authoritative by then — serving earlier would cache a locked page. `template_include` at 9999 is the last filter before the theme file is loaded, so the buffer captures the fully-resolved template.
+The priorities are deliberate. Priority 1 runs before anything can emit output, so the no-cache headers are still sendable. Priority 100 simply serves late, after other `template_redirect` consumers have had their say. (`post_password_required()` evaluates the cookie on each call and returns the same answer at either priority — WordPress does not "process" it at some point in between, so that is not the reason for the ordering.) `template_include` at 9999 is the last filter before the theme file is loaded, so the buffer captures the fully-resolved template.
 
 ### Method groups
 
@@ -53,7 +53,7 @@ The priorities are deliberate. Priority 1 runs before anything can emit output, 
 
 ## What is cached and what is skipped
 
-All three cache-engine methods apply the same gate chain, in this order:
+The two caching methods (`maybe_serve_cached_content`, `capture_template_output`) apply the same gate chain, in this order. `maybe_set_no_cache_headers()` is different: it has **no** `current_user_can()` check and *acts on* `post_password_required()` rather than skipping on it — it fires precisely because the post is locked. Note the two caching methods also order their own checks differently (`maybe_serve_cached_content` tests `manage_options` before `file_exists`; `capture_template_output` does the reverse):
 
 1. `is_searchandfilter_request()` → skip.
 2. `! is_singular()` → skip.

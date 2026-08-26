@@ -15,7 +15,7 @@ Real-time AI translation of a WordPress site into language-prefixed URLs (`/es/`
 | AI provider | Anthropic Claude (`https://api.anthropic.com/v1/messages`) |
 | Default model | `claude-haiku-4-5` |
 | Files / PHP LOC | 41 files, ~5,536 PHP LOC (~4,964 excluding `tests/`) |
-| Languages | 33 defined in `ACWPT_Languages::get_all()` |
+**34** defined in `ACWPT_Languages::get_all()`
 | Prompt packs | 8 per-language packs (`de`, `es`, `fr`, `it`, `ja`, `pl`, `pt`, `zh`) plus a base prompt |
 
 ### Loading

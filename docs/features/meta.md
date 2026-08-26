@@ -25,7 +25,8 @@ Single-file monolith. Inline CSS, inline JavaScript, AJAX handlers, OpenAI calls
 Bootstrap order at the bottom of the file:
 
 ```php
-AC_Bulk_Meta_Pages::get_instance();            // wires all hooks in the constructor
+// No standalone instantiation: the constructor runs as a side effect of the
+// get_instance() argument passed to amplifi_register_plugin() (:7920-7937).
 amplifi_register_plugin(
     'ac-bulk-meta', 'Meta', '...', ACMETA_VERSION, __FILE__,
     array( AC_Bulk_Meta_Pages::get_instance(), 'render_admin_page' )
@@ -62,7 +63,7 @@ register_deactivation_hook( __FILE__, '__return_false' );     // no-op
 
 ### OpenAI usage
 
-All generation calls `wp_remote_post( 'https://api.openai.com/v1/chat/completions', ... )` with a hard-coded `'model' => 'gpt-4o-mini'` (9 call sites). Key validation (`ajax_validate_openai_key`) uses `wp_remote_get( 'https://api.openai.com/v1/models' )`. The model is not configurable from the UI.
+All generation calls `wp_remote_post( 'https://api.openai.com/v1/chat/completions', ... )` with a hard-coded `'model' => 'gpt-4o-mini'` (8 call sites). Key validation (`ajax_validate_openai_key`) uses `wp_remote_get( 'https://api.openai.com/v1/models' )`. The model is not configurable from the UI.
 
 ## Admin UI
 
@@ -73,6 +74,10 @@ Three pages under the top-level `amplifi-studio` menu.
 | Meta (main) | `amplifi-ac-bulk-meta` | `amplifi-studio_page_amplifi-ac-bulk-meta` | `manage_options` | `render_admin_page` |
 | Meta: FAQ | `amplifi-ac-bulk-meta-faq` | `amplifi-studio_page_amplifi-ac-bulk-meta-faq` | `edit_posts` | `render_faq_page` |
 | Meta: JSON-LD | `amplifi-ac-bulk-meta-jsonld` | `amplifi-studio_page_amplifi-ac-bulk-meta-jsonld` | `edit_posts` | `render_jsonld_page` |
+
+> **The `edit_posts` split leaks the API key.** The FAQ page prints the OpenAI key
+> into the DOM (`ac-bulk-meta.php:7714`), so every Contributor and above can read it
+> from page source. Treat `edit_posts` on this site as equivalent to holding the key.
 
 The main page is registered by the framework (`amplifi_register_plugin` → `amplifi_page_slug( 'ac-bulk-meta' )` → `amplifi-ac-bulk-meta`) at `admin_menu` priority 5, always with `manage_options`. The two extra pages are added directly by `add_extra_submenus` at priority 10 with `edit_posts`, so editors can reach FAQ and JSON-LD but not the main page.
 
@@ -182,7 +187,7 @@ public function output_jsonld() {
 }
 ```
 
-- The whole method yields to **amplifi.schema**: if `AMPLIFI_SCHEMA_ACTIVE` is defined, amplifi.meta emits no structured data at all, including the FAQPage block.
+- Only **this** method yields to amplifi.schema: `output_jsonld()` returns early when `AMPLIFI_SCHEMA_ACTIVE` is defined (`ac-bulk-meta.php:6664`). The footer FAQ block is **not** guarded — `output_faqs_before_footer()` emits its own `FAQPage` JSON-LD unconditionally at `:7221`. So structured data still ships when schema is active, and when schema is inactive with FAQs deployed you get **two** `FAQPage` blocks on one page (head `:6727`, footer `:7221`).
 - Per-post JSON-LD is stored as a string in `_ac_jsonld` and echoed unescaped inside `<script type="application/ld+json">`. The only gate is a successful `json_decode`.
 - `generate_faqpage_schema` builds a `schema.org/FAQPage` with `mainEntity` of `Question` / `acceptedAnswer` pairs, running `wp_strip_all_tags()` over both question and answer, encoded with `JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES`.
 - The FAQPage block is emitted whenever FAQs are deployed, independently of whether `_ac_jsonld` exists.
@@ -215,8 +220,9 @@ The webhook has an ownership lock: once `ac_webhook_url` is set, `ac_webhook_url
 - **Bulk transients stop expiring after the first tick.** `ajax_bulk_generate_next` re-saves both transients without a TTL. An abandoned run leaves permanent rows in `wp_options` unless the user clicks Stop.
 - **`ac_bulk_generate_status` and `ac_bulk_generate_stop` check only the nonce**, not a capability. The nonce is only printed on pages gated by `manage_options` / `edit_posts`, but the handlers themselves would accept any logged-in user holding a valid nonce.
 - **`_ac_jsonld` is echoed unescaped.** Anyone with `edit_posts` can store arbitrary JSON that is printed verbatim into a `<script>` tag on the front end.
-- **The OpenAI key is stored and returned in plaintext**, and the model is hard-coded to `gpt-4o-mini` in nine places — changing it means editing all nine.
+- **The `edit_posts` FAQ page renders the OpenAI API key into the HTML.** `render_faq_page()` loads the key (`ac-bulk-meta.php:7509`) and prints it as an input value at `:7714`. The page is gated on `edit_posts` (`:77`), so any Contributor, Author or Editor can read the administrator's key from page source — even though `ac_save_openai_key` itself is `manage_options`-gated. `type="password"` hides it visually, not in the DOM.
+- **The OpenAI key is stored and returned in plaintext**, and the model is hard-coded to `gpt-4o-mini` in eight places — changing it means editing all eight.
 - **`ajax_generate_jsonld` writes to `error_log()` on every request**, including a `print_r` of `ac_jsonld_settings` and the first 200 characters of the generated payload. On a busy site this fills the PHP error log with schema noise.
 - **FAQ rows are orphaned on post deletion.** Nothing hooks `deleted_post` or `before_delete_post`, so `ac_faqs` accumulates rows pointing at post IDs that no longer exist, and the CSV export silently drops them because it `INNER JOIN`s against `{$wpdb->posts}`.
-- **Only the first three questions render.** `output_faqs_before_footer` breaks out of the question loop at `$i >= 3` while emitting answers for every FAQ, so FAQs 4+ are in the DOM and in the FAQPage schema but have no clickable question.
+- **Questions 4+ render in a separate container.** The first three go in the primary column; the rest are emitted full-width in `.faq-questions-overflow` (`ac-bulk-meta.php:7202-7212`) and are clickable — `initFaqClicks()` binds every `.faq-q`, with extra `scrollIntoView` handling for the overflow block. Earlier notes claiming FAQs 4+ are unreachable were wrong. Formerly: FAQs 4+ are in the DOM and in the FAQPage schema but have no clickable question.
 - The recent history for this path (`git log --oneline -15 -- plugins/amplifi-plugins/features/meta/`) is entirely suite-wide version bumps and consent-feature commits; there are no meta-specific commits in the last 15, so the monolith is effectively frozen and any change here is unexercised.

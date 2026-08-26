@@ -212,8 +212,11 @@ slug**, so the page slug does not match the feature slug:
 | `translate` | `ac-wp-translator` | `amplifi-ac-wp-translator` | `amplifi-studio_page_amplifi-ac-wp-translator` |
 
 Guessing `amplifi-<feature-slug>` gives you an `admin_enqueue_scripts` comparison
-that silently never fires, which is a genuinely annoying bug to chase. Read the
-feature's own `amplifi_register_plugin()` call.
+that silently never fires, which is a genuinely annoying bug to chase. **Nine of
+eleven features register under a legacy `ac-*` slug** — that is the rule, not the
+exception. Only `security` and `optimize` already begin with `amplifi-` and pass
+through `amplifi_page_slug()` unchanged. Always read the feature's own
+`amplifi_register_plugin()` call.
 
 ### 2. The hub page
 
