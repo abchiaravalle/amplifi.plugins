@@ -1,4 +1,12 @@
-/* amplifi.consent — front-end styles.
+@charset "UTF-8";
+/* This stylesheet is served as `text/css` with no charset parameter, so without
+   this @charset the browser decodes it per the referencing document and a
+   non-ASCII byte anywhere above a declaration can swallow that declaration.
+   That is not hypothetical: an em-dash in a comment silently dropped
+   `background` and `font-family` from the .acconsent-banner rule in production,
+   which showed as a pale halo around the banner on a dark-footer site. The file
+   is kept ASCII-only as well - belt and braces. */
+/* amplifi.consent - front-end styles.
  * Theme-proof: scoped class names, forced font-family/sizes, no reliance on host theme.
  * Visual: dark, translucent (glassmorphic) surfaces with light text; restrained radii.
  */
@@ -11,7 +19,7 @@
   --acconsent-text-dim: #aeb6bf;
   --acconsent-radius: 6px;
   --acconsent-radius-lg: 10px;
-  /* Monochrome control tokens — deliberately NOT tied to the accent, so the
+  /* Monochrome control tokens - deliberately NOT tied to the accent, so the
    * consent UI reads neutral on ANY site regardless of the configured accent. */
   --acconsent-btn-fill: #f2f3f5;          /* light fill for primary buttons */
   --acconsent-btn-fill-text: #14181c;     /* dark text on the light fill */
@@ -25,6 +33,26 @@
   display: flex; justify-content: center; padding: 16px;
   font-family: var(--acconsent-font) !important;
   box-sizing: border-box;
+  /* The banner box is 16px larger than its card on every side. That frame used
+     to be fully transparent, and the room reserved behind the banner is blank,
+     so on a dark-footer site the frame rendered as a pale halo around the card
+     - measured RGB ~246 against a black footer on asctmprd.
+     A hit test does NOT catch this: elementFromPoint reports the banner as
+     covering that area because the element is there; it simply was not
+     painting. Only a pixel measurement finds it.
+     Backdrop-blur alone does not fix it either - blurring a blank band just
+     yields blurred blank. The frame therefore carries the same surface tint as
+     the card, so it reads as one continuous control on any theme, light or
+     dark, without sampling a page colour or painting an opaque band of our
+     own. Blur is layered on top where supported, which softens the boundary
+     against real content that scrolls behind it.
+     KEEP THIS COMMENT ASCII-ONLY. This stylesheet is served as `text/css` with
+     no charset, so a non-ASCII byte here is decoded as latin-1 and swallows the
+     declarations that follow it: an em-dash in this very comment silently
+     dropped `background` and `font-family` from this rule in production. */
+  background: var(--acconsent-surface);
+  -webkit-backdrop-filter: blur(10px) saturate(115%);
+  backdrop-filter: blur(10px) saturate(115%);
 }
 .acconsent-pos-bottom { bottom: 0; }
 .acconsent-pos-center { top: 0; bottom: 0; align-items: center; background: rgba(0,0,0,.55); }
@@ -48,7 +76,7 @@
    frameworks (Bootstrap, hello-elementor's reset.css, etc.) commonly reset
    `button`/`[type="button"]`/`[type="submit"]` element selectors. Those are
    the SAME specificity (0,1,0) as our single class selector, so whichever
-   stylesheet loads later in the cascade wins on a tie — which is often the
+   stylesheet loads later in the cascade wins on a tie - which is often the
    theme, since it usually enqueues after plugins. Observed in the wild on
    ascentialmls.com: hello-elementor's reset.css and Bootstrap both silently
    overrode .acconsent-fab's border-radius/width with no !important on either
@@ -146,9 +174,9 @@
 .acconsent-legal-ref { color: var(--acconsent-text-dim); }
 
 /* CCPA/CPRA one-click opt-out inside the banner/modal. Only rendered when the
-   site sets optout_placement to 'banner' or 'both' — the DEFAULT placement is
-   the page footer (CCR tit.11 §7013(c)/§7014(c) require these links "at either
-   the header or footer of the business's internet homepage(s)", and §7026(a)(4)
+   site sets optout_placement to 'banner' or 'both' - the DEFAULT placement is
+   the page footer (CCR tit.11 Sec.7013(c)/Sec.7014(c) require these links "at either
+   the header or footer of the business's internet homepage(s)", and Sec.7026(a)(4)
    says a cookie banner is not by itself an acceptable opt-out method). Do Not
    Sell and Limit-SPI can both render here, so give them a real gap instead of
    relying on a single whitespace character between the two <button> tags. */
@@ -158,8 +186,8 @@
 /* ---------- Footer opt-out row (DEFAULT placement for the CCPA controls) ----------
    These are <button>s so a click can immediately effectuate the right, but in a
    footer they must READ as links sitting alongside the theme's own footer links.
-   §7003(c)'s "conspicuous" test is RELATIVE — "a font size and color that is at
-   least the approximate size or color as other links next to it" — so every
+   Sec.7003(c)'s "conspicuous" test is RELATIVE - "a font size and color that is at
+   least the approximate size or color as other links next to it" - so every
    type property here INHERITS from the surrounding footer rather than imposing
    the widget's own palette. That means a dark footer and a light footer both
    come out right with no per-site CSS.
@@ -190,13 +218,13 @@
 
 /* The AUTO-rendered row only. wp_footer() usually fires AFTER the theme's own
    <footer> element, so this lands at the very bottom of the document rather
-   than inside the theme's link row — it needs a little self-contained framing
+   than inside the theme's link row - it needs a little self-contained framing
    so it doesn't read as an orphaned strip. A shortcode placement gets NONE of
    this (no -auto class), because there the surrounding footer already supplies
    the layout and any padding we added would fight it.
 
    Because this row has NO adjacent links to inherit from (it is outside the
-   theme's footer), `color: inherit` here resolves against <body> — which on a
+   theme's footer), `color: inherit` here resolves against <body> - which on a
    dark-footer theme can land dark-on-dark. currentColor is therefore forced to
    a contrast-safe value ONLY on the auto row; the shortcode variant keeps pure
    inheritance, which is what makes it "similar in manner" to its neighbours
@@ -213,15 +241,15 @@
 /* Fallback reservation for the fixed banner (see syncBannerPadding() in
    consent.js). Used only when the trailing painted element cannot be extended.
    A real element rather than padding on <body>: padding lives inside the body
-   box, so it is painted by the body background — which CSS also propagates to
-   the canvas — and any attempt to recolour that band therefore recolours the
+   box, so it is painted by the body background - which CSS also propagates to
+   the canvas - and any attempt to recolour that band therefore recolours the
    whole page behind every transparent section. This element paints only itself,
    and it is deliberately TRANSPARENT: it shows the canvas exactly as the old
    body padding did, so it can never render as a wrong-coloured band. Height is
    set inline from JS (measured live).
 
    Armoured hard, because reserving this room is a legal requirement (CCPA
-   §7004(a)(4)(A) — the opt-out control must not be covered by the banner), and
+   Sec.7004(a)(4)(A) - the opt-out control must not be covered by the banner), and
    a single unqualified theme rule like `div{max-width:1200px}` or
    `body>div:last-child{display:none}` would otherwise silently delete it. */
 .acconsent-banner-spacer {
@@ -264,7 +292,7 @@
   display: flex !important; align-items: center !important; justify-content: center !important;
 }
 /* Docking side, set via the "Floating button side" admin setting
-   (fab_position: left | right — default left, unchanged). The PHP side
+   (fab_position: left | right - default left, unchanged). The PHP side
    always emits BOTH .acconsent-fab and a side modifier class
    (.acconsent-fab-left or .acconsent-fab-right); the -right modifier
    overrides the default left-docked position/coords, keeping the base
@@ -274,7 +302,7 @@
 .acconsent-fab:hover { box-shadow: 0 6px 22px rgba(0,0,0,.46); }
 .acconsent-cookie-icon { width: 22px; height: 22px; display: block; }
 
-/* ---------- Legal document (shortcode) — renders on the page, inherits theme text ---------- */
+/* ---------- Legal document (shortcode) - renders on the page, inherits theme text ---------- */
 .acconsent-legal-doc { max-width: 820px; margin: 0 auto; }
 .acconsent-legal-title { margin: 0 0 4px; }
 .acconsent-legal-meta { font-size: 13px !important; color: #6b7280; margin: 0 0 18px; }
