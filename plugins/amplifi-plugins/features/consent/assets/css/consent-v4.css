@@ -319,3 +319,14 @@
 @media (prefers-reduced-motion: reduce) {
   .acconsent-toast, .acconsent-btn { transition: none; }
 }
+
+/* Print: the banner is screen chrome and the reserved band is screen-only
+   scaffolding, so neither belongs in a printed page - together they were adding
+   a blank strip and a floating card to every print/PDF. The FAB is the same
+   class of thing. The footer opt-out row is real page content and stays. */
+@media print {
+  .acconsent-banner,
+  .acconsent-banner-spacer,
+  .acconsent-fab,
+  .acconsent-modal-overlay { display: none !important; }
+}

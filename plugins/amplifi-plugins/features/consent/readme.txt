@@ -4,7 +4,7 @@ Tags: cookie consent, gdpr, ccpa, privacy, consent log, gpc, consent mode
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.3.6
+Stable tag: 3.3.7
 License: MIT
 
 Cookie consent that withholds your tracking scripts until consent, keeps a best-effort server-side record of each choice, honors GPC, and can auto-block unmanaged trackers.
@@ -129,6 +129,19 @@ excludes tracker hosts at the server. These are known limitations of every
 JavaScript-based consent blocker, not specific to this plugin.
 
 == Changelog ==
+
+= 3.3.7 =
+* Fix: the reserved band was sized one pixel SHORT of the banner, which left the
+  last content fractionally underneath it. On this site it landed inside the
+  opt-out row's own padding so no control was ever covered, but the margin was
+  the wrong way round and fractional device-pixel ratios (1.25/1.5/2.75) make it
+  worse. The band is now sized one pixel OVER. Verified at true maximum scroll,
+  desktop and mobile: zero overlap between the banner and the opt-out row, both
+  controls hit-testing as themselves at their bottom edge.
+* Fix: the banner, the reserved band, the floating preferences button and the
+  modal overlay are hidden in print. They are screen chrome; printing them added
+  a blank strip and a floating card to every printed page or PDF. The footer
+  opt-out row is real page content and still prints.
 
 = 3.3.6 =
 * Fix: the banner's outer box is 16px larger than its card on every side, and

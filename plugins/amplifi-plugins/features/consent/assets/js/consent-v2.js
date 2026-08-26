@@ -724,9 +724,16 @@
     if (bannerSpacer.parentNode !== document.body) {
       document.body.appendChild(bannerSpacer);
     }
-    // h-1: the banner covers the band, and the spare pixel absorbs the rounding
-    // in Math.ceil so no sliver of it can peek above the banner's top edge.
-    var target = Math.max(0, h - 1);
+    // h + 1: the band must be at least the banner's true fractional height, or
+    // the last content sits fractionally under it. Math.ceil already rounds up,
+    // and the extra pixel covers device-pixel-ratio rounding on fractional-DPR
+    // displays (1.25/1.5/2.75), where a band sized to the CSS-pixel height can
+    // still land a sub-pixel short. Measured on production at true max scroll,
+    // desktop and mobile: zero overlap between the banner's top edge and the
+    // opt-out row, and both controls hit-test as themselves at their bottom
+    // edge. The spare pixel is never visible - the banner's frame paints over
+    // it (see consent-v4.css) rather than leaving it clear.
+    var target = Math.max(0, Math.ceil(h) + 1);
     if (parseInt(bannerSpacer.style.height, 10) !== target) {
       bannerSpacer.style.setProperty('height', target + 'px', 'important');
     }
