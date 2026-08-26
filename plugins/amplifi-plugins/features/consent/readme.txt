@@ -4,7 +4,7 @@ Tags: cookie consent, gdpr, ccpa, privacy, consent log, gpc, consent mode
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.3.5
+Stable tag: 3.3.6
 License: MIT
 
 Cookie consent that withholds your tracking scripts until consent, keeps a best-effort server-side record of each choice, honors GPC, and can auto-block unmanaged trackers.
@@ -129,6 +129,19 @@ excludes tracker hosts at the server. These are known limitations of every
 JavaScript-based consent blocker, not specific to this plugin.
 
 == Changelog ==
+
+= 3.3.6 =
+* Fix: the banner's outer box is 16px larger than its card on every side, and
+  that frame was fully transparent — so whatever sat at the end of the document
+  showed through it. Because the room reserved behind the banner is deliberately
+  blank, on a dark-footer site the frame rendered as a pale halo around the card,
+  measured at RGB ~246 against a black footer (~239 on mobile). Earlier releases
+  did not catch this because a hit test reports the banner as covering that area:
+  the element is there, it simply was not painting. The frame is now
+  backdrop-blurred, which ties it to whatever is genuinely behind it on light and
+  dark themes alike, with a neutral scrim fallback where backdrop-filter is
+  unsupported. This is the actual seam the previous three releases were trying to
+  hide by colouring the reserved band instead.
 
 = 3.3.5 =
 * Fix: the reserved room no longer tries to match the page's colour, because it

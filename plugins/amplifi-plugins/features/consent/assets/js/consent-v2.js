@@ -613,18 +613,22 @@
   // the document, one pixel shorter than the banner. The document then scrolls
   // that much further and the real content clears the banner.
   //
-  // Why transparent is not just acceptable but CORRECT — and why this file
-  // previously got it wrong twice:
+  // Why the band is transparent and needs no colour — and why this file got it
+  // wrong three times before:
   //
-  //   The reserved band occupies exactly the region a bottom-fixed banner
-  //   covers. Scrolled to the end of the document the banner is painted over
-  //   all of it, so the band's own colour is never visible. Sizing it h-1
-  //   rather than h absorbs the sub-pixel rounding in Math.ceil, so not even a
-  //   1px sliver escapes. Verified by hit-testing across banner heights of
-  //   120/243/302/500px at four viewports: no exposed band pixel in any case
-  //   where a reservation is needed at all.
+  //   The band occupies the region the banner sits over. The banner's CARD is
+  //   opaque, and its 16px frame is backdrop-blurred (consent-v4.css), so the
+  //   band is either covered outright or shows only as blur behind a control
+  //   the visitor is already looking at. Sizing it h-1 rather than h absorbs
+  //   the rounding in Math.ceil so no sliver escapes above the banner's edge.
   //
-  //   Two earlier attempts tried to make the band MATCH the page instead.
+  //   NOTE the frame matters: while `.acconsent-banner` was fully transparent,
+  //   a blank band DID show through it as a pale halo around the card —
+  //   measured RGB ~246 against a black footer on asctmprd. Anything that makes
+  //   that frame clear again reintroduces the seam, so the blur is load-bearing,
+  //   not decoration.
+  //
+  //   Three earlier attempts tried to make the band MATCH the page instead.
   //   3.3.2 used `padding-bottom` on <body>: padding is inside the body box, so
   //   the band was painted by the body background — which CSS propagates to the
   //   canvas — and darkening it to hide a seam repainted the canvas behind
@@ -638,9 +642,9 @@
   //   or a cloneNode can each corrupt, and it still mis-painted under
   //   background-clip:content-box or a narrower-than-viewport host.
   //
-  //   All three were solving a problem that does not exist. Nothing needs to
-  //   match, because nothing is seen. This version therefore samples no colour,
-  //   touches no element it does not own, and needs no verification step.
+  //   Every one of those tried to colour OUR element to hide a gap in THEIR
+  //   element. Fixing the banner's own frame removes the gap at source, so the
+  //   band samples no colour and touches nothing it does not own.
   var bannerSpacer = null;   // the reservation; always transparent
   var bannerRO = null;       // ResizeObserver on the live banner
 
