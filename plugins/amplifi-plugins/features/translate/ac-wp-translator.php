@@ -134,6 +134,25 @@ function acwpt_init() {
 	}
 }
 
+/**
+ * Custom cron interval for the preload watchdog.
+ *
+ * WordPress ships hourly/twicedaily/daily. An hour is far too coarse for
+ * resuming a stalled preload — a broken chain would idle for up to an hour
+ * before anything noticed.
+ */
+add_filter( 'cron_schedules', 'acwpt_cron_schedules' );
+
+function acwpt_cron_schedules( $schedules ) {
+	if ( ! isset( $schedules['acwpt_five_minutes'] ) ) {
+		$schedules['acwpt_five_minutes'] = array(
+			'interval' => 300,
+			'display'  => 'Every 5 minutes (amplifi.translate)',
+		);
+	}
+	return $schedules;
+}
+
 // Register a nav menu location so Appearance > Menus is available (even in block themes).
 add_action( 'after_setup_theme', 'acwpt_register_nav_menus', 20 );
 
@@ -266,5 +285,11 @@ function acwpt_activate() {
 register_deactivation_hook( __FILE__, 'acwpt_deactivate' );
 
 function acwpt_deactivate() {
+	// Leave no orphaned schedules behind: a recurring watchdog that outlives the
+	// feature would keep firing against classes that are no longer loaded.
+	wp_clear_scheduled_hook( 'acwpt_preload_watchdog' );
+	wp_clear_scheduled_hook( 'acwpt_process_preload_batch' );
+	wp_clear_scheduled_hook( 'acwpt_process_string_queue' );
+
 	flush_rewrite_rules();
 }

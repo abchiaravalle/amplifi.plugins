@@ -24,6 +24,7 @@ class ACWPT_String_Queue {
 
 	const QUEUE_OPTION_PREFIX = 'acwpt_string_queue_';
 	const LOCK_KEY            = 'acwpt_string_queue_lock';
+	const LOCK_STAMP_OPTION   = 'acwpt_string_queue_lock_at';
 	const CRON_HOOK           = 'acwpt_process_string_queue';
 
 	/** Max strings pulled from the queue per worker pass. */
@@ -110,10 +111,22 @@ class ACWPT_String_Queue {
 	public static function process( $only_language = null ) {
 		$summary = array( 'translated' => 0, 'failed' => 0, 'remaining' => 0 );
 
-		if ( get_transient( self::LOCK_KEY ) ) {
-			return $summary;
+		// A worker killed mid-batch (dropped connection, PHP fatal, deploy)
+		// leaves the lock set. Without this the queue would stay frozen until
+		// the transient expired — and on a site with a persistent object cache
+		// that can outlive the request that set it.
+		$lock = get_transient( self::LOCK_KEY );
+		if ( $lock ) {
+			$held_since = (int) get_option( self::LOCK_STAMP_OPTION, 0 );
+			if ( $held_since && ( time() - $held_since ) > 300 ) {
+				delete_transient( self::LOCK_KEY );
+			} else {
+				return $summary;
+			}
 		}
+
 		set_transient( self::LOCK_KEY, 1, 120 );
+		update_option( self::LOCK_STAMP_OPTION, time(), false );
 
 		$languages = $only_language
 			? array( $only_language )

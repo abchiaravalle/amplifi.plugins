@@ -20,6 +20,7 @@ class ACWPT_Preloader {
 	const STATUS_OPTION = 'acwpt_preload_status';
 	const LOCK_KEY      = 'acwpt_preload_lock';
 	const CRON_HOOK     = 'acwpt_process_preload_batch';
+	const WATCHDOG_HOOK = 'acwpt_preload_watchdog';
 	const BATCH_SIZE    = 3;
 
 	/**
@@ -27,6 +28,59 @@ class ACWPT_Preloader {
 	 */
 	public static function register() {
 		add_action( self::CRON_HOOK, array( 'ACWPT_Preloader', 'process_batch' ) );
+		add_action( self::WATCHDOG_HOOK, array( 'ACWPT_Preloader', 'watchdog' ) );
+		self::ensure_watchdog();
+	}
+
+	/**
+	 * Keep a recurring watchdog scheduled.
+	 *
+	 * The batch chain is self-continuing: each run schedules the next while work
+	 * remains. But that chain is a single thread of causality — if one link is
+	 * lost (a spawn request that never lands, a PHP fatal mid-batch, a deploy or
+	 * host restart between ticks, an object-cache flush that drops the scheduled
+	 * event) the queue simply stops, silently, with no error and no retry.
+	 *
+	 * A long preload must not depend on an unbroken chain, and must never depend
+	 * on an operator's terminal staying connected. This watchdog re-arms the
+	 * chain from a recurring event, so the run resumes on its own.
+	 */
+	public static function ensure_watchdog() {
+		if ( ! wp_next_scheduled( self::WATCHDOG_HOOK ) ) {
+			wp_schedule_event( time() + 60, 'acwpt_five_minutes', self::WATCHDOG_HOOK );
+		}
+	}
+
+	/**
+	 * Resume a stalled run.
+	 *
+	 * Fires on a schedule regardless of what the batch chain is doing. If there
+	 * is queued work but no batch pending, the chain is broken — restart it.
+	 */
+	public static function watchdog() {
+		$queue = get_option( self::QUEUE_OPTION, array() );
+
+		// Post queue stalled?
+		if ( ! empty( $queue ) && ! wp_next_scheduled( self::CRON_HOOK ) ) {
+			// A stale lock from a killed batch would block every future run.
+			$status = self::get_status();
+			$lock   = get_transient( self::LOCK_KEY );
+			if ( $lock && ! empty( $status['last_tick'] ) && ( time() - (int) $status['last_tick'] ) > 300 ) {
+				delete_transient( self::LOCK_KEY );
+			}
+			wp_schedule_single_event( time(), self::CRON_HOOK );
+			self::spawn();
+		}
+
+		// String queue stalled? Same reasoning, different queue.
+		if ( class_exists( 'ACWPT_String_Queue' ) && class_exists( 'ACWPT_Languages' ) ) {
+			foreach ( ACWPT_Languages::get_enabled_codes() as $lang ) {
+				if ( ACWPT_String_Queue::pending( $lang ) > 0 ) {
+					ACWPT_String_Queue::spawn();
+					break;
+				}
+			}
+		}
 	}
 
 	// =========================================================================
@@ -142,6 +196,10 @@ class ACWPT_Preloader {
 
 		$queue  = get_option( self::QUEUE_OPTION, array() );
 		$status = get_option( self::STATUS_OPTION, array() );
+
+		// Heartbeat: lets the watchdog tell "working" from "died holding the lock".
+		$status['last_tick'] = time();
+		update_option( self::STATUS_OPTION, $status, false );
 
 		if ( empty( $queue ) ) {
 			if ( ! empty( $status ) && empty( $status['finished_at'] ) ) {
