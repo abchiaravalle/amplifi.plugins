@@ -46,7 +46,7 @@ class ACWPT_Preloader {
 		}
 
 		$posts = get_posts( array(
-			'post_type'      => array( 'page', 'post' ),
+			'post_type'      => acwpt_post_types(),
 			'post_status'    => 'publish',
 			'posts_per_page' => -1,
 		) );
@@ -318,6 +318,69 @@ class ACWPT_Preloader {
 
 		$strings = (array) $m->invoke( $fe, $html );
 		return array_values( array_unique( array_filter( $strings ) ) );
+	}
+
+	/**
+	 * Translate ONE post into ONE language, warming both caches.
+	 *
+	 * Shared by the cron batch worker and the WP-CLI command so there is a
+	 * single definition of "preloaded" — warming post content alone leaves the
+	 * translated URL rendering source-language text for everything the page
+	 * builder and theme chrome contribute.
+	 *
+	 * @param WP_Post $post
+	 * @param string  $language
+	 * @param bool    $with_strings Also warm the rendered-page string cache.
+	 * @return array|WP_Error {post_cached:bool, strings:int}
+	 */
+	public static function preload_one( $post, $language, $with_strings = true ) {
+		if ( ! $post instanceof WP_Post ) {
+			$post = get_post( $post );
+		}
+		if ( ! $post ) {
+			return new WP_Error( 'no_post', 'Post not found.' );
+		}
+
+		$result = array( 'post_cached' => false, 'strings' => 0 );
+
+		$hash   = self::content_hash( $post );
+		$cached = ACWPT_Cache::get( $post->ID, $language );
+
+		if ( $cached && isset( $cached->content_hash ) && $cached->content_hash === $hash ) {
+			$result['post_cached'] = true;
+		} else {
+			$t = ACWPT_Translator::translate(
+				$post->post_title,
+				$post->post_content,
+				$post->post_excerpt,
+				$language
+			);
+
+			if ( is_wp_error( $t ) ) {
+				// A post-content failure must not abort the string pass: on
+				// page-builder sites almost all visible text comes from strings,
+				// so the page is still largely translatable without it.
+				error_log( 'ACWPT Preloader: post ' . $post->ID . ' -> ' . $language . ': ' . $t->get_error_message() );
+			} else {
+				ACWPT_Cache::set(
+					$post->ID,
+					$language,
+					$t['title'],
+					$t['content'],
+					$t['excerpt'],
+					$hash
+				);
+				$result['post_cached'] = true;
+			}
+		}
+
+		if ( $with_strings ) {
+			$status = array();
+			self::warm_page_strings( $post, $language, $status );
+			$result['strings'] = (int) ( $status['strings'] ?? 0 );
+		}
+
+		return $result;
 	}
 
 	/**

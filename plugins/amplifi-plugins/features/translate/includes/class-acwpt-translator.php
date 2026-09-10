@@ -57,7 +57,15 @@ class ACWPT_Translator {
 			$user_message .= "\n\n===EXCERPT===\n{$excerpt}";
 		}
 
-		$data = self::call_anthropic( $api_key, $model, $system_prompt, $user_message, 16000, 60 );
+		// Scale the timeout with the amount of text being translated. A fixed 60s
+		// was not enough for large page-builder posts: an 861KB rendered page
+		// failed with "cURL error 28: Operation timed out after 60001ms" on
+		// staging, leaving the post untranslated while its strings succeeded.
+		// Output is roughly proportional to input, so budget from source length.
+		$source_chars = strlen( $title ) + strlen( $content ) + strlen( $excerpt );
+		$timeout      = (int) max( 60, min( 300, ceil( $source_chars / 250 ) ) );
+
+		$data = self::call_anthropic( $api_key, $model, $system_prompt, $user_message, 16000, $timeout );
 		if ( is_wp_error( $data ) ) {
 			return $data;
 		}

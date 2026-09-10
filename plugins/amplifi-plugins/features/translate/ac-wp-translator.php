@@ -105,6 +105,7 @@ require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-translator.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-preloader.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-admin.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-frontend.php';
+require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-cli.php';
 
 // Register with the amplifi.studio framework.
 amplifi_register_plugin(
@@ -135,6 +136,99 @@ function acwpt_init() {
 
 // Register a nav menu location so Appearance > Menus is available (even in block themes).
 add_action( 'after_setup_theme', 'acwpt_register_nav_menus', 20 );
+
+/**
+ * Post types that should be translated, preloaded, and listed in the sitemap.
+ *
+ * Previously the preloader and the sitemap both hardcoded array('page','post'),
+ * which silently excluded every custom post type. On a site whose content lives
+ * in CPTs that meant most pages were never preloaded and never listed — 89 of
+ * 146 published items on the first site this was measured against.
+ *
+ * Defaults to every public, publicly-queryable post type (minus attachments).
+ * Override per-site via the `acwpt_post_types` filter, or via the
+ * `post_types` key in acwpt_settings.
+ *
+ * @return string[]
+ */
+function acwpt_post_types() {
+	$settings = get_option( 'acwpt_settings', array() );
+
+	if ( ! empty( $settings['post_types'] ) && is_array( $settings['post_types'] ) ) {
+		$types = array_values( array_filter( $settings['post_types'], 'post_type_exists' ) );
+	} else {
+		$types = array();
+		foreach ( get_post_types( array( 'public' => true ), 'objects' ) as $pt ) {
+			if ( 'attachment' === $pt->name ) {
+				continue;
+			}
+			// Skip types with no single view — nothing to translate at a URL.
+			if ( empty( $pt->publicly_queryable ) && empty( $pt->_builtin ) ) {
+				continue;
+			}
+			$types[] = $pt->name;
+		}
+	}
+
+	if ( empty( $types ) ) {
+		$types = array( 'page', 'post' );
+	}
+
+	/**
+	 * Filter the post types amplifi.translate operates on.
+	 *
+	 * @param string[] $types
+	 */
+	return apply_filters( 'acwpt_post_types', $types );
+}
+
+/**
+ * Should this post appear in the translated sitemap?
+ *
+ * Excludes content that must not be indexed regardless of language: password
+ * protected posts, anything flagged noindex by Yoast/RankMath/AIOSEO, and any
+ * post excluded via the `acwpt_sitemap_include_post` filter.
+ *
+ * @param WP_Post $post
+ * @return bool
+ */
+function acwpt_include_in_sitemap( $post ) {
+	$include = true;
+
+	if ( ! empty( $post->post_password ) ) {
+		$include = false;
+	}
+
+	// Yoast / AIOSEO store 1 for noindex; RankMath stores the robots array.
+	if ( $include ) {
+		$yoast = get_post_meta( $post->ID, '_yoast_wpseo_meta-robots-noindex', true );
+		if ( '1' === (string) $yoast ) {
+			$include = false;
+		}
+	}
+
+	if ( $include ) {
+		$rankmath = get_post_meta( $post->ID, 'rank_math_robots', true );
+		if ( is_array( $rankmath ) && in_array( 'noindex', $rankmath, true ) ) {
+			$include = false;
+		}
+	}
+
+	if ( $include ) {
+		$aioseo = get_post_meta( $post->ID, '_aioseo_robots_noindex', true );
+		if ( $aioseo ) {
+			$include = false;
+		}
+	}
+
+	/**
+	 * Filter whether a post is listed in the translated sitemap.
+	 *
+	 * @param bool    $include
+	 * @param WP_Post $post
+	 */
+	return (bool) apply_filters( 'acwpt_sitemap_include_post', $include, $post );
+}
 
 function acwpt_register_nav_menus() {
 	register_nav_menus( array(

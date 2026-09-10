@@ -1432,12 +1432,15 @@ class ACWPT_Frontend {
 		$home    = home_url();
 
 		$posts = get_posts( array(
-			'post_type'      => array( 'page', 'post' ),
+			'post_type'      => acwpt_post_types(),
 			'post_status'    => 'publish',
 			'posts_per_page' => -1,
 			'orderby'        => 'modified',
 			'order'          => 'DESC',
 		) );
+
+		// Drop anything that must not be indexed (password protected, noindex).
+		$posts = array_filter( $posts, 'acwpt_include_in_sitemap' );
 
 		$xml  = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
 		$xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"' . "\n";
