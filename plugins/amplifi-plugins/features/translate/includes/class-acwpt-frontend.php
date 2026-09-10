@@ -727,7 +727,7 @@ class ACWPT_Frontend {
 			return $m[0];
 		}
 		// Skip if it looks like code or a URL.
-		if ( preg_match( '/^https?:/', $text ) || preg_match( '/[{}()<>]/', $text ) ) {
+		if ( preg_match( '/^https?:/', $text ) || preg_match( '/[{}<>]/', $text ) ) {
 			return $m[0];
 		}
 		$translated = $this->get_string_translation( $text );
@@ -851,7 +851,7 @@ class ACWPT_Frontend {
 			foreach ( $m as $match ) {
 				$text = trim( $match[2] );
 				if ( strlen( $text ) >= 2 && ! preg_match( '/^[\d\s\.\-:\/]+$/', $text ) ) {
-					if ( ! preg_match( '/^https?:/', $text ) && ! preg_match( '/[{}()<>]/', $text ) ) {
+					if ( ! preg_match( '/^https?:/', $text ) && ! preg_match( '/[{}<>]/', $text ) ) {
 						$out[] = $text;
 					}
 				}
@@ -865,7 +865,7 @@ class ACWPT_Frontend {
 				if ( strlen( $text ) >= 2
 					&& ! preg_match( '/^[\d\s\.\-:\/\?!,]+$/', $text )
 					&& ! preg_match( '/^https?:/', $text )
-					&& ! preg_match( '/[{}()\[\]<>]/', $text ) ) {
+					&& ! preg_match( '/[{}<>]/', $text ) ) {
 					$out[] = $text;
 				}
 			}
@@ -878,7 +878,7 @@ class ACWPT_Frontend {
 				if ( strlen( $text ) >= 2
 					&& ! preg_match( '/^[\d\s\.\-:\/\?!,]+$/', $text )
 					&& ! preg_match( '/^https?:/', $text )
-					&& ! preg_match( '/[{}()\[\]<>]/', $text ) ) {
+					&& ! preg_match( '/[{}<>]/', $text ) ) {
 					$out[] = $text;
 				}
 			}
@@ -890,7 +890,7 @@ class ACWPT_Frontend {
 				if ( strlen( $text ) >= 2
 					&& ! preg_match( '/^[\d\s\.\-:\/\?!,]+$/', $text )
 					&& ! preg_match( '/^https?:/', $text )
-					&& ! preg_match( '/[{}()\[\]<>]/', $text ) ) {
+					&& ! preg_match( '/[{}<>]/', $text ) ) {
 					$out[] = $text;
 				}
 			}
@@ -940,7 +940,7 @@ class ACWPT_Frontend {
 				if ( strlen( $text ) < 2
 					|| preg_match( '/^[\d\s\.\-:\/\?!,]+$/', $text )
 					|| preg_match( '/^https?:/', $text )
-					|| preg_match( '/[{}()\[\]<>]/', $text ) ) {
+					|| preg_match( '/[{}<>]/', $text ) ) {
 					return $m[0];
 				}
 				$translated = $this->get_string_translation( $text );
@@ -960,7 +960,7 @@ class ACWPT_Frontend {
 				if ( strlen( $text ) < 2
 					|| preg_match( '/^[\d\s\.\-:\/\?!,]+$/', $text )
 					|| preg_match( '/^https?:/', $text )
-					|| preg_match( '/[{}()\[\]<>]/', $text ) ) {
+					|| preg_match( '/[{}<>]/', $text ) ) {
 					return $m[0];
 				}
 				$translated = $this->get_string_translation( $text );
@@ -980,7 +980,7 @@ class ACWPT_Frontend {
 				if ( strlen( $text ) < 2
 					|| preg_match( '/^[\d\s\.\-:\/\?!,]+$/', $text )
 					|| preg_match( '/^https?:/', $text )
-					|| preg_match( '/[{}()\[\]<>]/', $text ) ) {
+					|| preg_match( '/[{}<>]/', $text ) ) {
 					return $m[0];
 				}
 				$translated = $this->get_string_translation( $text );

@@ -105,12 +105,70 @@ class ACWPT_Glossary {
         }
 
         if ( $end === -1 ) {
-            return null;
+            return self::salvage_indexed_pairs( $text );
         }
 
         $json    = substr( $text, $start, $end - $start + 1 );
         $decoded = json_decode( $json, true );
-        return is_array( $decoded ) ? $decoded : null;
+        if ( is_array( $decoded ) ) {
+            return $decoded;
+        }
+
+        return self::salvage_indexed_pairs( $text );
+    }
+
+    /**
+     * Recover "index": "value" pairs from a malformed JSON response.
+     *
+     * Models occasionally emit a value containing an unescaped ASCII double
+     * quote — most often when they reach for typographic quotes and close with
+     * a plain one, e.g.
+     *
+     *     "10": "Złożona integracja automatyki „end to end""
+     *
+     * That terminates the JSON string early, so the brace-walk never balances
+     * and a strict decode of the whole object fails. Previously the entire
+     * batch was discarded and returned as a parse_error, throwing away up to 40
+     * translations that had already been paid for (observed on staging: one bad
+     * value at index 10 lost all 40).
+     *
+     * This recovers each pair independently, so a single malformed value costs
+     * only that value. Anything unrecoverable is simply absent from the result;
+     * the caller already falls back to the source string for missing indices.
+     *
+     * @param string $text Raw model output.
+     * @return array<string,string>|null
+     */
+    private static function salvage_indexed_pairs( $text ) {
+        if ( ! is_string( $text ) || '' === $text ) {
+            return null;
+        }
+
+        // Match "<digits>": "<value>" where the value runs to the last quote
+        // before the delimiter that ends the pair (a comma + next numeric key,
+        // or the closing brace). Non-greedy up to that boundary tolerates
+        // unescaped quotes inside the value.
+        $pattern = '/"(\d+)"\s*:\s*"(.*?)"\s*(?=,\s*"\d+"\s*:|\s*\}|\s*$)/s';
+
+        if ( ! preg_match_all( $pattern, $text, $matches, PREG_SET_ORDER ) ) {
+            return null;
+        }
+
+        $out = array();
+        foreach ( $matches as $m ) {
+            $value = $m[2];
+
+            // Undo standard JSON escapes that json_decode would have handled.
+            $value = str_replace(
+                array( '\\"', '\\\\', '\\n', '\\r', '\\t', '\\/' ),
+                array( '"', '\\', "\n", "\r", "\t", '/' ),
+                $value
+            );
+
+            $out[ $m[1] ] = $value;
+        }
+
+        return $out ? $out : null;
     }
 
     /**
