@@ -46,8 +46,26 @@ class ACWPT_Preloader {
 	 * chain from a recurring event, so the run resumes on its own.
 	 */
 	public static function ensure_watchdog() {
-		if ( ! wp_next_scheduled( self::WATCHDOG_HOOK ) ) {
-			wp_schedule_event( time() + 60, 'acwpt_five_minutes', self::WATCHDOG_HOOK );
+		$existing = wp_get_scheduled_event( self::WATCHDOG_HOOK );
+
+		// A non-recurring entry means wp_schedule_event() ran before the custom
+		// interval was registered and silently degraded to a one-shot. That
+		// watchdog fires once and then the site is unprotected again, which is
+		// worse than none because it looks scheduled.
+		if ( $existing && empty( $existing->schedule ) ) {
+			wp_clear_scheduled_hook( self::WATCHDOG_HOOK );
+			$existing = false;
+		}
+
+		if ( ! $existing ) {
+			$schedules = wp_get_schedules();
+			if ( isset( $schedules['acwpt_five_minutes'] ) ) {
+				wp_schedule_event( time() + 60, 'acwpt_five_minutes', self::WATCHDOG_HOOK );
+			} else {
+				// Interval not registered yet this request; fall back to hourly
+				// so the site is never left without a backstop.
+				wp_schedule_event( time() + 60, 'hourly', self::WATCHDOG_HOOK );
+			}
 		}
 	}
 
@@ -505,8 +523,13 @@ class ACWPT_Preloader {
 	}
 
 	private static function schedule_next() {
+		// Schedule slightly in the future, not at time(). An event timestamped
+		// "now" is consumed by the very cron run that spawned it, so the chain
+		// can appear to vanish: wp_next_scheduled() reports nothing pending
+		// while work remains. A small offset keeps the next link observable and
+		// leaves room for the current request to finish writing state.
 		if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
-			wp_schedule_single_event( time(), self::CRON_HOOK );
+			wp_schedule_single_event( time() + 30, self::CRON_HOOK );
 		}
 		self::spawn();
 	}
