@@ -263,49 +263,23 @@ class ACWPT_Frontend {
 			return;
 		}
 
-		// Prevent concurrent requests from all hitting the API for the same post+language.
-		// A second request in-flight will serve the source language rather than block.
-		$lock_key = 'acwpt_lock_' . $post->ID . '_' . $this->current_language;
-		if ( get_transient( $lock_key ) ) {
-			return;
+		// STALE-WHILE-REVALIDATE: never translate post content inside the
+		// visitor's request. This was a blocking call with a 60s timeout, so a
+		// cold page could exhaust the host gateway budget before rendering a
+		// single byte. Serve the source language now; queue the real translation.
+		//
+		// A stale cached row (content edited since it was translated) is still
+		// better than untranslated source, so it is used until the refresh lands.
+		if ( $cached ) {
+			$this->translations[ $post->ID ] = $cached;
 		}
-		set_transient( $lock_key, 1, 45 );
+
+		if ( class_exists( 'ACWPT_Preloader' ) ) {
+			ACWPT_Preloader::start_for_post( $post->ID );
+		}
 
 		if ( defined( 'ACWPT_DEBUG' ) && ACWPT_DEBUG ) {
-			error_log( 'ACWPT: Fetching translation for post ' . $post->ID . ' lang=' . $this->current_language );
-		}
-
-		$result = ACWPT_Translator::translate(
-			$post->post_title,
-			$post->post_content,
-			$post->post_excerpt,
-			$this->current_language
-		);
-
-		delete_transient( $lock_key );
-
-		if ( is_wp_error( $result ) ) {
-			error_log( 'ACWPT translation error for post ' . $post->ID . ': ' . $result->get_error_message() );
-			return;
-		}
-
-		ACWPT_Cache::set(
-			$post->ID,
-			$this->current_language,
-			$result['title'],
-			$result['content'],
-			$result['excerpt'],
-			$content_hash
-		);
-
-		$this->translations[ $post->ID ] = (object) array(
-			'translated_title'   => $result['title'],
-			'translated_content' => $result['content'],
-			'translated_excerpt' => $result['excerpt'],
-		);
-
-		if ( defined( 'ACWPT_DEBUG' ) && ACWPT_DEBUG ) {
-			error_log( 'ACWPT: Cached new translation for post ' . $post->ID . ' lang=' . $this->current_language );
+			error_log( 'ACWPT: post ' . $post->ID . ' lang=' . $this->current_language . ' not cached — queued for background translation' );
 		}
 	}
 
@@ -314,33 +288,41 @@ class ACWPT_Frontend {
 	// =========================================================================
 
 	/**
-	 * Save the string cache to the database, capping at 500 entries to prevent unbounded growth.
-	 * Preserves the _populated_at timestamp across trims.
+	 * Persist string translations to the unbounded store.
 	 */
 	private function save_string_cache( $cache ) {
 		$populated_at = isset( $cache['_populated_at'] ) ? $cache['_populated_at'] : null;
 		unset( $cache['_populated_at'] );
 
-		if ( count( $cache ) > 500 ) {
-			$cache = array_slice( $cache, -500, null, true );
+		// Persist to the unbounded string store. The previous implementation kept
+		// everything in a single option capped at 500 entries, which silently
+		// evicted (and later re-billed) the oldest strings on any real site.
+		if ( $cache ) {
+			ACWPT_String_Store::set_many( $this->current_language, $cache );
 		}
 
 		if ( null !== $populated_at ) {
 			$cache['_populated_at'] = $populated_at;
+			update_option( 'acwpt_strings_meta_' . $this->current_language, array( '_populated_at' => $populated_at ), false );
 		}
 
 		$this->string_cache = $cache;
-		update_option( 'acwpt_strings_' . $this->current_language, $cache, false );
 	}
 
 	/**
 	 * Load the string translation cache for the current language.
+	 *
+	 * Reads are now served per-string from ACWPT_String_Store, so this holds only
+	 * the strings already resolved during THIS request rather than the whole site's
+	 * translation set.
 	 */
 	private function load_string_cache() {
 		if ( null === $this->string_cache ) {
-			$this->string_cache = get_option( 'acwpt_strings_' . $this->current_language, array() );
-			if ( ! is_array( $this->string_cache ) ) {
-				$this->string_cache = array();
+			$this->string_cache = array();
+
+			$meta = get_option( 'acwpt_strings_meta_' . $this->current_language, array() );
+			if ( is_array( $meta ) && isset( $meta['_populated_at'] ) ) {
+				$this->string_cache['_populated_at'] = (int) $meta['_populated_at'];
 			}
 		}
 		return $this->string_cache;
@@ -351,7 +333,17 @@ class ACWPT_Frontend {
 	 */
 	private function get_string_translation( $original ) {
 		$cache = $this->load_string_cache();
-		return isset( $cache[ $original ] ) ? $cache[ $original ] : null;
+		if ( isset( $cache[ $original ] ) ) {
+			return $cache[ $original ];
+		}
+
+		$hit = ACWPT_String_Store::get( $this->current_language, $original );
+		if ( null !== $hit ) {
+			$this->string_cache[ $original ] = $hit;
+			return $hit;
+		}
+
+		return null;
 	}
 
 	/**
@@ -428,14 +420,22 @@ class ACWPT_Frontend {
 		$strings_needed = array_unique( array_filter( $strings_needed ) );
 
 		if ( ! empty( $strings_needed ) ) {
-			$translated = ACWPT_Translator::translate_strings( $strings_needed, $this->current_language );
+			// Resolve from the store, then defer any misses. This runs on `wp`,
+			// inside the visitor's request, so it must never call the API.
+			$found = ACWPT_String_Store::get_many( $this->current_language, array_values( $strings_needed ) );
+			foreach ( $found as $source => $target ) {
+				$cache[ $source ] = $target;
+			}
 
-			if ( is_wp_error( $translated ) ) {
-				error_log( 'ACWPT string translation error: ' . $translated->get_error_message() );
-			} else {
-				foreach ( $translated as $original => $trans ) {
-					$cache[ $original ] = $trans;
+			$missing = array();
+			foreach ( $strings_needed as $s ) {
+				if ( ! isset( $found[ $s ] ) ) {
+					$missing[] = $s;
 				}
+			}
+
+			if ( $missing ) {
+				ACWPT_String_Queue::enqueue( $this->current_language, $missing );
 			}
 		}
 
@@ -450,7 +450,10 @@ class ACWPT_Frontend {
 	public function clear_all_string_caches() {
 		$enabled = ACWPT_Languages::get_enabled_codes();
 		foreach ( $enabled as $code ) {
-			delete_option( 'acwpt_strings_' . $code );
+			delete_option( 'acwpt_strings_' . $code );        // legacy option store
+			delete_option( 'acwpt_strings_meta_' . $code );   // populated-at marker
+			ACWPT_String_Store::flush( $code );
+			ACWPT_String_Queue::clear( $code );
 		}
 		$this->string_cache = null;
 	}
@@ -610,10 +613,9 @@ class ACWPT_Frontend {
 		$result = $this->translate_meta_tags( $html );
 		$html   = $result !== null ? $result : $html;
 
-		// 2. Ensure all visible strings in the full page HTML are cached, then
-		//    translate in one pass — covers nav, header, footer, sections, divs, etc.
-		//    This replaces separate per-section passes; no duplicative API calls since
-		//    ensure_strings_cached_for_html() batches any missing strings first.
+		// 2. Resolve visible strings from the store; queue misses for background
+		//    translation. This no longer calls the API inline — see
+		//    ensure_strings_cached_for_html() for why.
 		$this->ensure_strings_cached_for_html( $html );
 		$result = $this->translate_html_blob( $html );
 		$html   = $result !== null ? $result : $html;
@@ -630,7 +632,41 @@ class ACWPT_Frontend {
 			$html = str_replace( $placeholder, $link, $html );
 		}
 
+		// 5. Decide cacheability. A partially-translated page must NOT be cached,
+		//    or the untranslated source text is frozen in the edge cache until the
+		//    TTL expires. Only fully-resolved pages are marked cacheable.
+		$this->mark_page_cacheability( $html );
+
 		return $html;
+	}
+
+	/**
+	 * Emit caching headers for a translated page.
+	 *
+	 * Translated URLs are real URLs backed by real rewrite rules, so once a page
+	 * is fully translated the host and CDN can cache it like any other page. Until
+	 * then it is explicitly marked no-store so a half-English render cannot stick.
+	 *
+	 * @param string $html Final page HTML.
+	 */
+	private function mark_page_cacheability( $html ) {
+		if ( headers_sent() ) {
+			return;
+		}
+
+		$pending = ACWPT_String_Queue::pending( $this->current_language );
+		$full    = ( 0 === $pending ) && $this->page_fully_translated( $html );
+
+		if ( $full ) {
+			header( 'X-ACWPT-Cacheable: 1', true );
+			header( 'X-ACWPT-Translation: complete', true );
+			return;
+		}
+
+		header( 'X-ACWPT-Cacheable: 0', true );
+		header( 'X-ACWPT-Translation: partial', true );
+		// Keep the edge from freezing a partially translated render.
+		header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0', true );
 	}
 
 	/**
@@ -656,14 +692,9 @@ class ACWPT_Frontend {
 			$original   = html_entity_decode( $cm[1], ENT_QUOTES, 'UTF-8' );
 			$translated = $this->get_string_translation( $original );
 			if ( ! $translated ) {
-				// Translate on the fly if not cached.
-				$result = ACWPT_Translator::translate_strings( array( $original ), $this->current_language );
-				if ( ! is_wp_error( $result ) && isset( $result[ $original ] ) ) {
-					$translated = $result[ $original ];
-					$cache      = $this->load_string_cache();
-					$cache[ $original ] = $translated;
-					$this->save_string_cache( $cache );
-				}
+				// Defer: a synchronous per-tag API call here added up to six more
+				// blocking round-trips to every cold page render.
+				ACWPT_String_Queue::enqueue( $this->current_language, array( $original ) );
 			}
 			if ( $translated && $translated !== $original ) {
 				$tag = str_replace( $cm[1], esc_attr( $translated ), $tag );
@@ -722,33 +753,83 @@ class ACWPT_Frontend {
 	}
 
 	/**
-	 * Extract translatable strings from HTML and batch-translate any missing; update string cache.
+	 * Resolve every translatable string in the page against the store, and hand
+	 * anything still missing to the background queue.
+	 *
+	 * STALE-WHILE-REVALIDATE: this method never calls the translation API. It
+	 * previously issued one synchronous API call per 40 missing strings while the
+	 * visitor's request was held open, which on a page with a few hundred
+	 * untranslated strings exceeded the host gateway timeout and returned a 502
+	 * (measured: 6 sequential calls, 54s, against WP Engine's 60s ceiling).
+	 *
+	 * The first view of a cold page now renders the source language for whatever
+	 * is not yet translated and completes in normal page-load time; the queue
+	 * fills in the rest for subsequent views.
+	 *
+	 * @param string $html Full page HTML.
 	 */
 	private function ensure_strings_cached_for_html( $html ) {
-		$cache = $this->load_string_cache();
 		$strings = $this->extract_translatable_strings_from_html( $html );
-		$to_translate = array();
-		foreach ( $strings as $s ) {
-			if ( ! isset( $cache[ $s ] ) ) {
-				$to_translate[] = $s;
-			}
-		}
-		if ( empty( $to_translate ) ) {
+		if ( empty( $strings ) ) {
 			return;
 		}
-		// Chunk to avoid oversized API requests (e.g. 40 strings per batch).
-		$chunk_size = 40;
-		$chunks = array_chunk( array_unique( $to_translate ), $chunk_size );
-		foreach ( $chunks as $chunk ) {
-			$translated = ACWPT_Translator::translate_strings( $chunk, $this->current_language );
-			if ( is_wp_error( $translated ) ) {
-				continue;
-			}
-			foreach ( $translated as $orig => $trans ) {
-				$cache[ $orig ] = $trans;
+
+		$strings = array_values( array_unique( $strings ) );
+
+		// One indexed query for the whole page instead of an option blob.
+		$found = ACWPT_String_Store::get_many( $this->current_language, $strings );
+
+		$cache = $this->load_string_cache();
+		foreach ( $found as $source => $target ) {
+			$cache[ $source ] = $target;
+		}
+		$this->string_cache = $cache;
+
+		$missing = array();
+		foreach ( $strings as $s ) {
+			if ( ! isset( $found[ $s ] ) ) {
+				$missing[] = $s;
 			}
 		}
-		$this->save_string_cache( $cache );
+
+		if ( empty( $missing ) ) {
+			return;
+		}
+
+		// Defer. Never block the visitor on an API call.
+		ACWPT_String_Queue::enqueue( $this->current_language, $missing );
+
+		if ( defined( 'ACWPT_DEBUG' ) && ACWPT_DEBUG ) {
+			error_log( sprintf(
+				'ACWPT: %d/%d strings cached for %s; %d queued for background translation.',
+				count( $found ),
+				count( $strings ),
+				$this->current_language,
+				count( $missing )
+			) );
+		}
+	}
+
+	/**
+	 * Is this page fully translated?
+	 *
+	 * Used to decide whether the response may be cached by the host/CDN. Caching a
+	 * partially-translated page would freeze the untranslated source text in place
+	 * until the cache expired, so only fully-resolved pages are cacheable.
+	 *
+	 * @param string $html Full page HTML.
+	 * @return bool
+	 */
+	private function page_fully_translated( $html ) {
+		$strings = $this->extract_translatable_strings_from_html( $html );
+		if ( empty( $strings ) ) {
+			return true;
+		}
+
+		$strings = array_values( array_unique( $strings ) );
+		$found   = ACWPT_String_Store::get_many( $this->current_language, $strings );
+
+		return count( $found ) >= count( $strings );
 	}
 
 	/**

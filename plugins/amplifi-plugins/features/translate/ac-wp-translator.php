@@ -97,6 +97,8 @@ require_once ACWPT_PLUGIN_DIR . 'includes/amplifi-framework.php';
 
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-languages.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-cache.php';
+require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-string-store.php';
+require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-string-queue.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-glossary.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-prompts.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-translator.php';
@@ -118,7 +120,12 @@ amplifi_register_plugin(
 add_action( 'plugins_loaded', 'acwpt_init', 1 );
 
 function acwpt_init() {
+	// Self-heal the string-store schema and back-fill from the legacy capped
+	// options. Cheap: short-circuits on a single option read once installed.
+	ACWPT_String_Store::maybe_install();
+
 	ACWPT_Preloader::register();
+	ACWPT_String_Queue::register();
 	ACWPT_Frontend::instance()->init();
 
 	if ( is_admin() ) {
@@ -140,6 +147,8 @@ register_activation_hook( __FILE__, 'acwpt_activate' );
 
 function acwpt_activate() {
 	ACWPT_Cache::create_table();
+	ACWPT_String_Store::create_table();
+	ACWPT_String_Store::migrate_from_options();
 
 	$defaults = array(
 		'api_key'            => '',

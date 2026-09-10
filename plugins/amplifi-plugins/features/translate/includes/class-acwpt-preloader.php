@@ -185,6 +185,18 @@ class ACWPT_Preloader {
 						);
 						$status['completed'] = ( $status['completed'] ?? 0 ) + 1;
 					}
+
+					// Warm the STRING cache for this post's rendered page.
+					//
+					// Post-level translation alone is not enough: a page-builder
+					// site keeps most of its visible text outside post_content
+					// (Elementor widget data, nav, header/footer chrome), and that
+					// text is translated from the RENDERED html by the string
+					// pipeline. Without this pass the preloader reports every post
+					// complete while the translated URL still renders source-
+					// language text and — on a cold page — blocks long enough to
+					// trip the host gateway timeout.
+					self::warm_page_strings( $post, $item['language'], $status );
 				}
 			} catch ( \Throwable $e ) {
 				error_log( 'ACWPT Preloader: exception translating post ' . ( $item['post_id'] ?? '?' ) . ' → ' . ( $item['language'] ?? '?' ) . ': ' . $e->getMessage() );
@@ -212,6 +224,101 @@ class ACWPT_Preloader {
 	// =========================================================================
 	// Status / Control
 	// =========================================================================
+
+	/**
+	 * Fetch a post's rendered page and translate every string in it that is not
+	 * already stored. Runs in the background (cron / CLI), so it is allowed to
+	 * make blocking API calls — unlike the front-end path.
+	 *
+	 * @param WP_Post $post     The source post.
+	 * @param string  $language Target language code.
+	 * @param array   $status   Status record, updated by reference.
+	 */
+	private static function warm_page_strings( $post, $language, &$status ) {
+		if ( ! class_exists( 'ACWPT_String_Store' ) || ! class_exists( 'ACWPT_Frontend' ) ) {
+			return;
+		}
+
+		$url = get_permalink( $post );
+		if ( ! $url ) {
+			return;
+		}
+
+		$resp = wp_remote_get(
+			$url,
+			array(
+				'timeout'   => 60,
+				'sslverify' => false,
+				// Marker so a site can identify (and skip logging) warm-up hits.
+				'headers'   => array( 'X-ACWPT-Preload' => '1' ),
+			)
+		);
+
+		if ( is_wp_error( $resp ) ) {
+			error_log( 'ACWPT Preloader: could not fetch ' . $url . ' — ' . $resp->get_error_message() );
+			return;
+		}
+
+		$html = wp_remote_retrieve_body( $resp );
+		if ( '' === $html ) {
+			return;
+		}
+
+		$strings = self::extract_strings( $html );
+		if ( empty( $strings ) ) {
+			return;
+		}
+
+		$missing = ACWPT_String_Store::missing( $language, $strings );
+		if ( empty( $missing ) ) {
+			return;
+		}
+
+		foreach ( array_chunk( $missing, 40 ) as $chunk ) {
+			$translated = ACWPT_Translator::translate_strings( $chunk, $language );
+			if ( is_wp_error( $translated ) ) {
+				error_log( 'ACWPT Preloader: string batch failed for ' . $language . ' — ' . $translated->get_error_message() );
+				break;
+			}
+
+			$pairs = array();
+			foreach ( $translated as $source => $target ) {
+				// An unchanged value is a legitimate non-translation (brand name,
+				// number); storing it would cache a non-translation as a result.
+				if ( is_string( $target ) && '' !== $target && $target !== $source ) {
+					$pairs[ $source ] = $target;
+				}
+			}
+
+			if ( $pairs ) {
+				ACWPT_String_Store::set_many( $language, $pairs );
+				$status['strings'] = ( $status['strings'] ?? 0 ) + count( $pairs );
+			}
+		}
+	}
+
+	/**
+	 * Reuse the frontend's extraction rules so the preloader and the renderer
+	 * always agree on what counts as a translatable string. Duplicating the
+	 * patterns here would let the two drift apart silently.
+	 *
+	 * @param string $html
+	 * @return string[]
+	 */
+	private static function extract_strings( $html ) {
+		$fe  = ACWPT_Frontend::instance();
+		$ref = new ReflectionClass( 'ACWPT_Frontend' );
+
+		if ( ! $ref->hasMethod( 'extract_translatable_strings_from_html' ) ) {
+			return array();
+		}
+
+		$m = $ref->getMethod( 'extract_translatable_strings_from_html' );
+		$m->setAccessible( true );
+
+		$strings = (array) $m->invoke( $fe, $html );
+		return array_values( array_unique( array_filter( $strings ) ) );
+	}
 
 	/**
 	 * @return array|null Status record, or null if no run has ever been started.
