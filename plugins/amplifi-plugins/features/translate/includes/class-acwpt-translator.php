@@ -118,13 +118,17 @@ class ACWPT_Translator {
 		$system_prompt = ACWPT_Prompts::build_strings_prompt( $language, $custom );
 		$user_message  = wp_json_encode( $indexed, JSON_UNESCAPED_UNICODE );
 
-		// Scale the timeout with batch size. A fixed 30s was enough for the
-		// 40-string production batches but times out on larger ones: measured
-		// on staging, a 48-string batch takes 25-30s on Haiku and consistently
-		// exceeded 30s on Sonnet, failing 6 of 20 review runs with cURL 28.
-		// Output length tracks input length, so budget from the source.
-		$source_chars = strlen( $user_message );
-		$timeout      = (int) max( 30, min( 180, ceil( $source_chars / 120 ) ) );
+		// Budget the timeout from the WHOLE request, not just the payload.
+		//
+		// Sizing on the user message alone was wrong: 20 short strings is ~2,000
+		// chars, which floored the timeout at 30s — while the system prompt had
+		// grown past 10,000 chars as language packs accumulated guidance rules,
+		// and agglutinative targets like Turkish expand output well beyond the
+		// input. Turkish timed out on three separate runs at that floor. The
+		// request is already billed server-side when we hang up, so a short
+		// timeout wastes money AND loses the result.
+		$request_chars = strlen( $user_message ) + strlen( $system_prompt );
+		$timeout       = (int) max( 90, min( 240, ceil( $request_chars / 90 ) ) );
 
 		$data = self::call_anthropic( $api_key, $model, $system_prompt, $user_message, 8192, $timeout );
 		if ( is_wp_error( $data ) ) {
