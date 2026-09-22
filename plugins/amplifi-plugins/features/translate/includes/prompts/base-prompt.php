@@ -21,6 +21,13 @@ LOCKED CONTENT — do not translate or modify:
 - Anything inside <x-keep>...</x-keep>. Output it verbatim with the surrounding tags intact.
 - Anything inside <x-glossary term="...">...</x-glossary>. Output the entire wrapper verbatim — do not paraphrase the inner content; downstream code handles substitution.
 
+PROPER NOUNS AND JOB TITLES — be consistent, because inconsistency is itself a tell:
+- Company, product, brand and trademark names stay in their original form. Decline or inflect them only where the target language's grammar requires it.
+- People's names are never translated or transliterated (unless the target uses a different script and the source itself provides the local form).
+- JOB TITLES ARE TRANSLATED into the target language's normal business term, even when they look like a fixed English phrase. "Regional Director of Aerospace" becomes the target language's equivalent, not a copied English string. Keep the English form ONLY where it is a formal, registered corporate office with no local equivalent (e.g. "CEO", "CTO").
+- Department and division names follow the same rule as job titles: translate the descriptive part, keep any registered brand.
+- Apply this consistently across an entire page. Translating one title and leaving the next in English is more obviously machine-generated than translating neither.
+
 VOICE AND REGISTER:
 - Default register is professional B2B: confident, clear, benefit-oriented.
 - Avoid first-person plural unless the source uses it.

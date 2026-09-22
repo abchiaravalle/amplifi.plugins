@@ -729,13 +729,13 @@ class ACWPT_Frontend {
 	 * Callback: translate the text inside a link.
 	 */
 	public function translate_link_text_callback( $m ) {
-		$text = trim( $m[2] );
+		$text = $this->normalize_candidate( $m[2] );
 		if ( strlen( $text ) < 2 || preg_match( '/^[\d\s\.\-:\/]+$/', $text ) ) {
 			return $m[0];
 		}
 		$translated = $this->get_string_translation( $text );
 		if ( $translated ) {
-			return $m[1] . str_replace( $text, $translated, $m[2] ) . $m[3];
+			return $m[1] . $translated . $m[3];
 		}
 		return $m[0];
 	}
@@ -744,7 +744,8 @@ class ACWPT_Frontend {
 	 * Callback: translate text inside an element.
 	 */
 	public function translate_element_text_callback( $m ) {
-		$text = trim( $m[2] );
+		$raw  = $m[2];
+		$text = $this->normalize_candidate( $raw );
 		if ( strlen( $text ) < 2 || preg_match( '/^[\d\s\.\-:\/]+$/', $text ) ) {
 			return $m[0];
 		}
@@ -754,7 +755,9 @@ class ACWPT_Frontend {
 		}
 		$translated = $this->get_string_translation( $text );
 		if ( $translated ) {
-			return $m[1] . str_replace( $text, $translated, $m[2] ) . $m[3];
+			// Replace the RAW matched text, not the normalised key: the source
+			// may carry entities or padding that must not survive substitution.
+			return $m[1] . $translated . $m[3];
 		}
 		return $m[0];
 	}
@@ -855,6 +858,31 @@ class ACWPT_Frontend {
 	}
 
 	/**
+	 * Normalise a candidate string lifted out of raw HTML.
+	 *
+	 * Entities must be decoded BEFORE the text reaches the model. The extractors
+	 * were inconsistent: the leading/trailing-text passes decoded, but the two
+	 * main ones (link text and block elements) did not, so strings like
+	 * "Actuation &amp; landing gear test" were sent escaped. The model
+	 * faithfully preserves the entity, it gets stored that way, and the page
+	 * renders a literal "&amp;". Measured on the review set: 9 outputs across
+	 * 5 language/model pairs carried &amp; or &#8211; straight through.
+	 *
+	 * Decoding here also means the store is keyed on the decoded form, so the
+	 * same visible sentence is one cache entry rather than several.
+	 *
+	 * @param string $text Raw inner text from the HTML.
+	 * @return string
+	 */
+	private function normalize_candidate( $text ) {
+		$text = html_entity_decode( $text, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		// Collapse the whitespace a page builder leaves between tags; a string
+		// differing only by indentation must not become a second cache entry.
+		$text = preg_replace( '/\s+/u', ' ', $text );
+		return trim( (string) $text );
+	}
+
+	/**
 	 * Extract text from links and common block elements (for translation collection).
 	 */
 	private function extract_translatable_strings_from_html( $html ) {
@@ -862,7 +890,7 @@ class ACWPT_Frontend {
 		// Link text.
 		if ( preg_match_all( '/(<a\b[^>]*>)([^<]+)(<\/a>)/i', $html, $m, PREG_SET_ORDER ) ) {
 			foreach ( $m as $match ) {
-				$text = trim( $match[2] );
+				$text = $this->normalize_candidate( $match[2] );
 				if ( strlen( $text ) >= 2 && ! preg_match( '/^[\d\s\.\-:\/]+$/', $text ) ) {
 					$out[] = $text;
 				}
@@ -871,7 +899,7 @@ class ACWPT_Frontend {
 		// Block/text elements (p, span, div, headings, li, td, th, label, figcaption, button, strong, em, b, dt, dd, blockquote, cite, caption).
 		if ( preg_match_all( '/(<(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)\b[^>]*>)([^<]{2,})(<\/(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)>)/i', $html, $m, PREG_SET_ORDER ) ) {
 			foreach ( $m as $match ) {
-				$text = trim( $match[2] );
+				$text = $this->normalize_candidate( $match[2] );
 				if ( strlen( $text ) >= 2 && ! preg_match( '/^[\d\s\.\-:\/]+$/', $text ) ) {
 					if ( ! preg_match( '/^https?:/', $text ) && ! preg_match( '/[{}<>]/', $text ) ) {
 						$out[] = $text;
