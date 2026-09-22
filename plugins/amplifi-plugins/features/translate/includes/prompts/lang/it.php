@@ -23,6 +23,12 @@ return array(
         'free trial'   => 'prova gratuita',
     ),
     'nuances' => array(
+        'In any coordinated list keep every item in the same grammatical form — all adjectives, all bare nouns, or all prepositional phrases. Never mix «automobilistico» with «delle pompe».',
+        'Render remote monitoring, diagnostics, access or control with «da remoto» («monitoraggio e diagnostica da remoto»); never force the adjective «remoto/remoti» to agree across mixed-gender coordinated nouns.',
+        'Drop English possessive adjectives where Italian uses the bare definite article: «our customers» → «i clienti». Keep «nostro» only when ownership is genuinely contrastive, at most once per sentence.',
+        'Never place two words sharing a root close together (produrre/prodotti, realizzare/realtà, soluzione/risolvere). Substitute a synonym — «realizzare i prodotti», «fornire i prodotti».',
+        'Translate demanding/harsh/challenging environments as «ambienti gravosi», «critici» or «impegnativi»; «esigenti» describes people, not operating conditions.',
+        'Fix one Italian equivalent per recurring source term and reuse it across every page of the site; do not alternate synonyms for the same concept.',
         'Use the established Italian industry term and translate acronyms that have a standard Italian form (NDT→CND/controlli non distruttivi, journals→perni, test and measurement→prova e misura/collaudo, disc-type→a disco, end-to-end→completo/integrato, input→dati, actionable→operativo); keep only naturalised borrowings such as PLC, software, team.',
         'Check every cognate — nouns AND verbs — before reusing it: consistent→costante/uniforme/ripetibile, revitalize→rilanciare/rinsaldare, evidence→dati/prove, eventually→alla fine; keep a Latin-looking word only if Italian business writing really uses it in that sense.',
         'Never open a standalone headline, bullet or caption with a bare past participle, whose gender and number would have no antecedent: render \'Powered by / Built for / Trusted by\' as a noun phrase or finite clause (Con…, Basato su…, La scelta di…), never \'Alimentato da\', which in Italian means electrically supplied.',
