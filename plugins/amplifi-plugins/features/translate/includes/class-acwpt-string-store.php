@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class ACWPT_String_Store {
 
-	const DB_VERSION        = '3.4.0';
+	const DB_VERSION        = '3.4.1';
 	const DB_VERSION_OPTION = 'acwpt_strings_db_version';
 
 	/**
@@ -326,8 +326,248 @@ class ACWPT_String_Store {
 	 * Drop the in-memory read cache. Used by long-running CLI loops so memory
 	 * does not grow without bound across many pages.
 	 */
+	/**
+	 * Retire one source string across every language.
+	 *
+	 * The precise alternative to flushing the store: used when a specific piece
+	 * of source text changes (site title, tagline) rather than the whole site.
+	 *
+	 * @param string $source Source text to forget.
+	 * @return int Rows removed.
+	 */
+	public static function forget( $source ) {
+		global $wpdb;
+		$table = self::table_name();
+
+		$deleted = (int) $wpdb->query(
+			$wpdb->prepare( "DELETE FROM {$table} WHERE source_hash = %s", md5( $source ) )
+		); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		self::reset_memo();
+		return $deleted;
+	}
+
 	public static function reset_memo() {
 		self::$memo = array();
+	}
+
+	// =====================================================================
+	// Change tracking
+	//
+	// Editing a post must NOT discard the site's translations. These methods
+	// let a save record "this post's rendered output may have changed" so a
+	// background worker can reconcile just that page, instead of the editor's
+	// request nuking a store that cost real money to build.
+	// =====================================================================
+
+	const DIRTY_OPTION = 'acwpt_dirty_posts';
+
+	/**
+	 * Record that a post's rendered output may have changed.
+	 *
+	 * Deliberately cheap: one option write, no rendering, no API calls. The
+	 * expensive reconciliation happens on cron.
+	 *
+	 * @param int $post_id
+	 */
+	public static function mark_post_dirty( $post_id ) {
+		$post_id = (int) $post_id;
+		if ( $post_id <= 0 ) {
+			return;
+		}
+
+		$dirty = get_option( self::DIRTY_OPTION, array() );
+		if ( ! is_array( $dirty ) ) {
+			$dirty = array();
+		}
+
+		$dirty[ $post_id ] = time();
+		update_option( self::DIRTY_OPTION, $dirty, false );
+	}
+
+	/**
+	 * @return int[] Post IDs awaiting reconciliation.
+	 */
+	public static function dirty_posts() {
+		$dirty = get_option( self::DIRTY_OPTION, array() );
+		return is_array( $dirty ) ? array_map( 'intval', array_keys( $dirty ) ) : array();
+	}
+
+	/**
+	 * @param int $post_id Post that has been reconciled.
+	 */
+	public static function clear_post_dirty( $post_id ) {
+		$dirty = get_option( self::DIRTY_OPTION, array() );
+		if ( ! is_array( $dirty ) ) {
+			return;
+		}
+		unset( $dirty[ (int) $post_id ] );
+		update_option( self::DIRTY_OPTION, $dirty, false );
+	}
+
+	/**
+	 * Per-language translation status for a set of posts.
+	 *
+	 * Answers "which pages have changed since we last translated them?" by
+	 * comparing each post's CURRENT content hash against the hash stored with
+	 * its translation — the same test the renderer uses, so the report cannot
+	 * disagree with what the site actually serves.
+	 *
+	 * @param string[] $languages
+	 * @param int[]    $post_ids  Omit to cover every configured post type.
+	 * @return array<int,array> Keyed by post ID.
+	 */
+	public static function translation_status( array $languages, array $post_ids = array() ) {
+		global $wpdb;
+
+		if ( ! $post_ids ) {
+			$post_ids = get_posts( array(
+				'post_type'      => function_exists( 'acwpt_post_types' ) ? acwpt_post_types() : array( 'post', 'page' ),
+				'post_status'    => 'publish',
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+			) );
+		}
+
+		if ( ! $post_ids ) {
+			return array();
+		}
+
+		$cache_table = $wpdb->prefix . 'acwpt_translations';
+		$ids_sql     = implode( ',', array_map( 'intval', $post_ids ) );
+
+		$rows = $wpdb->get_results(
+			"SELECT post_id, language, content_hash, updated_at
+			   FROM {$cache_table}
+			  WHERE post_id IN ({$ids_sql})"
+		); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		$have = array();
+		foreach ( $rows as $r ) {
+			$have[ (int) $r->post_id ][ $r->language ] = $r;
+		}
+
+		$out = array();
+		foreach ( $post_ids as $pid ) {
+			$post = get_post( $pid );
+			if ( ! $post ) {
+				continue;
+			}
+
+			$current = ACWPT_Preloader::content_hash( $post );
+			$entry   = array(
+				'post_id'   => (int) $pid,
+				'title'     => get_the_title( $post ),
+				'post_type' => $post->post_type,
+				'modified'  => $post->post_modified_gmt,
+				'languages' => array(),
+			);
+
+			foreach ( $languages as $lang ) {
+				$row = isset( $have[ (int) $pid ][ $lang ] ) ? $have[ (int) $pid ][ $lang ] : null;
+
+				if ( ! $row ) {
+					$state = 'missing';
+				} elseif ( $row->content_hash !== $current ) {
+					$state = 'stale';
+				} else {
+					$state = 'current';
+				}
+
+				$entry['languages'][ $lang ] = array(
+					'state'         => $state,
+					'translated_at' => $row ? $row->updated_at : null,
+				);
+			}
+
+			$out[ (int) $pid ] = $entry;
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Export every stored translation for backup.
+	 *
+	 * @param string|null $language Omit for all languages.
+	 * @return array
+	 */
+	public static function export( $language = null ) {
+		global $wpdb;
+		$table = self::table_name();
+
+		if ( $language ) {
+			$rows = $wpdb->get_results(
+				$wpdb->prepare( "SELECT language, source_text, translated_text, updated_at FROM {$table} WHERE language = %s ORDER BY language, id", $language ),
+				ARRAY_A
+			); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		} else {
+			$rows = $wpdb->get_results(
+				"SELECT language, source_text, translated_text, updated_at FROM {$table} ORDER BY language, id",
+				ARRAY_A
+			); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		}
+
+		$posts = $wpdb->get_results(
+			"SELECT post_id, language, translated_title, translated_content, translated_excerpt, content_hash, updated_at
+			   FROM {$wpdb->prefix}acwpt_translations"
+			. ( $language ? $wpdb->prepare( ' WHERE language = %s', $language ) : '' ),
+			ARRAY_A
+		); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		return array(
+			'exported_at' => gmdate( 'c' ),
+			'site'        => home_url(),
+			'db_version'  => self::DB_VERSION,
+			'strings'     => $rows ? $rows : array(),
+			'posts'       => $posts ? $posts : array(),
+		);
+	}
+
+	/**
+	 * Restore from an export produced by export().
+	 *
+	 * Additive by design — restoring a backup must not delete translations made
+	 * since it was taken.
+	 *
+	 * @param array $data
+	 * @return array {strings:int, posts:int}
+	 */
+	public static function import( array $data ) {
+		global $wpdb;
+		$counts = array( 'strings' => 0, 'posts' => 0 );
+
+		if ( ! empty( $data['strings'] ) && is_array( $data['strings'] ) ) {
+			$by_lang = array();
+			foreach ( $data['strings'] as $row ) {
+				if ( empty( $row['language'] ) || ! isset( $row['source_text'], $row['translated_text'] ) ) {
+					continue;
+				}
+				$by_lang[ $row['language'] ][ $row['source_text'] ] = $row['translated_text'];
+			}
+			foreach ( $by_lang as $lang => $pairs ) {
+				$counts['strings'] += self::set_many( $lang, $pairs );
+			}
+		}
+
+		if ( ! empty( $data['posts'] ) && is_array( $data['posts'] ) ) {
+			foreach ( $data['posts'] as $row ) {
+				if ( empty( $row['post_id'] ) || empty( $row['language'] ) ) {
+					continue;
+				}
+				ACWPT_Cache::set(
+					(int) $row['post_id'],
+					$row['language'],
+					$row['translated_title'] ?? '',
+					$row['translated_content'] ?? '',
+					$row['translated_excerpt'] ?? '',
+					$row['content_hash'] ?? ''
+				);
+				$counts['posts']++;
+			}
+		}
+
+		return $counts;
 	}
 
 	public static function stats() {

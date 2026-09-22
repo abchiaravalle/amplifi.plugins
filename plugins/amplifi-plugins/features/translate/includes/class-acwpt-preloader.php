@@ -21,15 +21,76 @@ class ACWPT_Preloader {
 	const LOCK_KEY      = 'acwpt_preload_lock';
 	const CRON_HOOK     = 'acwpt_process_preload_batch';
 	const WATCHDOG_HOOK = 'acwpt_preload_watchdog';
+	const RECONCILE_HOOK = 'acwpt_reconcile_dirty';
 	const BATCH_SIZE    = 3;
 
 	/**
 	 * Register the cron hook. Call from plugin init.
 	 */
 	public static function register() {
-		add_action( self::CRON_HOOK, array( 'ACWPT_Preloader', 'process_batch' ) );
-		add_action( self::WATCHDOG_HOOK, array( 'ACWPT_Preloader', 'watchdog' ) );
+		add_action( self::CRON_HOOK, array( __CLASS__, 'process_batch' ) );
+		add_action( self::WATCHDOG_HOOK, array( __CLASS__, 'watchdog' ) );
+		add_action( self::RECONCILE_HOOK, array( __CLASS__, 'reconcile_dirty' ) );
 		self::ensure_watchdog();
+	}
+
+	/**
+	 * Re-translate the rendered strings of posts whose content changed.
+	 *
+	 * Runs in the background because it needs the rendered page and may call the
+	 * API. A post save only records the post ID; nothing is discarded up front,
+	 * so the site keeps serving its existing translations until better ones
+	 * exist. Worst case a page briefly shows slightly outdated wording — far
+	 * better than the previous behaviour, where one save wiped every language.
+	 */
+	public static function reconcile_dirty() {
+		$dirty = ACWPT_String_Store::dirty_posts();
+		if ( ! $dirty ) {
+			return;
+		}
+
+		$languages = ACWPT_Languages::get_enabled_codes();
+		if ( ! $languages ) {
+			foreach ( $dirty as $pid ) {
+				ACWPT_String_Store::clear_post_dirty( $pid );
+			}
+			return;
+		}
+
+		// Bounded per tick: reconciliation renders pages and can call the API.
+		$batch = array_slice( $dirty, 0, 2 );
+
+		foreach ( $batch as $post_id ) {
+			$post = get_post( $post_id );
+			if ( ! $post || 'publish' !== $post->post_status ) {
+				ACWPT_String_Store::clear_post_dirty( $post_id );
+				continue;
+			}
+
+			foreach ( $languages as $lang ) {
+				try {
+					$status = array();
+					self::warm_page_strings( $post, $lang, $status );
+				} catch ( \Throwable $e ) {
+					error_log( 'ACWPT reconcile: post ' . $post_id . ' -> ' . $lang . ': ' . $e->getMessage() );
+				}
+			}
+
+			ACWPT_String_Store::clear_post_dirty( $post_id );
+		}
+
+		if ( ACWPT_String_Store::dirty_posts() ) {
+			self::schedule_reconcile();
+		}
+	}
+
+	/**
+	 * Queue a reconciliation pass.
+	 */
+	public static function schedule_reconcile() {
+		if ( ! wp_next_scheduled( self::RECONCILE_HOOK ) ) {
+			wp_schedule_single_event( time() + 60, self::RECONCILE_HOOK );
+		}
 	}
 
 	/**
@@ -98,6 +159,11 @@ class ACWPT_Preloader {
 					break;
 				}
 			}
+		}
+
+		// Posts edited but never reconciled? Their translations are drifting.
+		if ( class_exists( 'ACWPT_String_Store' ) && ACWPT_String_Store::dirty_posts() ) {
+			self::schedule_reconcile();
 		}
 	}
 
@@ -552,7 +618,14 @@ class ACWPT_Preloader {
 		);
 	}
 
-	private static function content_hash( $post ) {
+	/**
+	 * Hash of a post's translatable source.
+	 *
+	 * Public because cache invalidation, the status report, and the CLI all need
+	 * to answer the same question — "has the source changed since we translated
+	 * it?" — and must agree on the answer.
+	 */
+	public static function content_hash( $post ) {
 		$settings       = get_option( 'acwpt_settings', array() );
 		$custom_version = isset( $settings['custom_version'] ) ? (int) $settings['custom_version'] : 0;
 		return md5( $post->post_title . '||' . $post->post_content . '||' . $post->post_excerpt . '||v' . $custom_version );

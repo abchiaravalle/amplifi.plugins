@@ -75,8 +75,10 @@ class ACWPT_Frontend {
 		add_action( 'save_post', array( $this, 'invalidate_post_cache' ), 10, 2 );
 
 		// Clear string cache when site title/tagline changes.
-		add_action( 'update_option_blogname', array( $this, 'clear_all_string_caches' ) );
-		add_action( 'update_option_blogdescription', array( $this, 'clear_all_string_caches' ) );
+		// Site title/tagline are two strings, not the whole site. Retire just
+		// those rather than flushing every language's store.
+		add_action( 'update_option_blogname', array( $this, 'invalidate_site_identity_strings' ), 10, 2 );
+		add_action( 'update_option_blogdescription', array( $this, 'invalidate_site_identity_strings' ), 10, 2 );
 
 		// Schedule a rewrite flush if the plugin version changed (new rules may have been added).
 		$installed_version = get_option( 'acwpt_version', '0' );
@@ -447,6 +449,22 @@ class ACWPT_Frontend {
 	/**
 	 * Clear all string translation caches (all languages).
 	 */
+	/**
+	 * Retire the stored translations of the site title/tagline only.
+	 *
+	 * @param mixed $old Previous option value.
+	 * @param mixed $new New option value.
+	 */
+	public function invalidate_site_identity_strings( $old, $new ) {
+		if ( ! is_string( $old ) || '' === $old || $old === $new ) {
+			return;
+		}
+		if ( class_exists( 'ACWPT_String_Store' ) ) {
+			ACWPT_String_Store::forget( $old );
+		}
+		$this->string_cache = null;
+	}
+
 	public function clear_all_string_caches() {
 		$enabled = ACWPT_Languages::get_enabled_codes();
 		foreach ( $enabled as $code ) {
@@ -1356,21 +1374,43 @@ class ACWPT_Frontend {
 		if ( wp_is_post_revision( $post_id ) || wp_is_post_autosave( $post_id ) ) {
 			return;
 		}
-		ACWPT_Cache::delete_post( $post_id );
 
-		// Only clear string caches for pages — they appear in nav menus and page lists.
-		// Regular post saves don't affect nav text so there's no need to re-translate strings.
-		if ( $post->post_type === 'page' ) {
-			$this->clear_all_string_caches();
+		// Ignore saves that cannot change public output.
+		if ( in_array( $post->post_status, array( 'auto-draft', 'inherit', 'trash' ), true ) ) {
+			return;
 		}
 
-		// Invalidate the sitemap cache.
+		// Post-level translations are keyed by a content hash, so a stale row is
+		// simply not used. Dropping this post's rows is precise and cheap.
+		ACWPT_Cache::delete_post( $post_id );
+
+		// NEVER flush the string store here.
+		//
+		// This previously called clear_all_string_caches() for any page save. In
+		// the old capped-option design that discarded at most 500 strings; against
+		// the unbounded store it deletes EVERY translated string for EVERY
+		// language. Observed on staging: one page save destroyed 12,862 Polish
+		// strings — roughly $8 of billed translation — and left the site rendering
+		// English until a full re-run.
+		//
+		// The correct unit of invalidation is the STRING, not the site. A stored
+		// string stays valid until its own source text changes, so we only retire
+		// strings that this post actually contributed and that no longer appear in
+		// its rendered output. That work needs the rendered page, so it happens in
+		// the background rather than blocking the editor's save request.
+		ACWPT_String_Store::mark_post_dirty( $post_id );
+		ACWPT_Preloader::schedule_reconcile();
+
+		// The sitemap lists this post, so its cached XML is now stale.
 		delete_transient( 'acwpt_sitemap_xml' );
 
-		// Auto-preload: queue background translation for this post if enabled.
-		if ( $post->post_status === 'publish' ) {
+		// Queue a re-translation so the translated URL catches up on its own.
+		// Defaults ON: a multilingual site whose translations silently drift out
+		// of date is worse than one that costs a little to keep current.
+		if ( 'publish' === $post->post_status ) {
 			$settings = get_option( 'acwpt_settings', array() );
-			if ( ! empty( $settings['preload_auto'] ) ) {
+			$auto     = ! isset( $settings['preload_auto'] ) || ! empty( $settings['preload_auto'] );
+			if ( $auto ) {
 				ACWPT_Preloader::start_for_post( $post_id );
 			}
 		}

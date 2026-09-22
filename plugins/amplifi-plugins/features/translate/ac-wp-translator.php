@@ -104,6 +104,7 @@ require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-prompts.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-translator.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-preloader.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-admin.php';
+require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-status.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-frontend.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-cli.php';
 
@@ -131,6 +132,7 @@ function acwpt_init() {
 
 	if ( is_admin() ) {
 		ACWPT_Admin::instance()->init();
+		ACWPT_Status::register();
 	}
 }
 
