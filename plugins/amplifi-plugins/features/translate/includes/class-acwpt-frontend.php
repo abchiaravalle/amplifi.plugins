@@ -64,6 +64,10 @@ class ACWPT_Frontend {
 		// Language switcher shortcode.
 		add_shortcode( 'acwpt_switcher', array( $this, 'render_switcher' ) );
 
+		// Optional floating switcher — the only discovery path on a site whose
+		// theme has nowhere to place the shortcode.
+		add_action( 'wp_footer', array( $this, 'maybe_render_floating_switcher' ), 99 );
+
 		// Language switcher as nav menu item.
 		add_filter( 'wp_nav_menu_objects', array( $this, 'expand_language_menu_items' ), 10, 2 );
 		add_filter( 'nav_menu_link_attributes', array( $this, 'add_lang_link_attributes' ), 10, 4 );
@@ -1123,37 +1127,168 @@ class ACWPT_Frontend {
 	// =========================================================================
 
 	public function render_switcher( $atts ) {
+		$atts = shortcode_atts(
+			array(
+				'style' => 'select',   // select | inline
+			),
+			$atts,
+			'acwpt_switcher'
+		);
+
+		return 'inline' === $atts['style']
+			? $this->switcher_markup( 'inline' )
+			: $this->switcher_markup( 'select' );
+	}
+
+	/**
+	 * Build the switcher markup.
+	 *
+	 * @param string $style select|inline|floating
+	 * @return string
+	 */
+	private function switcher_markup( $style ) {
 		$enabled = ACWPT_Languages::get_enabled();
 		if ( empty( $enabled ) ) {
 			return '';
 		}
 
-		$source  = ACWPT_Languages::get_source();
-		$current = $this->current_language ? $this->current_language : $source;
-		$path    = $this->get_current_page_path();
+		$source   = ACWPT_Languages::get_source();
+		$current  = $this->current_language ? $this->current_language : $source;
+		$path     = $this->get_current_page_path();
+		$settings = get_option( 'acwpt_settings', array() );
+		$flags    = ! isset( $settings['show_flags'] ) || ! empty( $settings['show_flags'] );
 
-		$html  = '<div class="acwpt-switcher-wrap">';
-		$html .= '<select class="acwpt-switcher" onchange="if(this.value)window.location.href=this.value;">';
-
-		// Source language option.
-		$source_label = ACWPT_Languages::label( $source );
-		$source_url   = home_url( $path );
-		$html        .= '<option value="' . esc_url( $source_url ) . '"' . selected( $current, $source, false ) . '>';
-		$html        .= esc_html( $source_label );
-		$html        .= '</option>';
-
-		foreach ( $enabled as $code => $lang ) {
-			$label = ACWPT_Languages::label( $code );
-			$url   = home_url( '/' . $code . $path );
-			$html .= '<option value="' . esc_url( $url ) . '"' . selected( $current, $code, false ) . '>';
-			$html .= esc_html( $label );
-			$html .= '</option>';
+		// Source first, then each target, so the list order is stable.
+		$options = array( $source => home_url( $path ) );
+		foreach ( array_keys( $enabled ) as $code ) {
+			$options[ $code ] = home_url( '/' . $code . $path );
 		}
 
-		$html .= '</select>';
-		$html .= '</div>';
+		if ( 'select' === $style ) {
+			$html  = '<div class="acwpt-switcher-wrap">';
+			$html .= '<select class="acwpt-switcher" onchange="if(this.value)window.location.href=this.value;">';
+			foreach ( $options as $code => $url ) {
+				$html .= '<option value="' . esc_url( $url ) . '"' . selected( $current, $code, false ) . '>'
+					. esc_html( ACWPT_Languages::label( $code ) ) . '</option>';
+			}
+			$html .= '</select></div>';
+			return $html;
+		}
+
+		// Inline / floating share the same list markup.
+		$classes = 'acwpt-switcher-list' . ( 'floating' === $style ? ' acwpt-switcher-floating' : '' );
+
+		$html = '<nav class="' . esc_attr( $classes ) . '" aria-label="Language">';
+		if ( 'floating' === $style ) {
+			$html .= '<button type="button" class="acwpt-switcher-toggle" aria-expanded="false" aria-haspopup="true">'
+				. ( $flags ? '<span class="acwpt-flag">' . esc_html( ACWPT_Languages::flag( $current ) ) . '</span>' : '' )
+				. '<span class="acwpt-code">' . esc_html( strtoupper( $current ) ) . '</span>'
+				. '</button>';
+		}
+		$html .= '<ul class="acwpt-switcher-items">';
+		foreach ( $options as $code => $url ) {
+			$is_current = ( $code === $current );
+			$html      .= '<li class="acwpt-switcher-item' . ( $is_current ? ' is-current' : '' ) . '">'
+				. '<a href="' . esc_url( $url ) . '" hreflang="' . esc_attr( ACWPT_Languages::bcp47( $code ) ) . '"'
+				. ( $is_current ? ' aria-current="true"' : '' ) . ' data-acwpt-lang="' . esc_attr( $code ) . '">'
+				. ( $flags ? '<span class="acwpt-flag">' . esc_html( ACWPT_Languages::flag( $code ) ) . '</span> ' : '' )
+				. esc_html( ACWPT_Languages::name( $code ) )
+				. '</a></li>';
+		}
+		$html .= '</ul></nav>';
 
 		return $html;
+	}
+
+	/**
+	 * Inject a floating switcher into the footer.
+	 *
+	 * A shortcode or a menu item both require someone to place them. On a site
+	 * with ten languages the switcher is the only way a visitor discovers the
+	 * translations exist at all, so it can be turned on without touching the
+	 * theme.
+	 */
+	public function maybe_render_floating_switcher() {
+		if ( is_admin() ) {
+			return;
+		}
+
+		$settings = get_option( 'acwpt_settings', array() );
+		if ( empty( $settings['floating_switcher'] ) ) {
+			return;
+		}
+
+		$markup = $this->switcher_markup( 'floating' );
+		if ( ! $markup ) {
+			return;
+		}
+
+		$position = isset( $settings['floating_switcher_position'] ) ? $settings['floating_switcher_position'] : 'bottom-right';
+		$allowed  = array( 'bottom-right', 'bottom-left', 'top-right', 'top-left' );
+		if ( ! in_array( $position, $allowed, true ) ) {
+			$position = 'bottom-right';
+		}
+
+		echo '<div class="acwpt-floating-root acwpt-pos-' . esc_attr( $position ) . '">' . $markup . '</div>';
+		$this->print_switcher_styles();
+	}
+
+	/**
+	 * Styles for the floating switcher.
+	 *
+	 * Inlined deliberately: one small block on pages that use it beats an extra
+	 * blocking request, and it cannot be lost to a theme's asset pipeline.
+	 */
+	private function print_switcher_styles() {
+		static $done = false;
+		if ( $done ) {
+			return;
+		}
+		$done = true;
+		?>
+<style id="acwpt-switcher-css">
+.acwpt-floating-root{position:fixed;z-index:99999}
+.acwpt-pos-bottom-right{right:20px;bottom:20px}
+.acwpt-pos-bottom-left{left:20px;bottom:20px}
+.acwpt-pos-top-right{right:20px;top:20px}
+.acwpt-pos-top-left{left:20px;top:20px}
+.acwpt-switcher-floating{position:relative;font-family:inherit;font-size:14px;line-height:1}
+.acwpt-switcher-toggle{display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid rgba(0,0,0,.12);border-radius:999px;background:#fff;color:#111;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,.12);font:inherit}
+.acwpt-switcher-toggle:hover{border-color:rgba(0,0,0,.28)}
+.acwpt-switcher-floating .acwpt-switcher-items{position:absolute;right:0;bottom:calc(100% + 10px);min-width:190px;max-height:60vh;overflow-y:auto;margin:0;padding:6px;list-style:none;background:#fff;border:1px solid rgba(0,0,0,.12);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.16);opacity:0;visibility:hidden;transform:translateY(6px);transition:opacity .16s,transform .16s,visibility .16s}
+.acwpt-pos-top-right .acwpt-switcher-floating .acwpt-switcher-items,
+.acwpt-pos-top-left .acwpt-switcher-floating .acwpt-switcher-items{top:calc(100% + 10px);bottom:auto}
+.acwpt-pos-bottom-left .acwpt-switcher-floating .acwpt-switcher-items,
+.acwpt-pos-top-left .acwpt-switcher-floating .acwpt-switcher-items{left:0;right:auto}
+.acwpt-switcher-floating.is-open .acwpt-switcher-items{opacity:1;visibility:visible;transform:translateY(0)}
+.acwpt-switcher-items li{margin:0}
+.acwpt-switcher-items a{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;color:#111;text-decoration:none;white-space:nowrap}
+.acwpt-switcher-items a:hover{background:rgba(0,0,0,.06)}
+.acwpt-switcher-item.is-current a{font-weight:600;background:rgba(0,0,0,.05)}
+.acwpt-flag{font-size:16px}
+@media (prefers-color-scheme:dark){
+.acwpt-switcher-toggle,.acwpt-switcher-floating .acwpt-switcher-items{background:#1c1c1e;color:#f2f2f7;border-color:rgba(255,255,255,.16)}
+.acwpt-switcher-items a{color:#f2f2f7}
+.acwpt-switcher-items a:hover{background:rgba(255,255,255,.08)}
+}
+</style>
+<script id="acwpt-switcher-js">
+(function(){
+  var root = document.querySelector('.acwpt-switcher-floating');
+  if (!root) { return; }
+  var btn = root.querySelector('.acwpt-switcher-toggle');
+  if (!btn) { return; }
+  function close(){ root.classList.remove('is-open'); btn.setAttribute('aria-expanded','false'); }
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    var open = root.classList.toggle('is-open');
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  document.addEventListener('click', function(e){ if (!root.contains(e.target)) { close(); } });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') { close(); } });
+})();
+</script>
+		<?php
 	}
 
 	// =========================================================================

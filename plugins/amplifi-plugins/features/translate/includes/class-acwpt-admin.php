@@ -56,7 +56,20 @@ class ACWPT_Admin {
 		$clean['model']           = sanitize_text_field( $input['model'] ?? '' );
 		$clean['show_flags']      = ! empty( $input['show_flags'] );
 		$clean['show_suggestion'] = ! empty( $input['show_suggestion'] );
-		$clean['preload_auto']    = ! empty( $input['preload_auto'] );
+
+		// Auto re-translation defaults ON. A multilingual site whose translations
+		// silently drift out of date is worse than one that costs a little to
+		// keep current — so an absent key means enabled, not disabled.
+		$clean['preload_auto'] = ! isset( $input['preload_auto'] ) ? true : ! empty( $input['preload_auto'] );
+
+		$clean['floating_switcher'] = ! empty( $input['floating_switcher'] );
+
+		$position = sanitize_text_field( $input['floating_switcher_position'] ?? 'bottom-right' );
+		$clean['floating_switcher_position'] = in_array(
+			$position,
+			array( 'bottom-right', 'bottom-left', 'top-right', 'top-left' ),
+			true
+		) ? $position : 'bottom-right';
 
 		$enabled = array();
 		if ( ! empty( $input['enabled_languages'] ) && is_array( $input['enabled_languages'] ) ) {

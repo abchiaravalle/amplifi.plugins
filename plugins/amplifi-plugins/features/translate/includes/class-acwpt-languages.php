@@ -116,4 +116,23 @@ class ACWPT_Languages {
 
 		return $name;
 	}
+
+	/**
+	 * Flag emoji for a language, or '' when unknown.
+	 */
+	public static function flag( $code ) {
+		$lang = self::get( $code );
+		return $lang && ! empty( $lang['flag'] ) ? $lang['flag'] : '';
+	}
+
+	/**
+	 * Language name WITHOUT the flag, for markup that renders its own.
+	 */
+	public static function name( $code, $use_native = true ) {
+		$lang = self::get( $code );
+		if ( ! $lang ) {
+			return $code;
+		}
+		return $use_native ? $lang['native'] : $lang['name'];
+	}
 }
