@@ -149,10 +149,72 @@ class ACWPT_Translator {
 			$val = isset( $translated[ $key ] ) ? (string) $translated[ $key ] : $original;
 			$val = ACWPT_Glossary::strip_glossary_sentinels( $val );
 			$val = ACWPT_Glossary::strip_keep_sentinels( $val );
+			$val = self::localize_quotes( $val, $language );
 			$result[ $original ] = $val;
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Convert straight ASCII quotes to the target language's paired marks.
+	 *
+	 * Belt-and-braces alongside the prompt rule. Quote convention is mechanical
+	 * and language-determined — there is no judgement involved — so enforcing it
+	 * in code is strictly more reliable than asking the model twice. Native
+	 * reviewers flagged mismatched pairs (opening „ closing ") as a high-severity
+	 * defect in five languages across two rounds even after the prompt said not
+	 * to, because the English source carries straight quotes and they survive.
+	 *
+	 * Only balanced pairs are touched; an apostrophe or a lone quote is left
+	 * alone rather than guessed at.
+	 *
+	 * @param string $text
+	 * @param string $language
+	 * @return string
+	 */
+	private static function localize_quotes( $text, $language ) {
+		if ( false === strpos( $text, '"' ) ) {
+			return $text;
+		}
+
+		// open, close, and whether the language wants no-break spaces inside.
+		$marks = array(
+			'de' => array( '„', '“', false ),
+			'cs' => array( '„', '“', false ),
+			'pl' => array( '„', '”', false ),
+			'ro' => array( '„', '”', false ),
+			'hu' => array( '„', '”', false ),
+			'fr' => array( '«', '»', true ),
+			'es' => array( '«', '»', false ),
+			'it' => array( '«', '»', false ),
+			'pt' => array( '«', '»', false ),
+			'ru' => array( '«', '»', false ),
+			'zh' => array( '“', '”', false ),
+			'ja' => array( '「', '」', false ),
+		);
+
+		$code = strtolower( substr( (string) $language, 0, 2 ) );
+		if ( ! isset( $marks[ $code ] ) ) {
+			return $text;
+		}
+
+		list( $open, $close, $nbsp ) = $marks[ $code ];
+
+		// Pair them up in order: first quote opens, next closes.
+		return preg_replace_callback(
+			'/"([^"]*)"/u',
+			function ( $m ) use ( $open, $close, $nbsp ) {
+				$inner = $m[1];
+				if ( '' === trim( $inner ) ) {
+					return $m[0];
+				}
+				return $nbsp
+					? $open . "\xC2\xA0" . $inner . "\xC2\xA0" . $close
+					: $open . $inner . $close;
+			},
+			$text
+		);
 	}
 
 	// =========================================================================

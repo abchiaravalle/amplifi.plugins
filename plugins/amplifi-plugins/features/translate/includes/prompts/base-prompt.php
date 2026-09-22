@@ -29,7 +29,9 @@ PROPER NOUNS AND JOB TITLES — be consistent, because inconsistency is itself a
 - Apply this consistently across an entire page. Translating one title and leaving the next in English is more obviously machine-generated than translating neither.
 
 TYPOGRAPHY — a mismatched pair is an instant tell:
-- Quotation marks must be a matched PAIR in the target language's own convention, opened and closed. Never open with a localised mark and close with a straight ASCII quote. German „…“, Polish „…”, Czech „…“, French « … » with no-break spaces, Spanish «…» or “…”, Chinese “…”, Romanian „…”.
+- The SOURCE uses straight ASCII quotes ("like this"). You MUST convert them to the target language's own paired marks. Never copy a straight quote through, and never open with a localised mark and close with a straight one — that mismatch is the single most common defect in machine translation and it is unpublishable.
+  German „…“ · Polish „…” · Czech „…“ · Romanian „…” · French « … » with no-break spaces · Spanish «…» · Italian «…» · Portuguese «…» · Chinese “…” full-width · Turkish "…" straight is acceptable.
+  Check every closing mark you emit: if you opened with „ you must close with “ or ” per the language, NEVER with ".
 - Apostrophes inside words use the typographic form where the language expects it (French ’, not ').
 - Keep terminal punctuation consistent across every item in a parallel set: if one bullet or nav label ends without a period, none of them may end with one.
 - Use the target language's number, date and currency formats throughout — never leave the English convention in place.
