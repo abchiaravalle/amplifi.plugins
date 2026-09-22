@@ -1053,6 +1053,25 @@ class ACWPT_Frontend {
 		$escaped_home = preg_quote( $home_url, '/' );
 		$codes        = implode( '|', array_map( 'preg_quote', $enabled ) );
 
+		// Protect <link rel="alternate" hreflang> and <link rel="canonical">.
+		//
+		// These carry DELIBERATE, language-specific URLs: x-default and the
+		// source-language alternate must keep pointing at the untranslated
+		// original. Blind href rewriting prefixed them with the current
+		// language, so every translated page told Google "the English version
+		// of this page lives at /de/" — a same-URL conflict across all
+		// alternates, which invalidates the whole hreflang cluster.
+		$protected = array();
+		$html      = preg_replace_callback(
+			'/<link\b[^>]*\brel=["\'](?:alternate|canonical)["\'][^>]*>/i',
+			function ( $m ) use ( &$protected ) {
+				$key               = '<!--ACWPT_SEO_' . count( $protected ) . '-->';
+				$protected[ $key ] = $m[0];
+				return $key;
+			},
+			$html
+		);
+
 		// Prefix internal page links (not admin, assets, feeds, or already-prefixed).
 		$html = preg_replace_callback(
 			'/href="(' . $escaped_home . ')\/(?!wp-admin|wp-content|wp-includes|wp-json|wp-login|feed|xmlrpc|wp-cron|(?:' . $codes . ')\/)([^"]*)"/',
@@ -1075,6 +1094,11 @@ class ACWPT_Frontend {
 			$html
 		);
 
+		// Restore the SEO tags untouched.
+		foreach ( $protected as $key => $tag ) {
+			$html = str_replace( $key, $tag, $html );
+		}
+
 		return $html;
 	}
 
@@ -1096,28 +1120,39 @@ class ACWPT_Frontend {
 	// =========================================================================
 
 	public function output_hreflang_tags() {
-		if ( ! is_singular() ) {
-			return;
-		}
-
-		$post = get_queried_object();
-		if ( ! $post || ! ( $post instanceof WP_Post ) ) {
-			return;
-		}
-
 		$source  = ACWPT_Languages::get_source();
 		$enabled = ACWPT_Languages::get_enabled_codes();
 		if ( empty( $enabled ) ) {
 			return;
 		}
 
-		$original_url = get_permalink( $post );
+		// Resolve the SOURCE-language URL for whatever is being viewed.
+		//
+		// This previously bailed unless is_singular(), so archives, the blog
+		// index, taxonomy and search pages emitted no hreflang at all — on this
+		// site that is /events/, /catalog/, /resource-hub/ and every category,
+		// i.e. a large share of indexable URLs left with no language signal.
+		$post = get_queried_object();
+
+		if ( is_singular() && $post instanceof WP_Post ) {
+			$original_url = get_permalink( $post );
+		} else {
+			// Strip any language prefix from the current request to recover the
+			// canonical source URL.
+			$path = $this->get_current_page_path();
+			$original_url = home_url( $path );
+			$post = null;
+		}
+
+		if ( ! $original_url ) {
+			return;
+		}
 
 		echo '<link rel="alternate" hreflang="x-default" href="' . esc_url( $original_url ) . '" />' . "\n";
 		echo '<link rel="alternate" hreflang="' . esc_attr( ACWPT_Languages::bcp47( $source ) ) . '" href="' . esc_url( $original_url ) . '" />' . "\n";
 
 		foreach ( $enabled as $code ) {
-			$url = $this->get_translated_url( $code, $post );
+			$url = $post ? $this->get_translated_url( $code, $post ) : $this->get_translated_url( $code );
 			echo '<link rel="alternate" hreflang="' . esc_attr( ACWPT_Languages::bcp47( $code ) ) . '" href="' . esc_url( $url ) . '" />' . "\n";
 		}
 	}
