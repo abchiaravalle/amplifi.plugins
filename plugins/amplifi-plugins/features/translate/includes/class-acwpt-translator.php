@@ -174,8 +174,13 @@ class ACWPT_Translator {
 	 * @return string
 	 */
 	private static function localize_quotes( $text, $language ) {
+		$code = strtolower( substr( (string) $language, 0, 2 ) );
+
+		// Apostrophes are handled even when the string contains no quotes at
+		// all — the previous early return on '"' skipped them entirely, so
+		// French elisions (l'équilibrage) were never converted.
 		if ( false === strpos( $text, '"' ) ) {
-			return $text;
+			return self::localize_apostrophes( $text, $code );
 		}
 
 		// open, close, and whether the language wants no-break spaces inside.
@@ -194,9 +199,8 @@ class ACWPT_Translator {
 			'ja' => array( '「', '」', false ),
 		);
 
-		$code = strtolower( substr( (string) $language, 0, 2 ) );
 		if ( ! isset( $marks[ $code ] ) ) {
-			return $text;
+			return self::localize_apostrophes( $text, $code );
 		}
 
 		list( $open, $close, $nbsp ) = $marks[ $code ];
@@ -257,7 +261,37 @@ class ACWPT_Translator {
 			$text
 		);
 
-		return $text;
+		return self::localize_apostrophes( $text, $code );
+	}
+
+	/**
+	 * Convert straight apostrophes to the typographic form where required.
+	 *
+	 * Same class of defect as quotation marks, and same reasoning: mechanical,
+	 * language-determined, no judgement involved. A native French reviewer
+	 * flagged "all 37 apostrophes are ASCII straight ' instead of ’" as HIGH
+	 * severity after three rounds of prompt guidance — exactly the pattern that
+	 * proved unfixable by prompting for quotes.
+	 *
+	 * Only languages whose typography REQUIRES the curly form are touched.
+	 * Turkish uses the straight apostrophe before suffixes on proper nouns
+	 * (Ascential'in) and must be left alone.
+	 *
+	 * @param string $text
+	 * @param string $code Two-letter language code.
+	 * @return string
+	 */
+	private static function localize_apostrophes( $text, $code ) {
+		// fr/it elide constantly (l'équilibrage, dell'azienda); ca/pt use it too.
+		$needs_curly = array( 'fr', 'it', 'ca' );
+		if ( ! in_array( $code, $needs_curly, true ) || false === strpos( $text, "'" ) ) {
+			return $text;
+		}
+
+		// Only a WORD-INTERNAL apostrophe is an elision. A leading or trailing
+		// one is likely a quote the caller has already handled, or punctuation
+		// we should not guess at.
+		return preg_replace( '/(?<=\p{L})\'(?=\p{L})/u', "\xE2\x80\x99", $text );
 	}
 
 	// =========================================================================
