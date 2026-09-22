@@ -201,8 +201,24 @@ class ACWPT_Translator {
 
 		list( $open, $close, $nbsp ) = $marks[ $code ];
 
+		// Normalise any FOREIGN localised opening mark to a straight quote first.
+		//
+		// The model sometimes reaches for a different language's convention —
+		// German „ appearing in French or Chinese output, for example. Folding
+		// every known opening mark back to " lets the pairing logic below make a
+		// single correct decision instead of leaving a mark this language never
+		// uses.
+		$foreign_open  = array( '„', '«', '“', '「', '‟' );
+		$foreign_close = array( '“', '”', '»', '」', '‟' );
+		foreach ( array_diff( $foreign_open, array( $open ) ) as $f ) {
+			$text = str_replace( $f, '"', $text );
+		}
+		foreach ( array_diff( $foreign_close, array( $close, $open ) ) as $f ) {
+			$text = str_replace( $f, '"', $text );
+		}
+
 		// Pair them up in order: first quote opens, next closes.
-		return preg_replace_callback(
+		$text = preg_replace_callback(
 			'/"([^"]*)"/u',
 			function ( $m ) use ( $open, $close, $nbsp ) {
 				$inner = $m[1];
@@ -215,6 +231,33 @@ class ACWPT_Translator {
 			},
 			$text
 		);
+
+		// HALF-CONVERTED PAIRS.
+		//
+		// The model frequently localises the OPENING mark and leaves the closing
+		// one straight — especially when a <x-keep> sentinel sits between them,
+		// which visually separates the two quotes in its context. The paired
+		// regex above cannot see that case because only one straight quote
+		// remains, so it has no partner to match. Observed in all ten languages.
+		//
+		// Close any opening mark that is followed by a straight quote before the
+		// next opening mark.
+		$o = preg_quote( $open, '/' );
+		$text = preg_replace(
+			'/' . $o . '([^"' . $o . ']*)"/u',
+			$nbsp ? $open . "\xC2\xA0" . '$1' . "\xC2\xA0" . $close : $open . '$1' . $close,
+			$text
+		);
+
+		// And the mirror case: straight opening quote, localised closing mark.
+		$c = preg_quote( $close, '/' );
+		$text = preg_replace(
+			'/"([^"' . $c . ']*)' . $c . '/u',
+			$nbsp ? $open . "\xC2\xA0" . '$1' . "\xC2\xA0" . $close : $open . '$1' . $close,
+			$text
+		);
+
+		return $text;
 	}
 
 	// =========================================================================
