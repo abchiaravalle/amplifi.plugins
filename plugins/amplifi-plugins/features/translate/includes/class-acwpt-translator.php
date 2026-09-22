@@ -118,7 +118,15 @@ class ACWPT_Translator {
 		$system_prompt = ACWPT_Prompts::build_strings_prompt( $language, $custom );
 		$user_message  = wp_json_encode( $indexed, JSON_UNESCAPED_UNICODE );
 
-		$data = self::call_anthropic( $api_key, $model, $system_prompt, $user_message, 8192, 30 );
+		// Scale the timeout with batch size. A fixed 30s was enough for the
+		// 40-string production batches but times out on larger ones: measured
+		// on staging, a 48-string batch takes 25-30s on Haiku and consistently
+		// exceeded 30s on Sonnet, failing 6 of 20 review runs with cURL 28.
+		// Output length tracks input length, so budget from the source.
+		$source_chars = strlen( $user_message );
+		$timeout      = (int) max( 30, min( 180, ceil( $source_chars / 120 ) ) );
+
+		$data = self::call_anthropic( $api_key, $model, $system_prompt, $user_message, 8192, $timeout );
 		if ( is_wp_error( $data ) ) {
 			return $data;
 		}
