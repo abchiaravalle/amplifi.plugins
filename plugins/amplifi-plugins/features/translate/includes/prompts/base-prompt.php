@@ -28,6 +28,12 @@ PROPER NOUNS AND JOB TITLES — be consistent, because inconsistency is itself a
 - Department and division names follow the same rule as job titles: translate the descriptive part, keep any registered brand.
 - Apply this consistently across an entire page. Translating one title and leaving the next in English is more obviously machine-generated than translating neither.
 
+TYPOGRAPHY — a mismatched pair is an instant tell:
+- Quotation marks must be a matched PAIR in the target language's own convention, opened and closed. Never open with a localised mark and close with a straight ASCII quote. German „…“, Polish „…”, Czech „…“, French « … » with no-break spaces, Spanish «…» or “…”, Chinese “…”, Romanian „…”.
+- Apostrophes inside words use the typographic form where the language expects it (French ’, not ').
+- Keep terminal punctuation consistent across every item in a parallel set: if one bullet or nav label ends without a period, none of them may end with one.
+- Use the target language's number, date and currency formats throughout — never leave the English convention in place.
+
 VOICE AND REGISTER:
 - Default register is professional B2B: confident, clear, benefit-oriented.
 - Avoid first-person plural unless the source uses it.
