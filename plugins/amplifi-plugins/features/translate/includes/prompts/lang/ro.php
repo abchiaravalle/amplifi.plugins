@@ -29,6 +29,7 @@ return array(
         'spare parts'    => 'piese de schimb',
     ),
     'nuances' => array(
+        'NEVER let two coordinated verbs share one complement when they govern different cases. This exact sentence has failed four review rounds: \'We deliver and support intelligent systems\' rendered as \'Furniz\u0103m \u0219i asigur\u0103m mentenan\u021ba sistemelor inteligente\' is broken, because \'furniz\u0103m\' needs an ACCUSATIVE object (\'furniz\u0103m sisteme\') while \'asigur\u0103m mentenan\u021ba\' forces a GENITIVE (\'a sistemelor\'), so the delivery claim collapses. Write \'Furniz\u0103m \u0219i \u00eentre\u021binem sisteme inteligente\' with one shared accusative, or split into two clauses: \'Furniz\u0103m sisteme inteligente \u0219i le asigur\u0103m mentenan\u021ba\'. Before delivering, check every coordinated verb pair for this.',
         'Agree every object clitic with its noun\'s real gender and number — feminine plurals take \'le\', never the default \'îi\'; check the clitic against the noun before shipping.',
         'Never let coordinated verbs share a single complement when they govern different cases; repeat the object in each verb\'s own case or resume it with a clitic.',
         'Set an appositive brand or product name off with commas immediately after the noun it names; never strand it at the end of that noun\'s modifiers.',
