@@ -207,6 +207,21 @@ class ACWPT_Glossary {
      * Wrap glossary source terms in the input with <x-glossary term="...">
      * sentinels carrying the mandated translation. Case-sensitive whole-word.
      *
+     * A pinned term is substituted VERBATIM, so it is only safe where the term
+     * can stand uninflected in a real sentence. Two production defects came
+     * from ignoring that:
+     *
+     *   "Aerospace" pinned as a singular adjective forced singular agreement
+     *   onto a plural noun and broke a CTA headline in six languages.
+     *
+     *   "journals" pinned as Turkish "muylular" (bare plural) produced
+     *   "kendi muylular sahip rotorlar" — the sentence needs "muylularına"
+     *   (possessive + dative) after the postposition "sahip".
+     *
+     * So: pin a term for a given language ONLY when that language leaves it
+     * uninflected in context. For inflecting languages, state the required
+     * term in the language pack instead, where the model can decline it.
+     *
      * Note: same Unicode word-boundary caveat as apply_keep_sentinels — for
      * logographic scripts the term must be flanked by non-letter chars.
      */
