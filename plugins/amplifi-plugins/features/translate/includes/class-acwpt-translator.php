@@ -359,6 +359,17 @@ class ACWPT_Translator {
 	 * @return array|WP_Error     Decoded response body on success.
 	 */
 	private static function call_anthropic( $api_key, $model, $system, $user, $max_tokens = 8192, $timeout = 30 ) {
+		// SPEND CEILING. Checked before every request, not after.
+		//
+		// Queue depth was bounded but dollars were not, so a crawler walking
+		// every /{lang}/ URL or a sitewide markup change converted straight
+		// into unbounded spend. On breach we stop translating and keep serving
+		// cache, which degrades gracefully instead of billing indefinitely.
+		$budget = ACWPT_Budget::check();
+		if ( is_wp_error( $budget ) ) {
+			return $budget;
+		}
+
 		$response = wp_remote_post(
 			'https://api.anthropic.com/v1/messages',
 			array(
@@ -392,12 +403,19 @@ class ACWPT_Translator {
 
 		if ( $code !== 200 ) {
 			$msg = isset( $data['error']['message'] ) ? $data['error']['message'] : "HTTP {$code}";
+			// Remember billing failures so destructive actions can refuse.
+			// An exhausted balance means a flushed cache cannot be rebuilt.
+			ACWPT_Budget::note_api_error( $msg );
 			return new WP_Error( 'anthropic_error', 'Anthropic API error: ' . $msg );
 		}
 
 		if ( empty( $data['content'][0]['text'] ) ) {
 			return new WP_Error( 'empty_response', 'Anthropic returned an empty response.' );
 		}
+
+		// A good response clears any recorded billing failure, so destructive
+		// actions are unblocked once the account is funded again.
+		ACWPT_Budget::note_api_ok();
 
 		return $data;
 	}
@@ -423,6 +441,11 @@ class ACWPT_Translator {
 
 		$pricing = isset( self::$pricing[ $model ] ) ? self::$pricing[ $model ] : self::$pricing['claude-sonnet-4-5'];
 		$cost    = ( $input_tokens * $pricing['input'] ) + ( $output_tokens * $pricing['output'] );
+
+		// Feed the monthly ceiling. Separate from acwpt_usage, which is
+		// lifetime reporting: the budget needs a per-month figure it can
+		// compare against a limit.
+		ACWPT_Budget::record( $cost );
 
 		$month = gmdate( 'Y-m' );
 		$usage = get_option( 'acwpt_usage', array() );

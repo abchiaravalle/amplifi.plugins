@@ -513,7 +513,25 @@ class ACWPT_Frontend {
 		$this->string_cache = null;
 	}
 
-	public function clear_all_string_caches() {
+	/**
+	 * Delete every cached translation, for every enabled language.
+	 *
+	 * Guarded, because this is only a recoverable action if the API can
+	 * actually re-translate. With an exhausted balance or an invalid key, a
+	 * flush turns a working multilingual site into an English one with no way
+	 * back — and on this site that is ~$8 per language to rebuild.
+	 *
+	 * @param bool $force Skip the affordability check (CLI escape hatch).
+	 * @return true|WP_Error
+	 */
+	public function clear_all_string_caches( $force = false ) {
+		if ( ! $force ) {
+			$can = ACWPT_Budget::can_afford_rebuild();
+			if ( is_wp_error( $can ) ) {
+				return $can;
+			}
+		}
+
 		$enabled = ACWPT_Languages::get_enabled_codes();
 		foreach ( $enabled as $code ) {
 			delete_option( 'acwpt_strings_' . $code );        // legacy option store
@@ -522,6 +540,8 @@ class ACWPT_Frontend {
 			ACWPT_String_Queue::clear( $code );
 		}
 		$this->string_cache = null;
+
+		return true;
 	}
 
 	// =========================================================================

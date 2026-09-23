@@ -72,6 +72,10 @@ class ACWPT_Admin {
 		), 'strlen' ) );
 		$clean['sitemap_exclude'] = $ex_arr;
 
+		// monthly_limit: USD ceiling on API spend. Blank restores the default.
+		$lim = isset( $input['monthly_limit'] ) ? trim( (string) $input['monthly_limit'] ) : '';
+		$clean['monthly_limit'] = ( '' === $lim ) ? '' : max( 0, (float) $lim );
+
 		$position = sanitize_text_field( $input['floating_switcher_position'] ?? 'bottom-right' );
 		$clean['floating_switcher_position'] = in_array(
 			$position,
@@ -241,6 +245,36 @@ class ACWPT_Admin {
 								</select>
 								<span id="acwpt-model-status"></span>
 								<p class="description">claude-haiku-4-5 is recommended for cost-effective translation. Models are fetched from your Anthropic account.</p>
+							</td>
+						</tr>
+						<tr>
+							<th><label for="acwpt_monthly_limit">Monthly spend limit</label></th>
+							<td>
+								<?php
+								$lim   = isset( $settings['monthly_limit'] ) ? $settings['monthly_limit'] : '';
+								$spent = class_exists( 'ACWPT_Budget' ) ? ACWPT_Budget::spent_this_month() : 0;
+								$eff   = class_exists( 'ACWPT_Budget' ) ? ACWPT_Budget::monthly_limit() : 100;
+								$pct   = $eff > 0 ? min( 100, round( ( $spent / $eff ) * 100 ) ) : 0;
+								?>
+								<input type="number" step="1" min="0" style="width:8em"
+									id="acwpt_monthly_limit"
+									name="acwpt_settings[monthly_limit]"
+									value="<?php echo esc_attr( $lim ); ?>"
+									placeholder="100">
+								<span class="description">USD. Blank uses the $100 default. 0 removes the limit.</span>
+
+								<div style="margin-top:10px;max-width:420px">
+									<div style="height:8px;border-radius:4px;background:#e8eaed;overflow:hidden">
+										<div style="height:100%;width:<?php echo (int) $pct; ?>%;background:<?php echo $pct >= 90 ? '#b32d2e' : ( $pct >= 70 ? '#dba617' : '#008a20' ); ?>"></div>
+									</div>
+									<p class="description" style="margin-top:6px">
+										<strong>$<?php echo esc_html( number_format( $spent, 2 ) ); ?></strong>
+										of $<?php echo esc_html( number_format( $eff, 2 ) ); ?> this month
+										(<?php echo (int) $pct; ?>%).
+										Translation pauses at the limit; cached translations keep serving.
+										Set <code>ACWPT_MONTHLY_LIMIT</code> in wp-config.php to lock it.
+									</p>
+								</div>
 							</td>
 						</tr>
 						<tr>
