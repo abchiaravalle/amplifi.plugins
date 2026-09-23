@@ -23,6 +23,8 @@ return array(
         'small business'=> 'dla małych firm',
     ),
     'nuances' => array(
+        'In inflected languages, check that every noun and its modifiers carry the case, gender and number demanded by the governing preposition or verb; a dictionary-form phrase left mid-sentence is the clearest machine-translation tell.',
+        'When inserting a multi-word industry, sector or product-category name into a sentence, translate and decline the entire phrase to agree with its head noun — never paste a glossary entry in citation form.',
         'Never render \'solve a challenge\' as \'rozwiązać wyzwanie\'; write \'sprostać wyzwaniu\' or recast the noun as \'problem\'.',
         'Add no qualifier the English lacks: \'under pressure\' is \'pod presją\' or \'w warunkach presji\', never \'pod presją czasu\'.',
         'Preserve the force of source participles: \'focused on\' is \'skupionych na\' or \'zaangażowanych w\', not \'zainteresowanych\'.',

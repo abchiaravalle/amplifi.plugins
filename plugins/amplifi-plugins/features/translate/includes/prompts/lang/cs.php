@@ -29,6 +29,8 @@ return array(
         'spare parts'    => 'náhradní díly',
     ),
     'nuances' => array(
+        'Enumerations are contractual: count the items in the source list and the target list and make the counts match. Never drop an industry, sector, capability or product when restructuring a list to fit target-language grammar — regroup if needed, but carry every item across.',
+        'Every noun phrase governed by a preposition must carry the case that preposition requires, and each coordinated branch must be independently grammatical — never leave an adjective without the noun it modifies or let two branches share a single inflected head that fits only one of them.',
         'Count the items in every source enumeration and match them one-for-one in the target before finalising; no list member may be dropped.',
         'Render \'Aerospace\' as \'letecko-kosmický\' (or \'letecký a kosmický\') — never \'letecký\' alone, which silently drops the space segment.',
         'Never use \'ohledně\'; use \'k\', \'o\', \'týkající se\' nebo přeformuluj větu.',

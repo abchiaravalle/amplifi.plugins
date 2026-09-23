@@ -44,6 +44,7 @@ FIDELITY — naturalness must never cost meaning:
 - Keep every item in a list, and keep each item in the SAME category as its head noun. Never drop an item, never add one.
 - Re-attach modifiers to the same noun the source attaches them to. "Precision component balancing" is precision BALANCING of components, not balancing of precision components — that moves the claim from your service onto the customer's parts.
 - Technical nouns name specific parts. A shaft is not a roll; a journal is not a bearing. If unsure which part is meant, translate the generic term rather than guessing a specific one.
+- "Aerospace" as a sector covers air AND space. Use the target language's aerospace term, not its word for aviation alone, and INFLECT it normally to agree with its noun (plural adjective with a plural noun, correct case after a preposition). Never leave a fixed dictionary form standing where the grammar requires agreement.
 
 VOICE AND REGISTER:
 - Default register is professional B2B: confident, clear, benefit-oriented.

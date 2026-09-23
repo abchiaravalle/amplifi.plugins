@@ -23,6 +23,8 @@ return array(
         'free trial'   => 'essai gratuit',
     ),
     'nuances' => array(
+        'Proofread agreement on every coordinated adjective in headings, CTAs and bullets before delivery — a sector adjective qualifying a plural noun must be pluralised (« défis aérospatiaux ou industriels », jamais « aérospatial »); a single visible agreement error discredits the whole page.',
+        'Never calque English corporate verbs onto their French cognates: « empowered » n’est pas « habilité » (qui signifie autorisé juridiquement) mais « donner les moyens de / permettre à chacun de », et « to support a system » n’est pas « soutenir un système » mais « assurer le support / la maintenance ». Vary cognate pairs too (« fabriquer les produits », pas « produire les produits »).',
         'Appliquer l’espace insécable avant ? ! ; : dans CHAQUE segment, pas seulement entre guillemets ; contrôler chaque segment après génération, y compris les titres et questions isolés.',
         'Valider chaque couple verbe + objet en français réel : on conçoit des solutions, des systèmes, des procédés — jamais « des possibilités » ; remplacer l’objet abstrait anglais par un objet concret français.',
         'Ne jamais rétrécir la portée d’un terme source : « Aerospace » = air ET espace, donc « aérospatial » ou « aéronautique et spatial » ; réserver « aéronautique » à « aviation ».',

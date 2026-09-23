@@ -29,6 +29,9 @@ return array(
         'spare parts'    => 'yedek parça',
     ),
     'nuances' => array(
+        'Capitalise the first character of every translated sentence, heading and CTA; a headline that opens lowercase is an instant proofreading failure regardless of the target language.',
+        'Translate enumerations item for item: never insert a list element the source does not contain, and never repeat a term the governing head noun already carries.',
+        'When the source coordinates two alternatives and one branch is itself a compound term, pick a connector that visibly separates the branches instead of stacking two conjunctions in one phrase.',
         'Build "ister… ister…" so every branch has the same shape and the shared verb sits at the END: "İster sıfırdan ister mevcut teknolojilerle başlayalım". Never put a finite verb in the first branch and leave the second as a bare noun or postpositional phrase.',
         'Express physical features and parts with -li or "…olan", never "…-e sahip": "kendi muylusu olan rotorlar", "dört kanallı sistem". Reserve "sahip olmak" for genuine ownership by a person or company.',
         'Before using a verb+noun idiom, check which case it licenses. "Güç kazanmak" takes an accusative nominalization ("başarma gücünü kazanmak"), not a dative infinitive ("başarmaya güç kazanmak"). If unsure, rewrite with a plain common verb.',

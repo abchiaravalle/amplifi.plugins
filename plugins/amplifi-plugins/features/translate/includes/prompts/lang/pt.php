@@ -23,6 +23,7 @@ return array(
         'free trial'   => 'teste grátis',
     ),
     'nuances' => array(
+        'When two or more coordinated adjectives modify one plural noun, inflect every adjective for number and gender, not just the last one.',
         'Render paired English sector adjectives as bare adjectives agreeing with the Portuguese head noun ("desafios aeroespaciais ou industriais"), never as "da indústria X ou industrial".',
         'Preserve second-person reader address in questions and CTAs: translate "help solve for you" as "ajudá-lo a resolver", not as a bare "ajudar a resolver".',
         'Keep every branch of a "Quer esteja a…" series in the same estar a + infinitivo form; never use "à procura de" before an infinitive.',

@@ -23,6 +23,8 @@ return array(
         'free trial'   => 'prueba gratuita',
     ),
     'nuances' => array(
+        'Preserve open-ended enumerations: render English \'including\' / \'such as\' with \'como\' (and close with \'entre otros\' where natural), never with a colon or dash that presents the list as the complete set.',
+        'Proofread every heading, button and short marketing string for gender and number agreement between nouns and all coordinated adjectives — short strings get the least review and the most visibility.',
         'Render open-ended English enumerations (\'including\', \'such as\') with \'como\' or \'entre otros\'; never use a colon, which presents the list as complete and narrows the claim.',
         'Keep every item of a sector list in the same grammatical form: \'el de automoción, el eléctrico, el de bombas, el armamentístico, el papelero, el aeronáutico y el ferroviario\'.',
         'Make each adjective agree with the noun English actually modifies: \'tecnologías avanzadas de ensayos no destructivos\', not \'tecnología de ensayos no destructivos avanzados\'.',

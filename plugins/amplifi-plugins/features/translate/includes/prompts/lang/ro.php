@@ -29,6 +29,10 @@ return array(
         'spare parts'    => 'piese de schimb',
     ),
     'nuances' => array(
+        'Agree every object clitic with its noun\'s real gender and number — feminine plurals take \'le\', never the default \'îi\'; check the clitic against the noun before shipping.',
+        'Never let coordinated verbs share a single complement when they govern different cases; repeat the object in each verb\'s own case or resume it with a clitic.',
+        'Set an appositive brand or product name off with commas immediately after the noun it names; never strand it at the end of that noun\'s modifiers.',
+        'Translate process and defect vocabulary with the established shop-floor term (rework = \'reprelucrare\'), not a general-purpose paraphrase.',
         'Agree object clitics with the noun\'s real gender: use \'le\' for feminine plurals, \'îi\' only for masculine; never default to \'îi\'.',
         'Use \'pe\' plus a resumptive clitic only for definite, specific human objects; drop both before bare indefinite plurals like \'echipe\'.',
         'Never share one complement between coordinated verbs with different case government; repeat the object in its own case or resume it with a clitic.',

@@ -23,6 +23,8 @@ return array(
         'free trial'   => 'prova gratuita',
     ),
     'nuances' => array(
+        'Proofread every headline, CTA and navigation string for gender/number agreement before delivery: English adjectives are invariant, so agreement errors survive translation unnoticed and are most damaging exactly where they are most visible.',
+        'When one adjective in a coordinated pair modifies a shared plural noun, inflect both adjectives, not just the second.',
         'Never let «risolvere» govern «sfida»: una sfida si affronta o si supera. Translate English «solve a challenge» as «superare/affrontare una sfida».',
         'Render «aerospace» as «aerospaziale»; reserve «aeronautico» for «aviation/aeronautical». Do not narrow a sector name to a subset of what the English covers.',
         'Preserve English superlatives at full strength: «the safest, most dependable» must become «i più sicuri e affidabili», never the plain positive degree.',
