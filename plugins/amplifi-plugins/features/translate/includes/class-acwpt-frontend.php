@@ -1325,6 +1325,31 @@ class ACWPT_Frontend {
 			return false;
 		}
 
+		// JAVASCRIPT AND TEMPLATE SOURCE. On prod these were being extracted as
+		// prose from inline <script> and <script type="text/template"> blocks:
+		//
+		//   ').text(msg.content).html() + '     ' + inlineAgentName + '
+		//   '; messageHtml += '                 {{ data.display_name }}
+		//
+		// Each was billed, stored as an identity row, and — worse — counted by
+		// the coverage check, which marked every translated page "partial" and
+		// sent Cache-Control: no-store. That silently re-created the edge-cache
+		// defeat fixed earlier, by a different route.
+		if ( preg_match( '/\{\{.*\}\}|\{%.*%\}|<%.*%>/s', $text ) ) {
+			return false; // Handlebars / Twig / Underscore placeholders
+		}
+		if ( preg_match( '/(^[\'"+;]|[\'"+;]$|\)\s*\.\s*[a-z]+\(|\+=|\.html\(|\.text\(|=>|\bfunction\s*\()/i', $text ) ) {
+			return false; // string concatenation and method-chain fragments
+		}
+		if ( preg_match( '/^oEmbed\s*\((JSON|XML)\)$/i', trim( $text ) ) ) {
+			return false; // WordPress <link> discovery titles, not visible copy
+		}
+		// Bare template field names that leaked without their {{ }} braces,
+		// e.g. "post_title". A single snake_case token is an identifier.
+		if ( preg_match( '/^[a-z]+(?:_[a-z0-9]+)+$/', trim( $text ) ) ) {
+			return false;
+		}
+
 		return true;
 	}
 
@@ -1357,7 +1382,38 @@ class ACWPT_Frontend {
 	 * Extract text from links and common block elements (for translation collection).
 	 */
 	private function extract_translatable_strings_from_html( $html ) {
+		// HARVEST NAMED CONFIG OBJECTS BEFORE STRIPPING SCRIPTS.
+		//
+		// The strip below removes every non-JSON <script>, which would also
+		// delete `var ACCONSENT = {...}` — the cookie banner's copy, the first
+		// thing a visitor sees. Caught before deploying: the config pass sat
+		// after the strip and would have silently gone dead, re-breaking the
+		// banner that was fixed earlier. Pull the allowlisted keys out first.
 		$out = array();
+		if ( preg_match_all( '/\bvar\s+[A-Z][A-Z0-9_]{3,}\s*=\s*(\{.*?\})\s*;/s', $html, $pre ) ) {
+			foreach ( $pre[1] as $obj ) {
+				$data = json_decode( $obj, true );
+				if ( is_array( $data ) ) {
+					foreach ( self::collect_json_text( $data ) as $text ) {
+						$out[] = $text;
+					}
+				}
+			}
+		}
+
+		// Strip executable and template blocks. Their contents are code, not
+		// copy, and every pass below would otherwise mine them for strings.
+		// application/json blocks are kept: a dedicated pass reads those.
+		$html = preg_replace(
+			'#<script\b(?![^>]*type=["\']application/(?:ld\+)?json["\'])[^>]*>.*?</script>#is',
+			'',
+			$html
+		);
+		$html = preg_replace( '#<style\b[^>]*>.*?</style>#is', '', $html );
+		$html = preg_replace( '#<noscript\b[^>]*>.*?</noscript>#is', '', $html );
+
+		// $out already holds the harvested config strings; do not reset it.
+
 		// Link text.
 		if ( preg_match_all( '/(<a\b[^>]*>)([^<]+)(<\/a>)/i', $html, $m, PREG_SET_ORDER ) ) {
 			foreach ( $m as $match ) {
@@ -1694,6 +1750,25 @@ class ACWPT_Frontend {
 	private function dedupe_candidates( array $candidates ) {
 		$candidates = array_values( array_unique( array_filter( array_map( 'trim', $candidates ), 'strlen' ) ) );
 
+		// ONE GATE FOR EVERY PASS.
+		//
+		// is_translatable_prose() was only called from some extraction passes,
+		// so "oEmbed (JSON)" survived via the attribute path even after the gate
+		// was taught to reject it. Filtering here, at the single exit, means no
+		// pass can bypass it — whatever shape it captured, junk never reaches
+		// the translator or the coverage check.
+		$candidates = array_values(
+			array_filter(
+				$candidates,
+				function ( $c ) {
+					// Strings carrying markup are whole-block captures and are
+					// judged by the prose outside their tags.
+					$probe = false !== strpos( $c, '<' ) ? trim( strip_tags( $c ) ) : $c;
+					return '' !== $probe && $this->is_translatable_prose( $probe );
+				}
+			)
+		);
+
 		// Longest first, so a fragment is always compared against the whole.
 		usort(
 			$candidates,
@@ -1713,11 +1788,23 @@ class ACWPT_Frontend {
 			}
 
 			$contained = false;
-			foreach ( $kept as $k ) {
-				// Only longer strings are already in $kept, so one direction is enough.
-				if ( false !== mb_strpos( $k, $c ) ) {
-					$contained = true;
-					break;
+
+			// SHORT LABELS ARE NEVER DEDUPED ON CONTAINMENT.
+			//
+			// Substring dedupe dropped the cookie-banner button "Manage" because
+			// it appears inside the headlines "General Manager" and "Service
+			// Manager". Those are unrelated: a 1-3 word label is almost always an
+			// independent UI string, not a fragment of the sentence it happens to
+			// occur in. Losing it re-broke the banner fixed earlier today.
+			$words = preg_split( '/\s+/u', trim( $c ) );
+			if ( count( $words ) > 3 ) {
+				foreach ( $kept as $k ) {
+					// Word-boundary containment only, so "Manage" can never match
+					// "Manager" even for longer candidates.
+					if ( preg_match( '/(?<![\p{L}\p{N}])' . preg_quote( $c, '/' ) . '(?![\p{L}\p{N}])/u', $k ) ) {
+						$contained = true;
+						break;
+					}
 				}
 			}
 			if ( ! $contained ) {
