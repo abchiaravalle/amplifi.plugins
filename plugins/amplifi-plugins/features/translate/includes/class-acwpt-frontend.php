@@ -1642,6 +1642,12 @@ class ACWPT_Frontend {
 
 		$req = $wp->request;
 
+		// /acwpt-sitemap.xsl            -> browser stylesheet (crawlers ignore)
+		if ( 'acwpt-sitemap.xsl' === $req ) {
+			require ACWPT_PLUGIN_DIR . 'includes/sitemap-style.php';
+			exit;
+		}
+
 		// /acwpt-sitemap.xml            -> index of per-language children
 		// /acwpt-sitemap-<lang>.xml     -> the URLs for one language
 		$is_index = ( 'acwpt-sitemap.xml' === $req );
@@ -1719,6 +1725,8 @@ class ACWPT_Frontend {
 	 */
 	private function generate_sitemap_index( array $langs ) {
 		$xml  = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+		// Browser-only: crawlers ignore the stylesheet, humans get a readable table.
+		$xml .= '<?xml-stylesheet type="text/xsl" href="' . esc_url( home_url( '/acwpt-sitemap.xsl' ) ) . '"?>' . "\n";
 		$xml .= '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
 		foreach ( $langs as $code ) {
 			$xml .= "  <sitemap>\n";
@@ -1783,6 +1791,7 @@ class ACWPT_Frontend {
 		$posts = array_filter( $posts, 'acwpt_include_in_sitemap' );
 
 		$xml  = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+		$xml .= '<?xml-stylesheet type="text/xsl" href="' . esc_url( home_url( '/acwpt-sitemap.xsl' ) ) . '"?>' . "\n";
 		$xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"' . "\n";
 		$xml .= '        xmlns:xhtml="http://www.w3.org/1999/xhtml">' . "\n";
 
