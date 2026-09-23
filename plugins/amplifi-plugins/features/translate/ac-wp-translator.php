@@ -242,6 +242,35 @@ function acwpt_include_in_sitemap( $post ) {
 		}
 	}
 
+	// Per-site slug exclusions, editable in wp-admin.
+	//
+	// An SEO plugin's noindex flag is the right signal, but it is only set when
+	// somebody remembers to set it. In-progress rebuilds routinely sit at a
+	// public URL with no flag at all — on this site 'care-predict-revamp' was
+	// the FIRST entry in a sitemap advertising it in eleven languages. A slug
+	// list gives the editor a way to exclude a page without depending on
+	// another plugin's metadata.
+	if ( $include ) {
+		$settings = get_option( 'acwpt_settings', array() );
+		$excluded = isset( $settings['sitemap_exclude'] ) ? (array) $settings['sitemap_exclude'] : array();
+		foreach ( $excluded as $pattern ) {
+			$pattern = trim( (string) $pattern );
+			if ( '' === $pattern ) {
+				continue;
+			}
+			// Trailing * makes it a prefix match, so 'wip-*' covers a whole set.
+			if ( '*' === substr( $pattern, -1 ) ) {
+				if ( 0 === strpos( $post->post_name, rtrim( $pattern, '*' ) ) ) {
+					$include = false;
+					break;
+				}
+			} elseif ( $post->post_name === $pattern ) {
+				$include = false;
+				break;
+			}
+		}
+	}
+
 	/**
 	 * Filter whether a post is listed in the translated sitemap.
 	 *

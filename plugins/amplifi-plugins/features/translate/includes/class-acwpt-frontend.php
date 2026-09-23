@@ -1154,14 +1154,28 @@ class ACWPT_Frontend {
 			return;
 		}
 
+		// A page excluded from the sitemap must ALSO carry noindex.
+		//
+		// Removing a URL from a sitemap does not deindex it — Google reaches
+		// pages by crawling links, and the language switcher plus internal link
+		// prefixing give every translated page inbound links. Without this, an
+		// in-progress rebuild stays indexable in eleven languages even after it
+		// is dropped from the sitemap, which is exactly the false sense of
+		// safety the exclusion list would otherwise create.
+		$post = get_queried_object();
+		if ( is_singular() && $post instanceof WP_Post
+			&& function_exists( 'acwpt_include_in_sitemap' )
+			&& ! acwpt_include_in_sitemap( $post ) ) {
+			echo '<meta name="robots" content="noindex, follow" />' . "\n";
+			return; // No hreflang cluster for a page that must not be indexed.
+		}
+
 		// Resolve the SOURCE-language URL for whatever is being viewed.
 		//
 		// This previously bailed unless is_singular(), so archives, the blog
 		// index, taxonomy and search pages emitted no hreflang at all — on this
 		// site that is /events/, /catalog/, /resource-hub/ and every category,
 		// i.e. a large share of indexable URLs left with no language signal.
-		$post = get_queried_object();
-
 		if ( is_singular() && $post instanceof WP_Post ) {
 			$original_url = get_permalink( $post );
 		} else {
@@ -1600,7 +1614,7 @@ class ACWPT_Frontend {
 		ACWPT_Preloader::schedule_reconcile();
 
 		// The sitemap lists this post, so its cached XML is now stale.
-		delete_transient( 'acwpt_sitemap_xml' );
+		$this->flush_sitemap_cache();
 
 		// Queue a re-translation so the translated URL catches up on its own.
 		// Defaults ON: a multilingual site whose translations silently drift out
@@ -1622,7 +1636,21 @@ class ACWPT_Frontend {
 	 * Intercept requests for /acwpt-sitemap.xml and serve the sitemap.
 	 */
 	public function maybe_serve_sitemap( $wp ) {
-		if ( ! isset( $wp->request ) || $wp->request !== 'acwpt-sitemap.xml' ) {
+		if ( ! isset( $wp->request ) ) {
+			return;
+		}
+
+		$req = $wp->request;
+
+		// /acwpt-sitemap.xml            -> index of per-language children
+		// /acwpt-sitemap-<lang>.xml     -> the URLs for one language
+		$is_index = ( 'acwpt-sitemap.xml' === $req );
+		$lang     = null;
+		if ( ! $is_index && preg_match( '#^acwpt-sitemap-([a-z]{2}(?:-[a-z]{2})?)\.xml$#i', $req, $m ) ) {
+			$lang = strtolower( $m[1] );
+		}
+
+		if ( ! $is_index && null === $lang ) {
 			return;
 		}
 
@@ -1631,17 +1659,75 @@ class ACWPT_Frontend {
 			return; // Let WordPress 404 normally.
 		}
 
-		// Serve from cache if available.
-		$xml = get_transient( 'acwpt_sitemap_xml' );
-		if ( ! $xml ) {
-			$xml = $this->generate_sitemap_xml();
-			set_transient( 'acwpt_sitemap_xml', $xml, HOUR_IN_SECONDS );
+		$source = ACWPT_Languages::get_source();
+
+		if ( $is_index ) {
+			// A SITEMAP INDEX, not one monolithic file.
+			//
+			// The single file had grown to 12 MB across 6,512 URLs: legal under
+			// the 50 MB / 50,000 URL limits, but slow to fetch and slow for a
+			// crawler to process, and it forces a full regeneration whenever any
+			// one language changes. One child per language keeps each file small
+			// and lets Search Console report coverage per market.
+			$xml = get_transient( 'acwpt_sitemap_index' );
+			if ( ! $xml ) {
+				$xml = $this->generate_sitemap_index( array_merge( array( $source ), $enabled ) );
+				set_transient( 'acwpt_sitemap_index', $xml, HOUR_IN_SECONDS );
+			}
+		} else {
+			if ( $lang !== $source && ! in_array( $lang, $enabled, true ) ) {
+				return; // Unknown language: 404.
+			}
+			$key = 'acwpt_sitemap_xml_' . $lang;
+			$xml = get_transient( $key );
+			if ( ! $xml ) {
+				$xml = $this->generate_sitemap_xml( $lang );
+				set_transient( $key, $xml, HOUR_IN_SECONDS );
+			}
 		}
 
 		status_header( 200 );
 		header( 'Content-Type: application/xml; charset=UTF-8' );
 		echo $xml;
 		exit;
+	}
+
+	/**
+	 * Clear every cached sitemap file.
+	 *
+	 * Splitting into one child per language turned a single transient into
+	 * N+2 of them, so a bare delete_transient('acwpt_sitemap_xml') would now
+	 * leave the per-language children serving stale XML after an edit. Public
+	 * so the admin screen can reuse it.
+	 */
+	public function flush_sitemap_cache() {
+		delete_transient( 'acwpt_sitemap_xml' );   // legacy single-file key
+		delete_transient( 'acwpt_sitemap_index' );
+
+		$langs = ACWPT_Languages::get_enabled_codes();
+		$langs[] = ACWPT_Languages::get_source();
+		foreach ( array_unique( $langs ) as $code ) {
+			delete_transient( 'acwpt_sitemap_xml_' . $code );
+		}
+	}
+
+	/**
+	 * Build the sitemap index listing one child per language.
+	 *
+	 * @param string[] $langs Source language first, then targets.
+	 * @return string
+	 */
+	private function generate_sitemap_index( array $langs ) {
+		$xml  = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+		$xml .= '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+		foreach ( $langs as $code ) {
+			$xml .= "  <sitemap>\n";
+			$xml .= '    <loc>' . esc_url( home_url( '/acwpt-sitemap-' . $code . '.xml' ) ) . "</loc>\n";
+			$xml .= '    <lastmod>' . esc_html( gmdate( 'c' ) ) . "</lastmod>\n";
+			$xml .= "  </sitemap>\n";
+		}
+		$xml .= '</sitemapindex>';
+		return $xml;
 	}
 
 	/**
@@ -1664,10 +1750,25 @@ class ACWPT_Frontend {
 	 * Every entry includes <xhtml:link> alternates pointing to all language
 	 * versions plus x-default (the source language URL).
 	 */
-	private function generate_sitemap_xml() {
+	/**
+	 * Build the URL set for ONE language.
+	 *
+	 * Each <url> still carries the full hreflang cluster, including every other
+	 * language and x-default, because a cluster is only valid if every member
+	 * points at every other member. Splitting by language changes which URLs
+	 * are <loc>, not which alternates are declared.
+	 *
+	 * @param string $lang Language code this file covers.
+	 * @return string
+	 */
+	private function generate_sitemap_xml( $lang = null ) {
 		$enabled = ACWPT_Languages::get_enabled_codes();
 		$source  = ACWPT_Languages::get_source();
 		$home    = home_url();
+
+		if ( null === $lang ) {
+			$lang = $source;
+		}
 
 		$posts = get_posts( array(
 			'post_type'      => acwpt_post_types(),
@@ -1677,7 +1778,8 @@ class ACWPT_Frontend {
 			'order'          => 'DESC',
 		) );
 
-		// Drop anything that must not be indexed (password protected, noindex).
+		// Drop anything that must not be indexed (password protected, noindex,
+		// or slug-excluded in settings).
 		$posts = array_filter( $posts, 'acwpt_include_in_sitemap' );
 
 		$xml  = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
@@ -1691,27 +1793,28 @@ class ACWPT_Frontend {
 			$relative  = str_replace( $home, '', $permalink );
 			$relative  = '/' . ltrim( $relative, '/' );
 
-			// Build URLs for all language versions.
+			// Build URLs for all language versions (needed for the alternates).
 			$lang_urls            = array();
 			$lang_urls[ $source ] = $permalink;
 			foreach ( $enabled as $code ) {
 				$lang_urls[ $code ] = home_url( '/' . $code . $relative );
 			}
 
-			// A <url> block for each language version.
-			foreach ( $lang_urls as $lang => $url ) {
-				$xml .= "  <url>\n";
-				$xml .= '    <loc>' . esc_url( $url ) . "</loc>\n";
-				if ( $lastmod ) {
-					$xml .= '    <lastmod>' . esc_html( $lastmod ) . "</lastmod>\n";
-				}
-				// Hreflang alternates (every version, including self).
-				foreach ( $lang_urls as $alt_lang => $alt_url ) {
-					$xml .= '    <xhtml:link rel="alternate" hreflang="' . esc_attr( ACWPT_Languages::bcp47( $alt_lang ) ) . '" href="' . esc_url( $alt_url ) . '" />' . "\n";
-				}
-				$xml .= '    <xhtml:link rel="alternate" hreflang="x-default" href="' . esc_url( $permalink ) . '" />' . "\n";
-				$xml .= "  </url>\n";
+			if ( ! isset( $lang_urls[ $lang ] ) ) {
+				continue;
 			}
+
+			// One <url> for THIS language only; alternates still list them all.
+			$xml .= "  <url>\n";
+			$xml .= '    <loc>' . esc_url( $lang_urls[ $lang ] ) . "</loc>\n";
+			if ( $lastmod ) {
+				$xml .= '    <lastmod>' . esc_html( $lastmod ) . "</lastmod>\n";
+			}
+			foreach ( $lang_urls as $alt_lang => $alt_url ) {
+				$xml .= '    <xhtml:link rel="alternate" hreflang="' . esc_attr( ACWPT_Languages::bcp47( $alt_lang ) ) . '" href="' . esc_url( $alt_url ) . '" />' . "\n";
+			}
+			$xml .= '    <xhtml:link rel="alternate" hreflang="x-default" href="' . esc_url( $permalink ) . '" />' . "\n";
+			$xml .= "  </url>\n";
 		}
 
 		$xml .= '</urlset>';

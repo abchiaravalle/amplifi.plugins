@@ -64,6 +64,14 @@ class ACWPT_Admin {
 
 		$clean['floating_switcher'] = ! empty( $input['floating_switcher'] );
 
+		// sitemap_exclude: textarea, one slug per line, trailing * = prefix match.
+		$ex_in  = isset( $input['sitemap_exclude'] ) ? (string) $input['sitemap_exclude'] : '';
+		$ex_arr = array_values( array_filter( array_map(
+			function ( $l ) { return sanitize_text_field( trim( $l ) ); },
+			preg_split( '/\r\n|\r|\n/', $ex_in )
+		), 'strlen' ) );
+		$clean['sitemap_exclude'] = $ex_arr;
+
 		$position = sanitize_text_field( $input['floating_switcher_position'] ?? 'bottom-right' );
 		$clean['floating_switcher_position'] = in_array(
 			$position,
@@ -95,7 +103,7 @@ class ACWPT_Admin {
 		ACWPT_Frontend::instance()->clear_all_string_caches();
 
 		// Invalidate sitemap cache.
-		delete_transient( 'acwpt_sitemap_xml' );
+		ACWPT_Frontend::instance()->flush_sitemap_cache();
 
 		// Clear models cache if API key changed.
 		$old = get_option( 'acwpt_settings', array() );
@@ -217,6 +225,25 @@ class ACWPT_Admin {
 								</select>
 								<span id="acwpt-model-status"></span>
 								<p class="description">claude-haiku-4-5 is recommended for cost-effective translation. Models are fetched from your Anthropic account.</p>
+							</td>
+						</tr>
+						<tr>
+							<th><label for="acwpt_sitemap_exclude">Exclude from sitemap</label></th>
+							<td>
+								<?php
+								$ex = isset( $settings['sitemap_exclude'] ) ? (array) $settings['sitemap_exclude'] : array();
+								?>
+								<textarea
+									id="acwpt_sitemap_exclude"
+									name="acwpt_settings[sitemap_exclude]"
+									rows="5"
+									class="large-text code"
+									placeholder="One slug per line. Examples:&#10;care-predict-revamp&#10;wip-*"
+								><?php echo esc_textarea( implode( "\n", $ex ) ); ?></textarea>
+								<p class="description">
+									One page slug per line. A trailing <code>*</code> makes it a prefix match, so <code>wip-*</code> excludes every slug starting with <code>wip-</code>.
+									Excluded pages are dropped from the translated sitemap <strong>and</strong> served with <code>noindex</code> in every language &mdash; removing a URL from a sitemap alone does not deindex it, because search engines still reach it by following links.
+								</p>
 							</td>
 						</tr>
 						<tr>
