@@ -1668,7 +1668,64 @@ class ACWPT_Frontend {
 				$out[] = html_entity_decode( $text, ENT_QUOTES, 'UTF-8' );
 			}
 		}
-		return array_unique( $out );
+		// DEDUPE BY CONTAINMENT, and cap runaway blocks.
+		//
+		// Measured on prod: German held 10,204 rows for a page Polish renders in
+		// 2,402, and 1,953 of them (19%) were a SUBSTRING of another row — the
+		// same sentence stored both whole and in fragments, because the passes
+		// above deliberately overlap so that no markup shape is missed.
+		//
+		// Each fragment is separately billed, separately stored, and inflates the
+		// queue toward MAX_QUEUE, where further strings are silently discarded.
+		// Five languages stalled at that ceiling and could never complete.
+		//
+		// Keeping the LONGEST form is correct: a whole sentence translates better
+		// than its pieces, which is the entire reason the whole-block pass exists.
+		return $this->dedupe_candidates( $out );
+	}
+
+	/**
+	 * Drop candidates wholly contained in a longer candidate, and skip blocks
+	 * too large to translate usefully.
+	 *
+	 * @param string[] $candidates
+	 * @return string[]
+	 */
+	private function dedupe_candidates( array $candidates ) {
+		$candidates = array_values( array_unique( array_filter( array_map( 'trim', $candidates ), 'strlen' ) ) );
+
+		// Longest first, so a fragment is always compared against the whole.
+		usort(
+			$candidates,
+			function ( $a, $b ) {
+				return mb_strlen( $b ) - mb_strlen( $a );
+			}
+		);
+
+		$kept = array();
+		foreach ( $candidates as $c ) {
+			// A 2,700-character terms-and-conditions block was being sent as one
+			// string. That is slow, expensive, and far more likely to come back
+			// with a shifted or truncated mapping. Leave those to the content
+			// translator rather than the string pipeline.
+			if ( mb_strlen( $c ) > 1200 ) {
+				continue;
+			}
+
+			$contained = false;
+			foreach ( $kept as $k ) {
+				// Only longer strings are already in $kept, so one direction is enough.
+				if ( false !== mb_strpos( $k, $c ) ) {
+					$contained = true;
+					break;
+				}
+			}
+			if ( ! $contained ) {
+				$kept[] = $c;
+			}
+		}
+
+		return $kept;
 	}
 
 	/**
