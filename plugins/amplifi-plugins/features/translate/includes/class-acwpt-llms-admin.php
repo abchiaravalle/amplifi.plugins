@@ -50,8 +50,11 @@ class ACWPT_Llms_Admin {
 			<h1>llms.txt</h1>
 			<p class="description" style="max-width:820px">
 				Served at <code><?php echo esc_html( home_url( '/llms.txt' ) ); ?></code> and, for each
-				enabled language, at <code>/llms/&lt;lang&gt;</code> &mdash; extensionless, because WP Engine's nginx
-				claims any <code>.txt</code> path as a static file before WordPress sees it. This is what LLM answer engines
+				enabled language, at <code>/&lt;lang&gt;/llms.txt</code>. Written to disk as real files, because
+				WP Engine's nginx serves <code>.txt</code> paths from the filesystem without ever reaching
+				WordPress. Note the llms.txt spec only defines the root file and says nothing about
+				multilingual sites &mdash; this follows the same per-language convention as sitemaps.
+				This is what LLM answer engines
 				read to decide what this site is and which pages to cite. Translating rewrites same-site
 				URLs to that language's prefix, so a crawler following a link from the German document
 				lands on the German page.

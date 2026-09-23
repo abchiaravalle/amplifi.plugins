@@ -58,16 +58,60 @@ class ACWPT_Llms {
 
 	/**
 	 * Public URL for a language's document.
+	 *
+	 * /<lang>/llms.txt — matching the convention every llms.txt-aware crawler
+	 * already probes. The spec (llmstxt.org) defines only the root /llms.txt
+	 * and says nothing about multilingual sites, so there is no official
+	 * answer here; this mirrors the de-facto pattern used for robots.txt and
+	 * sitemaps, and keeps the filename a crawler is actually looking for.
+	 *
+	 * Backed by a REAL FILE, not a PHP route: WP Engine's nginx serves any
+	 * *.txt path from disk and never reaches PHP, so a dynamic handler at this
+	 * URL cannot work. Files are written on save/translate by write_files().
 	 */
 	public static function url( $lang ) {
 		if ( $lang === ACWPT_Languages::get_source() ) {
 			return home_url( '/llms.txt' );
 		}
-		// Extensionless. Any *.txt path is claimed by the host's static file
-		// handler before PHP runs, so a per-language document cannot live at a
-		// .txt URL on WP Engine. Measured: /llms-de.txt returned a 404 with
-		// Cloudflare headers only and no WordPress headers at all.
-		return home_url( '/llms/' . $lang );
+		return home_url( '/' . $lang . '/llms.txt' );
+	}
+
+	/**
+	 * Write every stored document to disk so the host can serve it.
+	 *
+	 * Called after any save or translate. Static files are also the right
+	 * shape for this content: an LLM crawler gets it with zero PHP, and it
+	 * survives the plugin being disabled.
+	 *
+	 * @return array [ lang => bytes|false ]
+	 */
+	public static function write_files() {
+		$written = array();
+		$root    = trailingslashit( ABSPATH );
+		$source  = ACWPT_Languages::get_source();
+
+		foreach ( array_merge( array( $source ), ACWPT_Languages::get_enabled_codes() ) as $lang ) {
+			$body = self::get( $lang );
+			if ( '' === trim( (string) $body ) ) {
+				continue;
+			}
+
+			if ( $lang === $source ) {
+				$path = $root . 'llms.txt';
+			} else {
+				$dir = $root . $lang;
+				if ( ! is_dir( $dir ) && ! wp_mkdir_p( $dir ) ) {
+					$written[ $lang ] = false;
+					continue;
+				}
+				$path = $dir . '/llms.txt';
+			}
+
+			$ok               = @file_put_contents( $path, $body ); // phpcs:ignore
+			$written[ $lang ] = ( false === $ok ) ? false : $ok;
+		}
+
+		return $written;
 	}
 
 	/**
@@ -109,14 +153,10 @@ class ACWPT_Llms {
 
 		if ( 'llms.txt' === $req ) {
 			$lang = $source;
-		} elseif ( preg_match( '#^llms/([a-z]{2})/?$#i', $req, $m ) ) {
-			// Canonical per-language form: extensionless, so the host's static
-			// file handler never claims it.
-			$lang = strtolower( $m[1] );
-		} elseif ( preg_match( '#^llms-([a-z]{2})\.txt$#i', $req, $m ) ) {
-			$lang = strtolower( $m[1] );
 		} elseif ( preg_match( '#^([a-z]{2})/llms\.txt$#i', $req, $m ) ) {
-			// Accepted on hosts that let the path through to PHP.
+			// Dynamic fallback for hosts that DO route .txt through PHP. On WP
+			// Engine this never fires because nginx serves the real file first,
+			// which is the intended outcome.
 			$lang = strtolower( $m[1] );
 		} else {
 			return;
@@ -164,6 +204,11 @@ class ACWPT_Llms {
 			'bytes'   => strlen( (string) $text ),
 		);
 		update_option( self::META_OPTION, $meta, false );
+
+		// Keep disk in step with the store. The option is the source of truth
+		// (survives a filesystem wipe, travels with a DB export); the file is
+		// what the host actually serves.
+		self::write_files();
 	}
 
 	public static function meta( $lang ) {
