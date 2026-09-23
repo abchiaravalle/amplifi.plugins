@@ -23,6 +23,10 @@ return array(
         'free trial'   => 'Kostenlose Testversion',
     ),
     'nuances' => array(
+        'Translate the exact machine part the source names: shaft = Welle, roll = Walze, journal = Lagerzapfen, spindle = Spindel. Never substitute the more familiar industry application (no Papiermaschinenwalze for a paper mill shaft).',
+        'Keep the brand\'s impossible/possible thread in German: render \'impossible\' as \'unmöglich\' (never \'unlösbar\') and preserve the \'möglich machen\' payoff instead of paraphrasing it as \'eine Lösung finden\'.',
+        'Carry scope-setting modifiers into the German noun phrase; dropping \'heavy\', \'advanced\' or \'specialized\' silently widens the claim (\'Fertigungshallen der Schwerindustrie\', not bare \'Fertigungshallen\').',
+        'When a source adjective does not collocate with its German noun, do not stack it attributively — move the whole adjective chain into a trailing dash apposition after the noun.',
         'FIDELITY: Factual change to a listed part type: \'paper mill shafts\' (Wellen) became \'Papiermaschinenwalzen\' = paper machine ROLLS/cylinders. Shafts and rolls are different components, so the machine\'s stated application range is altered. French renders the same item correctly as \'arbres de machines a papier\'.',
         'Attach every relative clause directly to its antecedent; never let the main verb or object intervene. Recast English \'Trusted by X who ...\' as \'X, die ..., vertrauen uns\' — not \'Hersteller vertrauen uns, die ...\'.',
         'In coordinated prepositional phrases, repeat the preposition and article for each member: \'in der Luft- und Raumfahrt oder in der Industrie\', never \'in der Luft- und Raumfahrt oder Industrie\'.',

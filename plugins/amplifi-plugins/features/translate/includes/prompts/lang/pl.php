@@ -23,6 +23,12 @@ return array(
         'small business'=> 'dla małych firm',
     ),
     'nuances' => array(
+        'Never render \'solve a challenge\' as \'rozwiązać wyzwanie\'; write \'sprostać wyzwaniu\' or recast the noun as \'problem\'.',
+        'Add no qualifier the English lacks: \'under pressure\' is \'pod presją\' or \'w warunkach presji\', never \'pod presją czasu\'.',
+        'Preserve the force of source participles: \'focused on\' is \'skupionych na\' or \'zaangażowanych w\', not \'zainteresowanych\'.',
+        'Keep role nouns at source specificity: \'technicians\' is \'technicy\', not the broader \'specjaliści\'.',
+        'Keep \'working toward a master\'s degree\' as ongoing enrolment (\'studiuje na studiach magisterskich\'); never imply completion or near-graduation.',
+        'Maintain the Państwo register in every address to the reader; never drop to ty-forms or bare second-person imperatives.',
         'FIDELITY: \'working toward\' (in progress, no stated stage) became \'kończy\' = \'is finishing/completing\'. The Polish asserts he is near graduation — a factual claim about a named person\'s credentials that the English does not make. RO (\'urmează un master\') and CS (\'studuje magisterský program\') render it correctly, confirming the Polish is the outlier.',
         'Lock one courtesy register before translating and hold it in every single string, including two-word CTAs, headlines, questions and imperatives: formal Państwo forms only, never second-person singular (Masz, Zapytaj, Twój, możesz). Short marketing strings are where the register silently breaks.',
         'Never translate an English verb+noun pair word for word — verify the Polish verb actually governs that noun. Wyzwaniu się sprosta lub stawia czoła (nigdy „rozwiązać wyzwanie”, „pomóc w wyzwaniu”); rozwiązuje się problem; projektuje się systemy, nie możliwości; w życie wciela się pomysły, nie pytania.',

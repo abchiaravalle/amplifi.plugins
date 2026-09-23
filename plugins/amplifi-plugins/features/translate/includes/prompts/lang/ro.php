@@ -29,6 +29,13 @@ return array(
         'spare parts'    => 'piese de schimb',
     ),
     'nuances' => array(
+        'Agree object clitics with the noun\'s real gender: use \'le\' for feminine plurals, \'îi\' only for masculine; never default to \'îi\'.',
+        'Use \'pe\' plus a resumptive clitic only for definite, specific human objects; drop both before bare indefinite plurals like \'echipe\'.',
+        'Never share one complement between coordinated verbs with different case government; repeat the object in its own case or resume it with a clitic.',
+        'Keep every item in a list grammatically parallel — all adjectives, all bare nouns, or all genitives — and repeat the genitival article across the series.',
+        'Attach a brand name directly to the noun it names, set off by commas, instead of stranding it after modifiers.',
+        'Invert to verb-then-subject when the subject carries a long relative clause; do not front-load heavy subjects as English does.',
+        'Keep the supine for machine names (\'mașini de echilibrat\') and keep rendering \'consistent\' as \'uniform/constant\', never \'consistent\'.',
         'Mark every definite or individuated human direct object with \'pe\' plus a clitic that AGREES in gender and number with it — îl/o/îi/le (\'le ajută pe echipe\', \'îi reunește pe cei mai buni tehnicieni\', \'pentru a-i sprijini pe clienți\') — in every clause, including superlatives, coordinated verbs and infinitives; never default to \'îi\', and never use \'pe\' in one sentence then drop it in the next.',
         'Respect case government: give each coordinated verb its own complement in the case it requires instead of sharing one noun phrase between an accusative verb and a genitive nominalisation — write \'Furnizăm sisteme inteligente și le asigurăm mentenanța\', never \'Livrăm și asigurăm mentenanța sistemelor\'.',
         'Keep a genitive enumeration in the genitive all the way to the last item: repeat a/al/ai/ale before each element and close with \'și a altor aspecte\' or \'și a multora\', never with a nominative tail such as \'și multe altele\'.',

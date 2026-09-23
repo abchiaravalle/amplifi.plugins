@@ -23,6 +23,12 @@ return array(
         'free trial'   => 'teste grátis',
     ),
     'nuances' => array(
+        'Render paired English sector adjectives as bare adjectives agreeing with the Portuguese head noun ("desafios aeroespaciais ou industriais"), never as "da indústria X ou industrial".',
+        'Preserve second-person reader address in questions and CTAs: translate "help solve for you" as "ajudá-lo a resolver", not as a bare "ajudar a resolver".',
+        'Keep every branch of a "Quer esteja a…" series in the same estar a + infinitivo form; never use "à procura de" before an infinitive.',
+        'Place the adjective qualifying the head noun immediately after that noun, before any de-complement ("solução conectada de gestão de desempenho").',
+        'Attach evolving/qualifying phrases directly to the noun they modify with no comma, and add the indefinite article after "para" in benefit phrases ("para uma inspeção mais…").',
+        'Keep the existing PT-PT register: article before possessives, enclisis in main clauses, estar a + infinitivo, «guillemets», and terms deteção, planeado, equilibragem, munhões, tempo de paragem, autómatos programáveis, END, correntes de Foucault.',
         'Never render the English pronoun \'one/ones\' as a bare \'um/uma\'. Repeat the head noun (\'otimizar uma solução existente\') or use a clitic (\'otimizá-la\').',
         'Keep the reflexive clitic on inherently pronominal verbs (adaptar-se, adequar-se, posicionar-se). If \'permitindo-nos adaptarmo-nos\' is clumsy, nominalise: \'permitindo-nos uma adaptação rápida\'.',
         'Never calque English verb+preposition pairs. \'presenting on\' is \'fazer apresentações sobre\', not \'apresentar sobre\'; \'reporting on\' is \'elaborar relatórios sobre\'.',

@@ -29,6 +29,13 @@ return array(
         'spare parts'    => 'yedek parça',
     ),
     'nuances' => array(
+        'Build "ister… ister…" so every branch has the same shape and the shared verb sits at the END: "İster sıfırdan ister mevcut teknolojilerle başlayalım". Never put a finite verb in the first branch and leave the second as a bare noun or postpositional phrase.',
+        'Express physical features and parts with -li or "…olan", never "…-e sahip": "kendi muylusu olan rotorlar", "dört kanallı sistem". Reserve "sahip olmak" for genuine ownership by a person or company.',
+        'Before using a verb+noun idiom, check which case it licenses. "Güç kazanmak" takes an accusative nominalization ("başarma gücünü kazanmak"), not a dative infinitive ("başarmaya güç kazanmak"). If unsure, rewrite with a plain common verb.',
+        'Use one Turkish term per concept across the whole file: bileşen (not komponent) for component, muylu for journal, merdane for roll, balanslama for balancing. Never alternate synonyms between strings.',
+        'When a list of sector modifiers ends in a head noun ("…dâhil birçok sanayi sektörü"), keep every list item a bare modifier — "otomotiv, elektrik, pompa, savunma, kâğıt" — and do not repeat "sanayi" inside the list.',
+        'Put the subject of a nominalized -DIK/-(y)EcEK clause in the genitive ("başkalarının vazgeçtiği", "ekiplerin doğrulamasına", "Dünyanın ilerlediğine"); leave it nominative only in temporal -DIğInDA adverbials ("insanlar … kazandığında").',
+        'Preserve the English modal strength and register: keep hedges as hedges ("can significantly impact" → "önemli ölçüde etkileyebilir"), keep job titles and common nouns lowercase ("program sorumlusu"), and keep straight ASCII quotes and apostrophes before suffixes (Ascential\'ın).',
         'In subordinate clauses built with -DIK/-(y)EcEK + possessive (gördüğü, olduğu, yaptığı), always put that clause\'s own subject in the genitive: "başkalarının sınır gördüğü yerde", never "başkaları sınır gördüğü yerde". Apply it to every such clause in a sentence, not just the first.',
         'Never pass an English term through word-for-word when the Turkish result is meaningless — degree fields, job functions, product categories. Render the established Turkish name of the field and drop redundant English words ("science business analytics" → "iş analitiği").',
         'Keep every branch of "ister… ister…" in the same grammatical shape: all converbs, all infinitives, or all noun phrases sharing one verb (olun/olsun) at the end. Never pair a verb-bearing branch with a bare noun or postpositional phrase.',

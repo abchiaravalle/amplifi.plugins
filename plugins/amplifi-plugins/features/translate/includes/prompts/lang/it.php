@@ -23,6 +23,11 @@ return array(
         'free trial'   => 'prova gratuita',
     ),
     'nuances' => array(
+        'Never let «risolvere» govern «sfida»: una sfida si affronta o si supera. Translate English «solve a challenge» as «superare/affrontare una sfida».',
+        'Render «aerospace» as «aerospaziale»; reserve «aeronautico» for «aviation/aeronautical». Do not narrow a sector name to a subset of what the English covers.',
+        'Preserve English superlatives at full strength: «the safest, most dependable» must become «i più sicuri e affidabili», never the plain positive degree.',
+        'Keep «risolvere» and «soluzioni» out of the same sentence: recast with «risposte», «problemi» or «rispondere a», mirroring the English word choice.',
+        'In «X such as [X of Y]» enumerations, replace the repeated head noun with «quelli di»: «rotori quali quelli di ventilatori», not «rotori quali rotori di ventilatori».',
         'FIDELITY: The claim dimension is swapped and broadened. \'Seamless\' asserts frictionless integration; \'completa\' asserts COMPLETE/total integration — a claim the English does not make. Spanish (\'fluida\') and Portuguese (\'perfeita\') both render the original claim. All four list items are preserved.',
         'Respect Italian verb–noun collocations instead of calquing the English verb: «una sfida» si affronta, si supera o si raccoglie, mai «si risolve»; only «problemi» e «questioni» si risolvono.',
         'Before finalising a sentence, scan it for shared roots and keep the source\'s own noun rather than a synonym that echoes: «answers» → «risposte», never «soluzioni» accanto a «risolvere».',
