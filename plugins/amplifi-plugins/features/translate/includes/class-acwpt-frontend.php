@@ -104,6 +104,12 @@ class ACWPT_Frontend {
 		add_action( 'parse_request', array( $this, 'maybe_serve_sitemap' ) );
 		add_filter( 'robots_txt', array( $this, 'add_sitemap_to_robots' ), 10, 2 );
 
+		// Fold the translated sitemap into whichever SEO plugin owns the index,
+		// so a crawler arriving at the conventional path still finds every
+		// language rather than an English-only tree.
+		add_filter( 'wpseo_sitemap_index', array( $this, 'add_to_seo_sitemap_index' ) );
+		add_filter( 'rank_math/sitemap/index', array( $this, 'add_to_seo_sitemap_index' ) );
+
 		// Fix canonical URL for translated pages.
 		add_filter( 'get_canonical_url', array( $this, 'filter_canonical_url' ), 10, 2 );
 
@@ -1117,6 +1123,29 @@ class ACWPT_Frontend {
 				}
 			}
 		}
+		// ACCESSIBILITY AND MEDIA ATTRIBUTES.
+		//
+		// alt, aria-label and title are read by search engines, screen readers
+		// and — increasingly — by AI agents navigating a page. They were never
+		// extracted, so a German page shipped 60 English aria-labels ("About",
+		// "Accept All", "Aerospace & industrials") and English alt text. To an
+		// agent driving the site in German, every control is unlabelled.
+		//
+		// alt is also the only description an image has: an LLM asked about a
+		// product photo has nothing else to read.
+		foreach ( array( 'alt', 'aria-label', 'title' ) as $attr ) {
+			if ( preg_match_all( '/\b' . preg_quote( $attr, '/' ) . '="([^"]{2,})"/i', $html, $am ) ) {
+				foreach ( $am[1] as $text ) {
+					$text = html_entity_decode( $text, ENT_QUOTES, 'UTF-8' );
+					// Skip anything that is not prose: URLs, numbers, codes.
+					if ( preg_match( '#^(https?://|[\d\s\.\-:/]+$)#', $text ) ) {
+						continue;
+					}
+					$out[] = $text;
+				}
+			}
+		}
+
 		// Form placeholder attributes.
 		if ( preg_match_all( '/\bplaceholder="([^"]{2,})"/i', $html, $m ) ) {
 			foreach ( $m[1] as $text ) {
@@ -1213,6 +1242,24 @@ class ACWPT_Frontend {
 			},
 			$html
 		);
+		// Translate accessibility and media attributes.
+		foreach ( array( 'alt', 'aria-label', 'title' ) as $attr ) {
+			$html = preg_replace_callback(
+				'/\b(' . preg_quote( $attr, '/' ) . ')="([^"]{2,})"/i',
+				function ( $m ) {
+					$text = html_entity_decode( $m[2], ENT_QUOTES, 'UTF-8' );
+					if ( preg_match( '#^(https?://|[\d\s\.\-:/]+$)#', $text ) ) {
+						return $m[0];
+					}
+					$translated = $this->get_string_translation( $text );
+					return $translated
+						? $m[1] . '="' . esc_attr( $translated ) . '"'
+						: $m[0];
+				},
+				$html
+			);
+		}
+
 		// Translate form placeholder attributes.
 		$html = preg_replace_callback(
 			'/\bplaceholder="([^"]{2,})"/i',
@@ -1908,6 +1955,35 @@ class ACWPT_Frontend {
 		}
 		$xml .= '</sitemapindex>';
 		return $xml;
+	}
+
+	/**
+	 * Fold the translated sitemap into the SEO plugin's sitemap index.
+	 *
+	 * The site was advertising TWO sitemaps. Yoast's /sitemap_index.xml lists
+	 * 14 children and contains zero translated URLs; ours lists 11 and contains
+	 * every language. A search engine that finds the Yoast index first — which
+	 * it will, because that is the conventional path and the one linked from
+	 * the SEO plugin's own output — sees an English-only site and no signal
+	 * that translations exist.
+	 *
+	 * Adding our index as an extra entry means either discovery path reaches
+	 * the full set, without asking the client to disable their SEO plugin's
+	 * sitemap.
+	 *
+	 * @param string $links Existing sitemap index entries (Yoast).
+	 * @return string
+	 */
+	public function add_to_seo_sitemap_index( $links ) {
+		$enabled = ACWPT_Languages::get_enabled_codes();
+		if ( empty( $enabled ) ) {
+			return $links;
+		}
+		$links .= "<sitemap>\n"
+			. "<loc>" . esc_url( home_url( '/acwpt-sitemap.xml' ) ) . "</loc>\n"
+			. "<lastmod>" . esc_html( gmdate( 'c' ) ) . "</lastmod>\n"
+			. "</sitemap>\n";
+		return $links;
 	}
 
 	/**
