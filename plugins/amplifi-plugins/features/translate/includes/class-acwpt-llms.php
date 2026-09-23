@@ -35,9 +35,57 @@ class ACWPT_Llms {
 	const META_OPTION = 'acwpt_llms_meta';
 
 	public static function init() {
+		// Serve early, straight off REQUEST_URI.
+		//
+		// Two layers claim these URLs before a normal hook would see them:
+		//
+		//   1. The feature's own language rewrite rules match /de/llms.txt and
+		//      turn it into index.php?pagename=llms.txt&acwpt_lang=de, so by
+		//      parse_request the path is already a page query.
+		//   2. More fundamentally, WP Engine's nginx treats a .txt extension as
+		//      a static file. /de/llms.txt never reaches PHP at all — measured:
+		//      a 404 carrying only Cloudflare headers, no WordPress headers,
+		//      while /llms.txt worked because a real file exists at the root.
+		//
+		// Layer 2 cannot be solved in PHP, so the canonical per-language URL is
+		// /llms-<lang>.txt, which nginx does not shadow. /<lang>/llms.txt is
+		// still accepted when it reaches us, for hosts that pass it through.
+		add_action( 'init', array( __CLASS__, 'maybe_serve_early' ), 1 );
 		add_action( 'parse_request', array( __CLASS__, 'maybe_serve' ), 0 );
 		add_action( 'wp_ajax_acwpt_translate_llms', array( __CLASS__, 'ajax_translate' ) );
 		add_action( 'wp_ajax_acwpt_save_llms', array( __CLASS__, 'ajax_save' ) );
+	}
+
+	/**
+	 * Public URL for a language's document.
+	 */
+	public static function url( $lang ) {
+		if ( $lang === ACWPT_Languages::get_source() ) {
+			return home_url( '/llms.txt' );
+		}
+		// Extensionless. Any *.txt path is claimed by the host's static file
+		// handler before PHP runs, so a per-language document cannot live at a
+		// .txt URL on WP Engine. Measured: /llms-de.txt returned a 404 with
+		// Cloudflare headers only and no WordPress headers at all.
+		return home_url( '/llms/' . $lang );
+	}
+
+	/**
+	 * Serve llms.txt straight from REQUEST_URI, ahead of the rewrite rules.
+	 */
+	public static function maybe_serve_early() {
+		if ( is_admin() || wp_doing_ajax() || wp_doing_cron() ) {
+			return;
+		}
+		$uri = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+		$path = trim( (string) wp_parse_url( $uri, PHP_URL_PATH ), '/' );
+		if ( '' === $path ) {
+			return;
+		}
+		if ( false === stripos( $path, 'llms' ) ) {
+			return;
+		}
+		self::serve_path( $path );
 	}
 
 	/**
@@ -47,20 +95,35 @@ class ACWPT_Llms {
 		if ( ! isset( $wp->request ) ) {
 			return;
 		}
-		$req = trim( $wp->request, '/' );
+		self::serve_path( trim( $wp->request, '/' ) );
+	}
 
+	/**
+	 * Resolve a request path to a language document and emit it.
+	 *
+	 * @param string $req Path with no leading or trailing slash.
+	 */
+	private static function serve_path( $req ) {
 		$source = ACWPT_Languages::get_source();
 		$lang   = null;
 
 		if ( 'llms.txt' === $req ) {
 			$lang = $source;
-		} elseif ( preg_match( '#^([a-z]{2})/llms\.txt$#i', $req, $m ) ) {
+		} elseif ( preg_match( '#^llms/([a-z]{2})/?$#i', $req, $m ) ) {
+			// Canonical per-language form: extensionless, so the host's static
+			// file handler never claims it.
 			$lang = strtolower( $m[1] );
-			if ( $lang !== $source && ! in_array( $lang, ACWPT_Languages::get_enabled_codes(), true ) ) {
-				return; // Unknown language: let WordPress 404.
-			}
+		} elseif ( preg_match( '#^llms-([a-z]{2})\.txt$#i', $req, $m ) ) {
+			$lang = strtolower( $m[1] );
+		} elseif ( preg_match( '#^([a-z]{2})/llms\.txt$#i', $req, $m ) ) {
+			// Accepted on hosts that let the path through to PHP.
+			$lang = strtolower( $m[1] );
 		} else {
 			return;
+		}
+
+		if ( $lang !== $source && ! in_array( $lang, ACWPT_Languages::get_enabled_codes(), true ) ) {
+			return; // Unknown language: let WordPress 404.
 		}
 
 		$body = self::get( $lang );

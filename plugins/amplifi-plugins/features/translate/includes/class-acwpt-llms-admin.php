@@ -50,7 +50,8 @@ class ACWPT_Llms_Admin {
 			<h1>llms.txt</h1>
 			<p class="description" style="max-width:820px">
 				Served at <code><?php echo esc_html( home_url( '/llms.txt' ) ); ?></code> and, for each
-				enabled language, at <code>/&lt;lang&gt;/llms.txt</code>. This is what LLM answer engines
+				enabled language, at <code>/llms/&lt;lang&gt;</code> &mdash; extensionless, because WP Engine's nginx
+				claims any <code>.txt</code> path as a static file before WordPress sees it. This is what LLM answer engines
 				read to decide what this site is and which pages to cite. Translating rewrites same-site
 				URLs to that language's prefix, so a crawler following a link from the German document
 				lands on the German page.
@@ -96,7 +97,7 @@ class ACWPT_Llms_Admin {
 						</button>
 						<span class="description" style="margin-left:8px">Overwrites this document, including hand edits.</span>
 					<?php endif; ?>
-					<a class="button" href="<?php echo esc_url( home_url( ( $current === $source ? '' : '/' . $current ) . '/llms.txt' ) ); ?>" target="_blank">View live</a>
+					<a class="button" href="<?php echo esc_url( ACWPT_Llms::url( $current ) ); ?>" target="_blank">View live</a>
 				</p>
 
 				<textarea id="acwpt-llms-text" class="large-text code" rows="26"
