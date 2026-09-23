@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class ACWPT_String_Store {
 
-	const DB_VERSION        = '3.4.1';
+	const DB_VERSION        = '3.5.0';
 	const DB_VERSION_OPTION = 'acwpt_strings_db_version';
 
 	/**
@@ -49,13 +49,15 @@ class ACWPT_String_Store {
 			id BIGINT UNSIGNED AUTO_INCREMENT,
 			language VARCHAR(10) NOT NULL,
 			source_hash CHAR(32) NOT NULL,
+			prompt_version VARCHAR(12) NOT NULL DEFAULT '',
 			source_text TEXT NOT NULL,
 			translated_text TEXT NOT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
 			UNIQUE KEY lang_hash (language, source_hash),
-			KEY language (language)
+			KEY language (language),
+			KEY lang_ver (language, prompt_version)
 		) {$charset};";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -224,6 +226,81 @@ class ACWPT_String_Store {
 	// =========================================================================
 
 	/**
+	 * Prompt fingerprint for the language, resolved once per request.
+	 */
+	private static function current_prompt_version( $language ) {
+		static $memo = array();
+		if ( isset( $memo[ $language ] ) ) {
+			return $memo[ $language ];
+		}
+		if ( ! class_exists( 'ACWPT_Prompts' ) ) {
+			return '';
+		}
+
+		$s      = get_option( 'acwpt_settings', array() );
+		$custom = array(
+			'never_translate'     => (array) ( $s['never_translate'] ?? array() ),
+			'glossary'            => (array) ( $s['glossary'] ?? array() ),
+			'custom_instructions' => (array) ( $s['custom_instructions'] ?? array() ),
+		);
+
+		$memo[ $language ] = ACWPT_Prompts::prompt_version( $language, $custom );
+		return $memo[ $language ];
+	}
+
+	/**
+	 * Source strings whose translation predates the current prompt.
+	 *
+	 * These are STALE, not wrong: they keep serving so the page never falls
+	 * back to English, while the queue re-translates them at the new version.
+	 * That is what makes a prompt improvement shippable across a fleet without
+	 * flushing and re-buying every site.
+	 *
+	 * @param string $language
+	 * @param int    $limit
+	 * @return string[] Source texts needing refresh.
+	 */
+	public static function stale_sources( $language, $limit = 200 ) {
+		global $wpdb;
+
+		$version = self::current_prompt_version( $language );
+		if ( '' === $version ) {
+			return array();
+		}
+
+		return (array) $wpdb->get_col(
+			$wpdb->prepare(
+				'SELECT source_text FROM ' . self::table_name()
+				. ' WHERE language = %s AND prompt_version <> %s LIMIT %d',
+				$language,
+				$version,
+				(int) $limit
+			)
+		);
+	}
+
+	/**
+	 * How many stored rows are behind the current prompt.
+	 */
+	public static function stale_count( $language ) {
+		global $wpdb;
+
+		$version = self::current_prompt_version( $language );
+		if ( '' === $version ) {
+			return 0;
+		}
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT COUNT(*) FROM ' . self::table_name()
+				. ' WHERE language = %s AND prompt_version <> %s',
+				$language,
+				$version
+			)
+		);
+	}
+
+	/**
 	 * Upsert many translations in one statement.
 	 *
 	 * @param string               $language Language code.
@@ -250,9 +327,9 @@ class ACWPT_String_Store {
 				if ( '' === $source || '' === $translated ) {
 					continue;
 				}
-				$values[] = '(%s, %s, %s, %s)';
+				$values[] = '(%s, %s, %s, %s, %s)';
 				$hash     = md5( $source );
-				array_push( $params, $language, $hash, $source, $translated );
+				array_push( $params, $language, $hash, $source, $translated, self::current_prompt_version( $language ) );
 
 				self::$memo[ $language ][ $hash ] = $translated;
 			}
@@ -261,9 +338,9 @@ class ACWPT_String_Store {
 				continue;
 			}
 
-			$sql = "INSERT INTO {$table} (language, source_hash, source_text, translated_text) VALUES "
+			$sql = "INSERT INTO {$table} (language, source_hash, source_text, translated_text, prompt_version) VALUES "
 				. implode( ', ', $values )
-				. ' ON DUPLICATE KEY UPDATE translated_text = VALUES(translated_text), updated_at = CURRENT_TIMESTAMP';
+				. ' ON DUPLICATE KEY UPDATE translated_text = VALUES(translated_text), prompt_version = VALUES(prompt_version), updated_at = CURRENT_TIMESTAMP';
 
 			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			$res = $wpdb->query( $wpdb->prepare( $sql, $params ) );

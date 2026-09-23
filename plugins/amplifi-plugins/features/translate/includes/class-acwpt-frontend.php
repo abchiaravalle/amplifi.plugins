@@ -1122,6 +1122,9 @@ class ACWPT_Frontend {
 		'heading_text', 'label', 'title', 'text', 'description', 'subtitle',
 		'button_text', 'link_text', 'caption', 'placeholder', 'cta_text',
 		'tab_title', 'item_title', 'nav_label', 'menu_title',
+		// Consent banner copy (features/consent), same shape.
+		'banner_title', 'banner_message', 'accept_label', 'reject_label',
+		'manage_label', 'save_label', 'toast_accepted', 'toast_rejected',
 	);
 
 	/**
@@ -1289,6 +1292,34 @@ class ACWPT_Frontend {
 				$candidate = $this->normalize_candidate( $inner );
 				if ( mb_strlen( $candidate ) >= 8 && mb_strlen( $candidate ) <= 800 ) {
 					$out[] = $candidate;
+				}
+			}
+		}
+
+		// COPY INSIDE A NAMED JS CONFIG OBJECT.
+		//
+		// The consent banner is the FIRST thing a visitor sees and it stayed
+		// English: its copy ships as `var ACCONSENT = {"settings":{...}}` in an
+		// inline <script>, and the extractor deliberately ignores scripts —
+		// rewriting arbitrary JS would break the page.
+		//
+		// So this targets NAMED config objects only, and within them only keys
+		// that are plainly labels. Everything else in the script is untouched.
+		// Handles the consent banner and any other feature that localises copy
+		// the same way.
+		if ( preg_match_all(
+			'/\bvar\s+[A-Z][A-Z0-9_]{3,}\s*=\s*(\{.*?\})\s*;/s',
+			$html,
+			$jm,
+			PREG_SET_ORDER
+		) ) {
+			foreach ( $jm as $j ) {
+				$data = json_decode( $j[1], true );
+				if ( ! is_array( $data ) ) {
+					continue;
+				}
+				foreach ( self::collect_json_text( $data ) as $text ) {
+					$out[] = $text;
 				}
 			}
 		}
@@ -1553,6 +1584,28 @@ class ACWPT_Frontend {
 			array( $this, 'translate_link_text_callback' ),
 			$html
 		);
+		// Translate copy inside named JS config objects (consent banner etc).
+		$html = preg_replace_callback(
+			'/(\bvar\s+[A-Z][A-Z0-9_]{3,}\s*=\s*)(\{.*?\})(\s*;)/s',
+			function ( $m ) {
+				$data = json_decode( $m[2], true );
+				if ( ! is_array( $data ) ) {
+					return $m[0];
+				}
+				$changed = false;
+				$walked  = $this->translate_json_text( $data, $changed );
+				if ( ! $changed ) {
+					return $m[0];
+				}
+				$encoded = wp_json_encode( $walked, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+				if ( ! $encoded || null === json_decode( $encoded, true ) ) {
+					return $m[0]; // never emit JS that will not parse
+				}
+				return $m[1] . $encoded . $m[3];
+			},
+			$html
+		);
+
 		// Labels that wrap a brand span (megamenu cards). Mirrors the extractor.
 		$html = preg_replace_callback(
 			'/(<(span|a)\b[^>]*>)((?:(?!<\/?(?:span|a)\b).)*?<span\b[^>]*class="[^"]*brand[^"]*"[^>]*>[^<]{2,60}<\/span>[^<]{3,140})(<\/\2>)/is',

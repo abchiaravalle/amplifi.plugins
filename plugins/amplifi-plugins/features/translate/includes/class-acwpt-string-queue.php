@@ -157,7 +157,29 @@ class ACWPT_String_Queue {
 
 		foreach ( (array) $languages as $lang ) {
 			$queue = get_option( self::option_name( $lang ), array() );
-			if ( ! is_array( $queue ) || empty( $queue ) ) {
+			if ( ! is_array( $queue ) ) {
+				$queue = array();
+			}
+
+			// TOP UP WITH STALE ROWS when there is nothing new to do.
+			//
+			// A language pack improvement used to reach only strings that had
+			// never been translated — everything already stored kept serving
+			// its old output until someone flushed the language and paid for it
+			// again. Rows now carry the prompt fingerprint they were made with,
+			// so an improved pack marks them stale and they refresh here, a
+			// bounded batch at a time, while continuing to serve.
+			if ( empty( $queue ) && class_exists( 'ACWPT_String_Store' ) ) {
+				$stale = ACWPT_String_Store::stale_sources( $lang, self::BATCH_SIZE );
+				foreach ( $stale as $src ) {
+					$queue[ $src ] = 1;
+				}
+				if ( $stale ) {
+					update_option( self::option_name( $lang ), $queue, false );
+				}
+			}
+
+			if ( empty( $queue ) ) {
 				continue;
 			}
 

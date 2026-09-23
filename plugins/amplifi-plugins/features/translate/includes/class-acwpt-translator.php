@@ -149,11 +149,55 @@ class ACWPT_Translator {
 			$val = isset( $translated[ $key ] ) ? (string) $translated[ $key ] : $original;
 			$val = ACWPT_Glossary::strip_glossary_sentinels( $val );
 			$val = ACWPT_Glossary::strip_keep_sentinels( $val );
-			$val = self::localize_quotes( $val, $language );
+			$val = self::typography_text_only( array( __CLASS__, 'localize_quotes' ), $val, $language );
 			$result[ $original ] = $val;
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Apply typography localisation to TEXT ONLY, never to markup.
+	 *
+	 * This exists because I broke the live Polish homepage with it. The new
+	 * whole-block extraction sends a sentence WITH its inline HTML to the
+	 * translator, and localize_quotes() then converted the ASCII quotes inside
+	 * HTML ATTRIBUTES into Polish typographic quotes:
+	 *
+	 *   <span class="textorange">  ->  <span class=„textorange”>
+	 *
+	 * The browser then parsed the rest of the hero as one giant class value, so
+	 * "Impossible? Done." vanished into an attribute and the heading rendered
+	 * empty. Every language with paired quote marks was exposed to this.
+	 *
+	 * Fix: mask every tag before typography runs, restore afterwards. Quotes
+	 * inside markup are syntax and must stay ASCII; quotes in prose are
+	 * typography and should be localised.
+	 *
+	 * @param callable $fn   Typography function to apply to text nodes.
+	 * @param string   $text Possibly HTML-bearing string.
+	 * @param string   $lang Language code.
+	 * @return string
+	 */
+	private static function typography_text_only( callable $fn, $text, $lang ) {
+		if ( false === strpos( $text, '<' ) ) {
+			return $fn( $text, $lang ); // plain text: nothing to protect
+		}
+
+		$tags = array();
+		$masked = preg_replace_callback(
+			'/<[^>]+>/',
+			function ( $m ) use ( &$tags ) {
+				$key = "\x01" . count( $tags ) . "\x02";
+				$tags[ $key ] = $m[0];
+				return $key;
+			},
+			$text
+		);
+
+		$masked = $fn( $masked, $lang );
+
+		return strtr( $masked, $tags );
 	}
 
 	/**
@@ -173,7 +217,7 @@ class ACWPT_Translator {
 	 * @param string $language
 	 * @return string
 	 */
-	private static function localize_quotes( $text, $language ) {
+	public static function localize_quotes( $text, $language ) {
 		$code = strtolower( substr( (string) $language, 0, 2 ) );
 
 		// open, close, and whether the language wants no-break spaces inside.
@@ -198,7 +242,7 @@ class ACWPT_Translator {
 		);
 
 		if ( ! isset( $marks[ $code ] ) ) {
-			return self::localize_apostrophes( $text, $code );
+			return self::typography_text_only( array( __CLASS__, 'localize_apostrophes' ), $text, $code );
 		}
 
 		list( $open, $close, $nbsp ) = $marks[ $code ];
@@ -216,11 +260,11 @@ class ACWPT_Translator {
 
 		if ( '"' === $open ) {
 			// Straight-quote language: normalisation above is the whole job.
-			return self::localize_apostrophes( $text, $code );
+			return self::typography_text_only( array( __CLASS__, 'localize_apostrophes' ), $text, $code );
 		}
 
 		if ( false === strpos( $text, '"' ) && false === strpos( $text, $open ) ) {
-			return self::localize_apostrophes( $text, $code );
+			return self::typography_text_only( array( __CLASS__, 'localize_apostrophes' ), $text, $code );
 		}
 
 		// Pair them up in order: first quote opens, next closes.
@@ -263,7 +307,7 @@ class ACWPT_Translator {
 			$text
 		);
 
-		return self::localize_french_spacing( self::localize_apostrophes( $text, $code ), $code );
+		return self::typography_text_only( array( __CLASS__, 'localize_french_spacing' ), self::typography_text_only( array( __CLASS__, 'localize_apostrophes' ), $text, $code ), $code );
 	}
 
 	/**
@@ -284,7 +328,7 @@ class ACWPT_Translator {
 	 * @param string $code Two-letter language code.
 	 * @return string
 	 */
-	private static function localize_french_spacing( $text, $code ) {
+	public static function localize_french_spacing( $text, $code ) {
 		if ( 'fr' !== $code ) {
 			return $text;
 		}
@@ -328,7 +372,7 @@ class ACWPT_Translator {
 	 * @param string $code Two-letter language code.
 	 * @return string
 	 */
-	private static function localize_apostrophes( $text, $code ) {
+	public static function localize_apostrophes( $text, $code ) {
 		// fr/it elide constantly (l'équilibrage, dell'azienda); ca/pt use it too.
 		$needs_curly = array( 'fr', 'it', 'ca' );
 		if ( ! in_array( $code, $needs_curly, true ) || false === strpos( $text, "'" ) ) {

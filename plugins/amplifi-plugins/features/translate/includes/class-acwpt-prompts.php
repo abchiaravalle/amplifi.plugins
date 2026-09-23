@@ -52,6 +52,42 @@ class ACWPT_Prompts {
     }
 
     /**
+     * Fingerprint of everything that determines translation OUTPUT.
+     *
+     * The string store keys purely on md5(source), so improving a language pack
+     * invalidated NOTHING — every already-translated string kept serving its old
+     * output. That was not theoretical: ten Polish rules from a native reviewer
+     * were added, reported as shipped, and had no effect on the live page until
+     * the language was manually flushed and re-bought.
+     *
+     * Mixing this hash into the cache key makes a pack update mark rows STALE
+     * rather than wrong: they still serve (so the page never falls back to
+     * English) while the queue re-translates them at the new version. That turns
+     * "re-buy the whole site" into a budgeted background migration, and makes it
+     * possible to ship a quality fix across a fleet without a flush.
+     *
+     * @param string $lang_code Target language.
+     * @param array  $custom    Per-site glossary / never-translate / instructions.
+     * @return string 12-char fingerprint.
+     */
+    public static function prompt_version( $lang_code, array $custom = array() ) {
+        static $memo = array();
+
+        $key = $lang_code . '|' . md5( wp_json_encode( $custom ) );
+        if ( isset( $memo[ $key ] ) ) {
+            return $memo[ $key ];
+        }
+
+        // The assembled prompt already contains the base rules, the language
+        // pack and the per-site custom blocks, so hashing it covers every input
+        // without having to enumerate them.
+        $assembled = self::build_strings_prompt( $lang_code, $custom );
+
+        $memo[ $key ] = substr( hash( 'sha256', $assembled ), 0, 12 );
+        return $memo[ $key ];
+    }
+
+    /**
      * Build the system prompt for batch string translation (JSON return).
      */
     public static function build_strings_prompt( $lang_code, array $custom ) {
