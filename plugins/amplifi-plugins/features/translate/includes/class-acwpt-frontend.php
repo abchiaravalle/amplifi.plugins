@@ -707,7 +707,18 @@ class ACWPT_Frontend {
 		}
 
 		$translated = $this->get_string_translation( $text );
-		return $translated ? $translated : $text;
+		if ( $translated ) {
+			return $translated;
+		}
+
+		// Head strings (title, meta description, og:*) are produced by the SEO
+		// plugin and never pass through the body extractor, so a miss here was
+		// never queued: nine of ten languages served an English <title> and meta
+		// description indefinitely. Queue it; the next render picks it up.
+		if ( class_exists( 'ACWPT_String_Queue' ) && $this->is_translatable_prose( $text ) ) {
+			ACWPT_String_Queue::enqueue( $this->current_language, array( html_entity_decode( $text, ENT_QUOTES, 'UTF-8' ) ) );
+		}
+		return $text;
 	}
 
 	/**
@@ -812,6 +823,19 @@ class ACWPT_Frontend {
 			return $html;
 		}
 
+		// Set aside regions already translated upstream so no pass below re-reads
+		// them as English source. Restored just before the buffer returns.
+		$done_regions = array();
+		$html = preg_replace_callback(
+			'/<!--acwpt:done-->(.*?)<!--\/acwpt:done-->/s',
+			function ( $m ) use ( &$done_regions ) {
+				$key                  = '<!--ACWPT_DONE_' . count( $done_regions ) . '-->';
+				$done_regions[ $key ] = $m[1];
+				return $key;
+			},
+			$html
+		);
+
 		// Stash the SOURCE html. Cacheability is judged against this, not
 		// against the translated output — see count_unresolved_source_strings().
 		$this->source_html_for_coverage = $html;
@@ -862,6 +886,9 @@ class ACWPT_Frontend {
 		// caching for all ten languages, and re-queued German strings to be
 		// translated into German — forever.
 		$this->coverage_missing = $this->count_unresolved_source_strings();
+		if ( $this->coverage_missing >= 0 ) {
+			$this->coverage_missing += (int) $this->upstream_missing;
+		}
 
 		// 4b. Translate JSON-LD structured data.
 		//
@@ -894,6 +921,14 @@ class ACWPT_Frontend {
 		//    TTL expires. Only fully-resolved pages are marked cacheable.
 		$this->mark_page_cacheability( $html );
 
+		// Put the upstream-translated regions back.
+		if ( $done_regions ) {
+			$html = strtr( $html, $done_regions );
+		}
+		// Strip any fence a filter left unconsumed (e.g. content that never
+		// reached the buffer's mask step).
+		$html = str_replace( array( '<!--acwpt:done-->', '<!--/acwpt:done-->' ), '', $html );
+
 		return $html;
 	}
 
@@ -912,6 +947,12 @@ class ACWPT_Frontend {
 	/** Buffered page html BEFORE substitution, for coverage measurement. */
 	private $source_html_for_coverage = '';
 
+	/** Source strings with no stored translation on this request. */
+	private $coverage_missing_list = array();
+
+	/** Missing strings counted in regions translated upstream (Elementor). */
+	private $upstream_missing = 0;
+
 	/**
 	 * Emit a translation map for labels injected by third-party JS.
 	 *
@@ -923,10 +964,10 @@ class ACWPT_Frontend {
 		if ( ! $this->current_language || $this->current_language === ACWPT_Languages::get_source() ) {
 			return $html;
 		}
-		// Only bother when a known client-rendered widget is present.
-		if ( false === stripos( $html, 'mktoForm' ) && false === stripos( $html, 'munchkin' ) ) {
-			return $html;
-		}
+		// Labels injected by JavaScript after our response is sent. Marketo
+		// forms, the theme's floating "Get in touch" tab (created with
+		// document.createElement in footer.php), and the chat widget's
+		// greeting all rendered English on every language in round 4.
 
 		$labels = array(
 			'First Name', 'Last Name', 'Email Address', 'Company Name', 'Title',
@@ -935,6 +976,8 @@ class ACWPT_Frontend {
 			'Is there anything specific that you\'d like to discuss?',
 			'By checking this box, I consent to receive marketing communications.',
 			'Interested In', 'Choose files', 'Required', 'Please complete this field.',
+			'Get in touch', 'How can I help you today?', 'New Chat', 'Try one of these:',
+			'Type your message...', 'Send',
 		);
 
 		$map = array();
@@ -965,10 +1008,10 @@ class ACWPT_Frontend {
 			. 'if(r.placeholder&&M[r.placeholder.trim()])r.placeholder=M[r.placeholder.trim()];'
 			. 'if(r.value&&r.type==="submit"&&M[r.value.trim()])r.value=M[r.value.trim()];'
 			. 'for(var i=0;i<r.childNodes.length;i++)tr(r.childNodes[i]);}'
-			. 'function run(){document.querySelectorAll("form[id^=mktoForm],.mktoForm").forEach(tr);}'
+			. 'function run(){document.querySelectorAll("form[id^=mktoForm],.mktoForm,.lets-talk-btn,[class*=chat],[id*=chat],[class*=sentia],[id*=sentia]").forEach(tr);}'
 			. 'if(document.readyState!=="loading")run();else document.addEventListener("DOMContentLoaded",run);'
 			. 'new MutationObserver(function(m){for(var i=0;i<m.length;i++){for(var j=0;j<m[i].addedNodes.length;j++){'
-			. 'var n=m[i].addedNodes[j];if(n.nodeType===1&&(n.matches&&(n.matches("form[id^=mktoForm]")||n.querySelector("form[id^=mktoForm]"))))run();}}})'
+			. 'var n=m[i].addedNodes[j];if(n.nodeType===1){run();return;}}}})'
 			. '.observe(document.documentElement,{childList:true,subtree:true});'
 			. '})();</script>';
 
@@ -994,7 +1037,9 @@ class ACWPT_Frontend {
 		$strings = array_values( array_unique( $strings ) );
 		$found   = ACWPT_String_Store::get_many( $this->current_language, $strings );
 
-		return max( 0, count( $strings ) - count( $found ) );
+		$this->coverage_missing_list = array_values( array_diff( $strings, array_keys( $found ) ) );
+
+		return count( $this->coverage_missing_list );
 	}
 
 	private function mark_page_cacheability( $html ) {
@@ -1011,6 +1056,26 @@ class ACWPT_Frontend {
 		// from some other page must not make THIS page uncacheable, or a busy
 		// site never caches anything.
 		$full = ( 0 === (int) $this->coverage_missing );
+
+		// Coverage diagnostics. The header is just a number, so it is safe on a
+		// public page and lets anyone see WHY a page is uncacheable without
+		// backend access. The string list goes to a transient only when the
+		// request carries the site's debug token. Added because nine languages
+		// reported "partial" with every extracted string stored and an empty
+		// queue, and there was no way to see what the check was counting.
+		header( 'X-ACWPT-Missing: ' . (int) $this->coverage_missing, true );
+		$token = (string) get_option( 'acwpt_debug_token', '' );
+		if ( '' !== $token && isset( $_GET['acwpt_debug'] ) && hash_equals( $token, (string) wp_unslash( $_GET['acwpt_debug'] ) ) ) {
+			set_transient(
+				'acwpt_cov_debug_' . $this->current_language,
+				array(
+					'missing'      => (int) $this->coverage_missing,
+					'source_bytes' => strlen( (string) $this->source_html_for_coverage ),
+					'strings'      => array_slice( $this->coverage_missing_list, 0, 60 ),
+				),
+				900
+			);
+		}
 
 		if ( $full ) {
 			header( 'X-ACWPT-Cacheable: 1', true );
@@ -1107,7 +1172,29 @@ class ACWPT_Frontend {
 			return $content;
 		}
 		$this->ensure_strings_cached_for_html( $content );
-		return $this->translate_html_blob( $content );
+
+		// Coverage for this region is measured HERE, against its English source,
+		// because the page buffer will only ever see the translated result.
+		$cands = $this->extract_translatable_strings_from_html( $content );
+		if ( $cands ) {
+			$found = ACWPT_String_Store::get_many( $this->current_language, $cands );
+			$this->upstream_missing += max( 0, count( $cands ) - count( $found ) );
+		}
+
+		$translated = $this->translate_html_blob( $content );
+
+		// FENCE THE ALREADY-TRANSLATED REGION.
+		//
+		// Elementor content is translated here, before the page output buffer
+		// runs. The buffer then re-extracted this region, which is already in
+		// the target language, and looked it up in an English-keyed store:
+		//   - it counted as "missing", so every page reported partial and sent
+		//     Cache-Control: no-store (fr, zh, es, pt, cs), and
+		//   - where it got queued, the queue "translated" German into German and
+		//     the buffer then substituted that second rewrite over correct text
+		//     (measured: de 73, pl 216, ro 61, tr 51, it 37 such rows).
+		// The markers let the buffer skip what has already been done.
+		return '<!--acwpt:done-->' . $translated . '<!--/acwpt:done-->';
 	}
 
 	/**
@@ -1796,8 +1883,25 @@ class ACWPT_Frontend {
 			// Manager". Those are unrelated: a 1-3 word label is almost always an
 			// independent UI string, not a fragment of the sentence it happens to
 			// occur in. Losing it re-broke the banner fixed earlier today.
-			$words = preg_split( '/\s+/u', trim( $c ) );
-			if ( count( $words ) > 3 ) {
+			// A candidate that is a complete unit on its own — ends in terminal
+			// punctuation, or has no sentence punctuation at all (a heading or
+			// button label) — is kept even when a longer string contains it.
+			//
+			// Round 4 of blind review found three strings left in English on
+			// every language: "Start a service ticket", "Report an issue or
+			// request services from our support team." and "Elevating support,
+			// Enhancing value". Each also occurs inside a LONGER, different
+			// string elsewhere on the page, so containment dedupe discarded the
+			// standalone copy. Reviewers noticed that the longer variant was
+			// translated and the shorter one sat next to it in English.
+			//
+			// Only mid-sentence fragments (the pieces the whole-block pass
+			// already covers) are safe to drop.
+			$plain      = trim( strip_tags( $c ) );
+			$standalone = (bool) preg_match( '/[.!?…:。！？]$/u', $plain )
+				|| ! preg_match( '/[,;.]/u', $plain );
+			$words      = preg_split( '/\s+/u', $plain );
+			if ( ! $standalone && count( $words ) > 3 ) {
 				foreach ( $kept as $k ) {
 					// Word-boundary containment only, so "Manage" can never match
 					// "Manager" even for longer candidates.

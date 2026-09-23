@@ -23,6 +23,10 @@ return array(
         'free trial'   => 'Kostenlose Testversion',
     ),
     'nuances' => array(
+        'Do not place a comma before "oder" / "und" joining two main clauses that share a subject: "Melden Sie ein Problem oder fordern Sie Leistungen an".',
+        '"Contract balancing" is "Auftragsauswuchten". Use "Auswuchten" / "Auswucht-" consistently; never "Maschinenausgleich".',
+        '"Affiliates:" in a footer list of sister companies is "Verbundene Unternehmen:".',
+        '"cab HVAC" keeps "cab": "Fahrerhaus-Klimatisierung".',
         'Translate the exact machine part the source names: shaft = Welle, roll = Walze, journal = Lagerzapfen, spindle = Spindel. Never substitute the more familiar industry application (no Papiermaschinenwalze for a paper mill shaft).',
         'Keep the brand\'s impossible/possible thread in German: render \'impossible\' as \'unmöglich\' (never \'unlösbar\') and preserve the \'möglich machen\' payoff instead of paraphrasing it as \'eine Lösung finden\'.',
         'Carry scope-setting modifiers into the German noun phrase; dropping \'heavy\', \'advanced\' or \'specialized\' silently widens the claim (\'Fertigungshallen der Schwerindustrie\', not bare \'Fertigungshallen\').',

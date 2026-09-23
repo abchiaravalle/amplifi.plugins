@@ -23,6 +23,8 @@ return array(
         'free trial'   => '免费试用',
     ),
     'nuances' => array(
+        'Use manufacturing vocabulary, not office or spreadsheet vocabulary: a factory "cell" is "生产单元" or "工位", never "单元格"; a production "line" is "生产线".',
+        'Keep every modifier, including trailing purpose phrases such as "for their consumers" ("为其消费者").',
         'Count the characters in every pre-nominal modifier before shipping. If more than about 12 characters sit before the head noun, put the noun first and move the modifier into its own predicate clause: 系统专为…定制设计，满足… not 针对…定制设计的系统; 制造商信赖我们，能在…交付… not 深受…结果的制造商信赖. Conventional credential chains (X大学Y专业学士学位) are exempt.',
         'Read every stacked modifier aloud and check for false word boundaries. If two adjacent characters fuse into an unintended word (需要大规模可靠 → 大规模可靠), rebuild with a separate clause such as 在大规模生产中.',
         'Keep the English claim direction and modality exactly. Neutral verbs stay neutral — impact is 产生影响, never 减少/改善/优化/提升 unless the English names that direction — and modals survive as 可/能/有助于, never as a bare assertion of accomplished fact.',

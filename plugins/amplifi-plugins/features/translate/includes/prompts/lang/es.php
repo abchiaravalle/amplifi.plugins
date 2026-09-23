@@ -23,6 +23,9 @@ return array(
         'free trial'   => 'prueba gratuita',
     ),
     'nuances' => array(
+        '"expert people" / "experts" as a counted figure is "expertos" or "profesionales", never "personal experto" ("personal" is a collective and cannot be counted).',
+        '"XL Machine" is a company name and stays exactly "XL Machine"; never "máquinas XL".',
+        '"actionable insights" is "información accionable" or "conclusiones prácticas"; check that the verb agrees with its subject.',
         'Preserve open-ended enumerations: render English \'including\' / \'such as\' with \'como\' (and close with \'entre otros\' where natural), never with a colon or dash that presents the list as the complete set.',
         'Proofread every heading, button and short marketing string for gender and number agreement between nouns and all coordinated adjectives — short strings get the least review and the most visibility.',
         'Render open-ended English enumerations (\'including\', \'such as\') with \'como\' or \'entre otros\'; never use a colon, which presents the list as complete and narrows the claim.',

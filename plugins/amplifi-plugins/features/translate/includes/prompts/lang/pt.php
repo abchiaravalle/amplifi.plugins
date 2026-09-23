@@ -23,6 +23,9 @@ return array(
         'free trial'   => 'teste grátis',
     ),
     'nuances' => array(
+        'VARIANT: this site\'s Portuguese is EUROPEAN PORTUGUESE (pt-PT). Use pt-PT spelling and vocabulary throughout and never mix with Brazilian forms: "equipa" not "equipe", "dinamómetro" not "dinamômetro", "peças sobressalentes" not "peças de reposição", "selecione a sua equipa", "contacto" not "contato", "registo" not "registro". Mixing the two is the single strongest machine-translation tell a Portuguese reader sees.',
+        'Use the possessive with the definite article consistently: "a nossa plataforma", "os nossos técnicos", "a sua empresa". Never mix "nossa plataforma" and "a nossa plataforma" on one page.',
+        '"uncompromising" is "sem concessões", never "sem compromissos" (which reads as "no obligation"). "engineer" as a verb is "criar" / "desenvolver", never "engenhar". "responsiveness" is "capacidade de resposta". "sales inquiry" is "pedido de informação comercial", not "consulta de vendas".',
         'When two or more coordinated adjectives modify one plural noun, inflect every adjective for number and gender, not just the last one.',
         'Render paired English sector adjectives as bare adjectives agreeing with the Portuguese head noun ("desafios aeroespaciais ou industriais"), never as "da indústria X ou industrial".',
         'Preserve second-person reader address in questions and CTAs: translate "help solve for you" as "ajudá-lo a resolver", not as a bare "ajudar a resolver".',

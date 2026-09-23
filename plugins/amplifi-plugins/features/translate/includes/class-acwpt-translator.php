@@ -185,6 +185,7 @@ class ACWPT_Translator {
 			$val = ACWPT_Glossary::strip_glossary_sentinels( $val );
 			$val = ACWPT_Glossary::strip_keep_sentinels( $val );
 			$val = self::typography_text_only( array( __CLASS__, 'localize_quotes' ), $val, $language );
+			$val = self::typography_text_only( array( __CLASS__, 'localize_thousands' ), $val, $language );
 			$result[ $original ] = $val;
 		}
 
@@ -343,6 +344,32 @@ class ACWPT_Translator {
 		);
 
 		return self::typography_text_only( array( __CLASS__, 'localize_french_spacing' ), self::typography_text_only( array( __CLASS__, 'localize_apostrophes' ), $text, $code ), $code );
+	}
+
+	/**
+	 * Localise English thousands separators ("13,000") in translated text.
+	 *
+	 * Deterministic, so it lives in code rather than the prompt (same rule as
+	 * the quote and apostrophe classes). A Spanish reader parses "13,000" as
+	 * thirteen-point-zero; reviewers flagged it on the live page.
+	 * Only digit groups of exactly three after a comma are touched, so phone
+	 * numbers, dates and decimals are left alone.
+	 */
+	public static function localize_thousands( $text, $code ) {
+		$sep = array(
+			'de' => '.', 'es' => '.', 'it' => '.', 'pt' => '.', 'ro' => '.', 'tr' => '.',
+			'fr' => "\u{202F}", 'pl' => "\u{00A0}", 'cs' => "\u{00A0}",
+		);
+		if ( ! isset( $sep[ $code ] ) ) {
+			return $text; // zh and en keep the comma
+		}
+		return preg_replace_callback(
+			'/(?<![\d.,])\d{1,3}(?:,\d{3})+(?![\d,]|\.\d)/u',
+			function ( $m ) use ( $sep, $code ) {
+				return str_replace( ',', $sep[ $code ], $m[0] );
+			},
+			$text
+		);
 	}
 
 	/**

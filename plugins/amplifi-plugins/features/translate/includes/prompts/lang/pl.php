@@ -23,6 +23,11 @@ return array(
         'small business'=> 'dla małych firm',
     ),
     'nuances' => array(
+        'ANNOUNCEMENT HEADLINES: awansować / mianować / powołać / zatrudnić take "na stanowisko" (accusative), never "na stanowisku". "Ascential ogłasza Raymonda Kime\'a na stanowisku..." is wrong; write "Ascential powołuje Raymonda Kime\'a na stanowisko..." or "...ogłasza powołanie Raymonda Kime\'a na stanowisko...". Reviewers found this error 14 times across the news feed.',
+        'WORD ORDER in "complex, mission-critical products and solutions": "złożone produkty i rozwiązania o kluczowym znaczeniu". Never "złożonych, krytycznych dla misji produktów".',
+        '"low-bearing" / "high-bearing" balancing machines are low-speed / high-speed ("niskoobrotowe" / "wysokoobrotowe"). "niskoosiowych" and "wysokoosiowych" are not Polish words.',
+        '"timely insights" keeps the time claim: "wnioski we właściwym czasie" or "wnioski na czas". Do not replace it with "praktyczne" (actionable), which is a different promise.',
+        '"turbo balancing" and "turbocharger" are "turbosprężarka", never "turbina" (turbine), which is a different machine for a different buyer.',
         'PAŃSTWO TAKES THIRD-PERSON PLURAL, NEVER SECOND. \'Możecie Państwo\' and \'Czy możecie\' are the single clearest non-native markers in Polish B2B copy. Write \'Mogą Państwo zadzwonić\', \'Czy mogą Państwo udostępnić\'. Never \'możecie\', \'jesteście\', \'chcecie\' with Państwo.',
         'ONE REGISTER PER DOCUMENT, AND NEVER TWO IN ONE SENTENCE. Reviewers found \'Dowiedz się, ... mogą pomóc Państwu\' — an informal imperative and a formal pronoun in the same clause. That is the signature of segment-by-segment machine translation. Commit to Państwo everywhere: \'Potrzebują Państwo pomocy?\' not \'Potrzebujesz pomocy?\'; \'Prosimy o kontakt\' not \'Skontaktuj się\'; \'Prosimy opisać\' not \'Opisz\'; \'Dowiedzą się Państwo\' not \'Dowiedz się\'.',
         'ADJECTIVE MUST AGREE WITH ITS NOUN IN CASE. \'bystrych umysły\' mixes genitive adjective with accusative noun — impossible for a native. Also avoid the calque itself: \'sharp minds\' is \'wiedza ekspercka\' or \'doświadczeni specjaliści\' in capital-equipment copy, never \'bystre umysły\', which reads juvenile.',
