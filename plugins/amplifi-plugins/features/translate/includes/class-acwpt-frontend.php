@@ -145,6 +145,9 @@ class ACWPT_Frontend {
 		// Prevent WordPress redirect_canonical from redirecting /es/blog/ → /blog/.
 		add_filter( 'redirect_canonical', array( $this, 'prevent_canonical_redirect' ), 10, 2 );
 
+		// Keep a missing translated URL inside its own language.
+		add_action( 'template_redirect', array( $this, 'handle_language_404' ), 1 );
+
 		// Identify translated pages with a debug header.
 		add_action( 'send_headers', array( $this, 'send_translated_page_headers' ) );
 
@@ -372,7 +375,7 @@ class ACWPT_Frontend {
 	/**
 	 * Get a single string translation from cache.
 	 */
-	private function get_string_translation( $original ) {
+	public function get_string_translation( $original ) {
 		$cache = $this->load_string_cache();
 		if ( isset( $cache[ $original ] ) ) {
 			return $cache[ $original ];
@@ -705,6 +708,55 @@ class ACWPT_Frontend {
 		return $redirect_url;
 	}
 
+	/**
+	 * Send a missing translated URL to that language's home, not the English one.
+	 *
+	 * Measured before this fix: /de/nonexistent-page/ returned 301 to the site
+	 * root. Two problems with that. It is a soft 404 — Google treats
+	 * redirect-to-home for missing content as a quality signal against the
+	 * whole property, and the URL can linger in the index. And it dumps a
+	 * German visitor onto an English page, which is a worse outcome than a
+	 * 404 for a buyer who arrived from a German search result.
+	 *
+	 * 302 rather than 301 because the target is not a permanent replacement for
+	 * the requested URL; the content may appear later, and a 301 would be
+	 * cached by browsers and intermediaries indefinitely.
+	 */
+	public function handle_language_404() {
+		if ( ! is_404() || ! $this->current_language ) {
+			return;
+		}
+		if ( $this->current_language === ACWPT_Languages::get_source() ) {
+			return;
+		}
+
+		$target = home_url( '/' . $this->current_language . '/' );
+
+		// Never redirect the language home to itself.
+		$current = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+		if ( untrailingslashit( $current ) === untrailingslashit( wp_parse_url( $target, PHP_URL_PATH ) ) ) {
+			return;
+		}
+
+		/**
+		 * Filter the destination for a missing translated URL.
+		 *
+		 * Return false to keep WordPress's own 404 handling, which is the
+		 * better choice for a site that has a designed 404 template per
+		 * language.
+		 *
+		 * @param string $target Language home URL.
+		 * @param string $lang   Current language code.
+		 */
+		$target = apply_filters( 'acwpt_language_404_redirect', $target, $this->current_language );
+		if ( ! $target ) {
+			return;
+		}
+
+		wp_safe_redirect( $target, 302 );
+		exit;
+	}
+
 	// =========================================================================
 	// Full Page Output Buffer
 	// =========================================================================
@@ -761,6 +813,17 @@ class ACWPT_Frontend {
 		// Restore protected language switcher links.
 		foreach ( $protected_links as $placeholder => $link ) {
 			$html = str_replace( $placeholder, $link, $html );
+		}
+
+		// 4b. Translate JSON-LD structured data.
+		//
+		// Runs after the SEO plugin has rendered its graph and after link
+		// prefixing, so it sees the final markup. Every translated page was
+		// emitting inLanguage "en-US", contradicting <html lang>, hreflang and
+		// og:locale — schema is what search engines and LLM answer engines read
+		// to decide what a page is and who it serves.
+		if ( class_exists( 'ACWPT_Schema' ) ) {
+			$html = ACWPT_Schema::filter_html( $html, $this->current_language );
 		}
 
 		// 5. Decide cacheability. A partially-translated page must NOT be cached,

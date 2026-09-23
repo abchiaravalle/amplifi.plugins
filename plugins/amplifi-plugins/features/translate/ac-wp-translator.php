@@ -105,6 +105,9 @@ require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-translator.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-preloader.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-admin.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-status.php';
+require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-schema.php';
+require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-llms.php';
+require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-llms-admin.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-frontend.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-cli.php';
 
@@ -130,8 +133,13 @@ function acwpt_init() {
 	ACWPT_String_Queue::register();
 	ACWPT_Frontend::instance()->init();
 
+	// JSON-LD translation and the per-language llms.txt endpoints.
+	ACWPT_Schema::init();
+	ACWPT_Llms::init();
+
 	if ( is_admin() ) {
 		ACWPT_Admin::instance()->init();
+		ACWPT_Llms_Admin::init();
 		ACWPT_Status::register();
 	}
 }

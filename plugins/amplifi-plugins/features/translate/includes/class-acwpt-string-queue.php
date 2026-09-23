@@ -176,9 +176,28 @@ class ACWPT_String_Queue {
 
 				$pairs = array();
 				foreach ( $translated as $source => $target ) {
-					// translate_strings() falls back to the original on a miss;
-					// storing an identity mapping would cache a non-translation.
-					if ( is_string( $target ) && '' !== $target && $target !== $source ) {
+					// STORE IDENTITY RESULTS. Do not skip them.
+					//
+					// This used to drop any $target === $source pair and then
+					// dequeue the chunk anyway. The comment below claimed that
+					// stopped a loop; it created one. Dequeuing without storing
+					// means the next render misses in get_many(), re-enqueues,
+					// re-calls the API, gets the same identity result, and
+					// dequeues again — permanently.
+					//
+					// On a B2B manufacturing site the affected set is large and
+					// constant: API, ISO 9001, CNC, ROI, SaaS, 2024, part
+					// numbers, and any brand not in never_translate. Every one
+					// was re-billed on essentially every queue cycle, in all ten
+					// languages, on every site — a spend floor no amount of
+					// warming could remove, and the likely reason cost accrued
+					// on a site whose queues read as drained.
+					//
+					// A genuine identity result is a CORRECT translation and
+					// belongs in the cache. The real failure case the old guard
+					// was reaching for is a parse miss, and translate_strings()
+					// already handles that by leaving the chunk queued above.
+					if ( is_string( $target ) && '' !== $target ) {
 						$pairs[ $source ] = $target;
 					}
 				}
@@ -188,8 +207,8 @@ class ACWPT_String_Queue {
 					$summary['translated'] += count( $pairs );
 				}
 
-				// Dequeue the whole chunk: identity results are legitimate
-				// non-translations (brand names, numbers) and must not loop.
+				// Dequeue the chunk. Safe now that identity results are stored:
+				// the next lookup hits the cache instead of re-queuing.
 				foreach ( $chunk as $s ) {
 					unset( $queue[ $s ] );
 				}

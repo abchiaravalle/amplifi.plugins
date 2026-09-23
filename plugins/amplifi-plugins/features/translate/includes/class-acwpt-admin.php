@@ -99,10 +99,26 @@ class ACWPT_Admin {
 			update_option( 'acwpt_flush_rules', true );
 		}
 
-		// Clear string translation caches when settings change.
-		ACWPT_Frontend::instance()->clear_all_string_caches();
+		// DO NOT flush the string store here.
+		//
+		// This used to call clear_all_string_caches(), which DELETEs every
+		// stored translation for every enabled language. It was unconditional,
+		// so toggling "show flags", nudging the switcher position, adding a
+		// sitemap exclusion, or pressing Save with no changes at all destroyed
+		// the entire corpus — 9,748 rows on this site, and Polish alone cost
+		// ~$8.26 to rebuild. Every client admin who opened this page was one
+		// click from a full re-bill, in ten languages, on every site.
+		//
+		// This is the same bug class already fixed on post-save, where one page
+		// edit wiped 12,862 Polish strings. The custom_version machinery below
+		// already invalidates precisely for the three settings that genuinely
+		// change translation output (never_translate, glossary,
+		// custom_instructions), so the blanket flush was pure collateral damage.
+		//
+		// A deliberate full flush is still available from the Status screen,
+		// behind its own nonce and confirmation.
 
-		// Invalidate sitemap cache.
+		// Invalidate sitemap cache (cheap, regenerates on next request).
 		ACWPT_Frontend::instance()->flush_sitemap_cache();
 
 		// Clear models cache if API key changed.
