@@ -1293,6 +1293,71 @@ class ACWPT_Frontend {
 			}
 		}
 
+		// LABELS THAT WRAP A BRAND SPAN.
+		//
+		// The megamenu writes cards as:
+		//   <span class="tmm-card-label"><span class="tmm-brand-word">Ascential
+		//   Care</span> - Available service level agreements</span>
+		//
+		// The brand span is its own element, so the prose after it is a trailing
+		// text node inside a <span> — matched by none of the passes above
+		// (<span> is not in the nested-block list, and the whole-block pass
+		// only covers p/h/li/td). Four menu labels stayed English on every
+		// language because of this one shape.
+		//
+		// Captured as the WHOLE label including the inner span, so the brand
+		// stays protected by the never-translate sentinels and the sentence
+		// reads as one unit.
+		if ( preg_match_all(
+			'/<(span|a)\b[^>]*>((?:(?!<\/?(?:span|a)\b).)*?<span\b[^>]*class="[^"]*brand[^"]*"[^>]*>[^<]{2,60}<\/span>[^<]{3,140})<\/\1>/is',
+			$html,
+			$lm,
+			PREG_SET_ORDER
+		) ) {
+			foreach ( $lm as $lmatch ) {
+				$candidate = $this->normalize_candidate( $lmatch[2] );
+				if ( mb_strlen( $candidate ) >= 8 && mb_strlen( $candidate ) <= 300 ) {
+					$out[] = $candidate;
+				}
+			}
+		}
+
+		// SELECT OPTIONS. 209 <option> tags on this site's support form and the
+		// extractor saw none of them — the block pattern does not include
+		// <option>, so every request-type, service-type and country label
+		// shipped in English on every language. The reviewer listed these
+		// explicitly ("the request-type options", "the whole country list").
+		//
+		// The option's VALUE attribute is left alone: it is what gets submitted
+		// and often keys server-side logic. Only the visible label is touched.
+		if ( preg_match_all( '/<select\b[^>]*>(.*?)<\/select>/is', $html, $sm, PREG_SET_ORDER ) ) {
+			foreach ( $sm as $sel ) {
+				// Skip country pickers. ~200 options x 10 languages is ~2,000
+				// calls of no commercial value: the list is proper nouns, the
+				// submitted value must stay stable, and a buyer finds their own
+				// country regardless of the label language.
+				if ( preg_match_all( '/<option\b[^>]*>([^<]{2,120})<\/option>/i', $sel[1], $opts ) ) {
+					if ( count( $opts[1] ) > 60 ) {
+						continue;
+					}
+					foreach ( $opts[1] as $text ) {
+						$text = $this->normalize_candidate( $text );
+						if ( mb_strlen( $text ) >= 2 && ! preg_match( '/^[\d\s\.\-:\/\+]+$/u', $text ) ) {
+							$out[] = $text;
+						}
+					}
+				}
+			}
+		}
+		if ( preg_match_all( '/<optgroup\b[^>]*\blabel="([^"]{2,120})"/i', $html, $gm ) ) {
+			foreach ( $gm[1] as $text ) {
+				$text = $this->normalize_candidate( $text );
+				if ( mb_strlen( $text ) >= 2 ) {
+					$out[] = $text;
+				}
+			}
+		}
+
 		// TEXT INSIDE JSON EMBEDDED IN AN ATTRIBUTE.
 		//
 		// This theme ships nav config in <script type="application/json">, so copy
@@ -1488,6 +1553,50 @@ class ACWPT_Frontend {
 			array( $this, 'translate_link_text_callback' ),
 			$html
 		);
+		// Labels that wrap a brand span (megamenu cards). Mirrors the extractor.
+		$html = preg_replace_callback(
+			'/(<(span|a)\b[^>]*>)((?:(?!<\/?(?:span|a)\b).)*?<span\b[^>]*class="[^"]*brand[^"]*"[^>]*>[^<]{2,60}<\/span>[^<]{3,140})(<\/\2>)/is',
+			function ( $m ) {
+				$candidate = $this->normalize_candidate( $m[3] );
+				if ( mb_strlen( $candidate ) < 8 || mb_strlen( $candidate ) > 300 ) {
+					return $m[0];
+				}
+				$t = $this->get_string_translation( $candidate );
+				if ( ! $t ) {
+					return $m[0];
+				}
+				// Refuse anything that lost the brand span.
+				if ( substr_count( strtolower( $t ), '<span' ) !== substr_count( strtolower( $m[3] ), '<span' ) ) {
+					return $m[0];
+				}
+				return $m[1] . $t . $m[4];
+			},
+			$html
+		);
+
+		// Translate <option> labels, leaving the submitted value untouched.
+		$html = preg_replace_callback(
+			'/(<option\b[^>]*>)([^<]{2,120})(<\/option>)/i',
+			function ( $m ) {
+				$text = $this->normalize_candidate( $m[2] );
+				if ( mb_strlen( $text ) < 2 || preg_match( '/^[\d\s\.\-:\/\+]+$/u', $text ) ) {
+					return $m[0];
+				}
+				$t = $this->get_string_translation( $text );
+				return $t ? $m[1] . esc_html( $t ) . $m[3] : $m[0];
+			},
+			$html
+		);
+		$html = preg_replace_callback(
+			'/(<optgroup\b[^>]*\blabel=")([^"]{2,120})(")/i',
+			function ( $m ) {
+				$text = $this->normalize_candidate( $m[2] );
+				$t    = mb_strlen( $text ) >= 2 ? $this->get_string_translation( $text ) : '';
+				return $t ? $m[1] . esc_attr( $t ) . $m[3] : $m[0];
+			},
+			$html
+		);
+
 		// Translate copy inside embedded JSON settings (Elementor data-settings).
 		//
 		// Decode, walk the allowlisted keys, re-encode. If anything fails to
