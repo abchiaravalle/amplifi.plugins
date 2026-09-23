@@ -874,6 +874,21 @@ class ACWPT_Frontend {
 			$html = ACWPT_Schema::filter_html( $html, $this->current_language );
 		}
 
+		// 4c. Client-rendered third-party widgets.
+		//
+		// A reviewer drove the real conversion path and found the Marketo lead
+		// form entirely in English: FIRST NAME, LAST NAME, Submit. Those labels
+		// are injected by Marketo's own JS after our response is sent, so zero
+		// of them exist in the HTML we produce and no server-side pass can ever
+		// reach them. Measured: "FIRST NAME" appears 0 times in our output.
+		//
+		// The form sits directly in the conversion path, so leaving it English
+		// undoes the rest of the work. We ship the translations we already hold
+		// for those labels plus a MutationObserver that applies them as the
+		// widget renders. Text nodes and placeholders only — never values,
+		// names or anything the vendor submits.
+		$html = $this->inject_client_widget_translations( $html );
+
 		// 5. Decide cacheability. A partially-translated page must NOT be cached,
 		//    or the untranslated source text is frozen in the edge cache until the
 		//    TTL expires. Only fully-resolved pages are marked cacheable.
@@ -896,6 +911,69 @@ class ACWPT_Frontend {
 
 	/** Buffered page html BEFORE substitution, for coverage measurement. */
 	private $source_html_for_coverage = '';
+
+	/**
+	 * Emit a translation map for labels injected by third-party JS.
+	 *
+	 * Only strings we ALREADY have a cached translation for are emitted, so
+	 * this never triggers an API call during a page render and never blocks.
+	 * A missing label simply stays English until the queue has translated it.
+	 */
+	private function inject_client_widget_translations( $html ) {
+		if ( ! $this->current_language || $this->current_language === ACWPT_Languages::get_source() ) {
+			return $html;
+		}
+		// Only bother when a known client-rendered widget is present.
+		if ( false === stripos( $html, 'mktoForm' ) && false === stripos( $html, 'munchkin' ) ) {
+			return $html;
+		}
+
+		$labels = array(
+			'First Name', 'Last Name', 'Email Address', 'Company Name', 'Title',
+			'Phone Number', 'Submit', 'Country', 'State', 'City', 'Comments',
+			'How did you first hear about us?',
+			'Is there anything specific that you\'d like to discuss?',
+			'By checking this box, I consent to receive marketing communications.',
+			'Interested In', 'Choose files', 'Required', 'Please complete this field.',
+		);
+
+		$map = array();
+		foreach ( $labels as $label ) {
+			$t = $this->get_string_translation( $label );
+			if ( $t && $t !== $label ) {
+				$map[ $label ] = $t;
+			}
+			// Marketo renders labels uppercase with a trailing colon.
+			$upper = mb_strtoupper( $label, 'UTF-8' );
+			if ( $t && $t !== $label ) {
+				$map[ $upper ]        = mb_strtoupper( $t, 'UTF-8' );
+				$map[ $label . ':' ]  = $t . ':';
+				$map[ $upper . ':' ]  = mb_strtoupper( $t, 'UTF-8' ) . ':';
+			}
+		}
+
+		if ( empty( $map ) ) {
+			return $html;
+		}
+
+		$json   = wp_json_encode( $map, JSON_UNESCAPED_UNICODE );
+		$script = '<script id="acwpt-widget-i18n">(function(){'
+			. 'var M=' . $json . ';'
+			. 'function tr(r){if(!r)return;'
+			. 'if(r.nodeType===3){var k=r.nodeValue.trim();if(M[k])r.nodeValue=r.nodeValue.replace(k,M[k]);return;}'
+			. 'if(r.nodeType!==1)return;'
+			. 'if(r.placeholder&&M[r.placeholder.trim()])r.placeholder=M[r.placeholder.trim()];'
+			. 'if(r.value&&r.type==="submit"&&M[r.value.trim()])r.value=M[r.value.trim()];'
+			. 'for(var i=0;i<r.childNodes.length;i++)tr(r.childNodes[i]);}'
+			. 'function run(){document.querySelectorAll("form[id^=mktoForm],.mktoForm").forEach(tr);}'
+			. 'if(document.readyState!=="loading")run();else document.addEventListener("DOMContentLoaded",run);'
+			. 'new MutationObserver(function(m){for(var i=0;i<m.length;i++){for(var j=0;j<m[i].addedNodes.length;j++){'
+			. 'var n=m[i].addedNodes[j];if(n.nodeType===1&&(n.matches&&(n.matches("form[id^=mktoForm]")||n.querySelector("form[id^=mktoForm]"))))run();}}})'
+			. '.observe(document.documentElement,{childList:true,subtree:true});'
+			. '})();</script>';
+
+		return str_replace( '</body>', $script . '</body>', $html );
+	}
 
 	/**
 	 * Count source strings on this request that have no stored translation.
@@ -1208,6 +1286,49 @@ class ACWPT_Frontend {
 	}
 
 	/**
+	 * Is this string prose a translator should see at all?
+	 *
+	 * The live Polish page rendered the sales phone number as "dostepnosc
+	 * strony internetowej". The number had been EXTRACTED and sent for
+	 * translation: the numeric guard was /^[\d\s\.\-:\/\+]+$/, which does not
+	 * allow parentheses, so "+1 (616) 234-1000" was treated as prose. Anything
+	 * that is an identifier rather than language must never enter the batch:
+	 * it cannot be improved by translation and it can be corrupted by it.
+	 *
+	 * @param string $text Normalised candidate.
+	 * @return bool
+	 */
+	private function is_translatable_prose( $text ) {
+		$text = trim( (string) $text );
+
+		if ( '' === $text || mb_strlen( $text ) < 2 ) {
+			return false;
+		}
+
+		// Phone numbers, in any common punctuation style.
+		if ( preg_match( '/^[\+\(\)\d\s\.\-\/x#]{7,}$/u', $text ) ) {
+			return false;
+		}
+		// Pure numerics, ranges, percentages, counters.
+		if ( preg_match( '/^[\d\s\.,:\/\+\-%x×]+$/u', $text ) ) {
+			return false;
+		}
+		// URLs, emails, file paths, hashes.
+		if ( preg_match( '/^(https?:|mailto:|tel:|www\.|\/|#)/i', $text ) ) {
+			return false;
+		}
+		if ( preg_match( '/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i', $text ) ) {
+			return false;
+		}
+		// Markup or template syntax that leaked into a text node.
+		if ( preg_match( '/[{}]|<\/?[a-z]+\s*\/?>$/i', $text ) && false === strpos( $text, ' ' ) ) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
 	 * Normalise a candidate string lifted out of raw HTML.
 	 *
 	 * Entities must be decoded BEFORE the text reaches the model. The extractors
@@ -1241,7 +1362,7 @@ class ACWPT_Frontend {
 		if ( preg_match_all( '/(<a\b[^>]*>)([^<]+)(<\/a>)/i', $html, $m, PREG_SET_ORDER ) ) {
 			foreach ( $m as $match ) {
 				$text = $this->normalize_candidate( $match[2] );
-				if ( strlen( $text ) >= 2 && ! preg_match( '/^[\d\s\.\-:\/]+$/', $text ) ) {
+				if ( $this->is_translatable_prose( $text ) ) {
 					$out[] = $text;
 				}
 			}
@@ -1353,6 +1474,29 @@ class ACWPT_Frontend {
 			}
 		}
 
+		// TEXT BEFORE A NESTED CHILD ELEMENT.
+		//
+		// The footer heading "Affiliates:" is written as
+		//   <li style="...">Affiliates: <ul> ... </ul></li>
+		// so its text is followed by a CHILD element rather than a closing tag.
+		// The block pass needs >text< adjacent, the nested-block pass needs a
+		// preceding </div>, and the inline-leading pass only looks ahead to
+		// INLINE tags — none matched, so it stayed English while every sibling
+		// heading around it translated. A reviewer spotted it precisely because
+		// its neighbours were Polish.
+		if ( preg_match_all(
+			'/<(?:li|td|th|dt|dd|h[1-6]|p|div)\b[^>]*>\s*([^<>{}]{3,120}?)\s*<(?:ul|ol|div|span|section|table|p)\b/i',
+			$html,
+			$cm
+		) ) {
+			foreach ( $cm[1] as $text ) {
+				$text = $this->normalize_candidate( $text );
+				if ( $this->is_translatable_prose( $text ) ) {
+					$out[] = $text;
+				}
+			}
+		}
+
 		// SELECT OPTIONS. 209 <option> tags on this site's support form and the
 		// extractor saw none of them — the block pattern does not include
 		// <option>, so every request-type, service-type and country label
@@ -1373,7 +1517,7 @@ class ACWPT_Frontend {
 					}
 					foreach ( $opts[1] as $text ) {
 						$text = $this->normalize_candidate( $text );
-						if ( mb_strlen( $text ) >= 2 && ! preg_match( '/^[\d\s\.\-:\/\+]+$/u', $text ) ) {
+						if ( $this->is_translatable_prose( $text ) ) {
 							$out[] = $text;
 						}
 					}
@@ -1429,9 +1573,7 @@ class ACWPT_Frontend {
 		if ( preg_match_all( '/<\/(?:div|p|span|h[1-6])>\s*([^<>{}]{3,120}?)\s*<\/(?:div|p|li|td)>/u', $html, $tm ) ) {
 			foreach ( $tm[1] as $text ) {
 				$text = $this->normalize_candidate( $text );
-				if ( mb_strlen( $text ) >= 3
-					&& ! preg_match( '/^[\d\s\.\-:\/\+%]+$/u', $text )
-					&& ! preg_match( '/^https?:/i', $text ) ) {
+				if ( $this->is_translatable_prose( $text ) ) {
 					$out[] = $text;
 				}
 			}
@@ -1441,7 +1583,7 @@ class ACWPT_Frontend {
 		if ( preg_match_all( '/(<(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)\b[^>]*>)([^<]{2,})(<\/(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)>)/i', $html, $m, PREG_SET_ORDER ) ) {
 			foreach ( $m as $match ) {
 				$text = $this->normalize_candidate( $match[2] );
-				if ( strlen( $text ) >= 2 && ! preg_match( '/^[\d\s\.\-:\/]+$/', $text ) ) {
+				if ( $this->is_translatable_prose( $text ) ) {
 					if ( ! preg_match( '/^https?:/', $text ) && ! preg_match( '/[{}<>]/', $text ) ) {
 						$out[] = $text;
 					}
@@ -1623,6 +1765,20 @@ class ACWPT_Frontend {
 					return $m[0];
 				}
 				return $m[1] . $t . $m[4];
+			},
+			$html
+		);
+
+		// Text that precedes a nested child element (e.g. "Affiliates:" + <ul>).
+		$html = preg_replace_callback(
+			'/(<(?:li|td|th|dt|dd|h[1-6]|p|div)\b[^>]*>\s*)([^<>{}]{3,120}?)(\s*<(?:ul|ol|div|span|section|table|p)\b)/i',
+			function ( $m ) {
+				$text = $this->normalize_candidate( $m[2] );
+				if ( ! $this->is_translatable_prose( $text ) ) {
+					return $m[0];
+				}
+				$t = $this->get_string_translation( $text );
+				return $t ? $m[1] . esc_html( $t ) . $m[3] : $m[0];
 			},
 			$html
 		);

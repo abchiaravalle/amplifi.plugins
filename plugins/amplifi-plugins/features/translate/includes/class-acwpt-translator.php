@@ -143,10 +143,45 @@ class ACWPT_Translator {
 			return new WP_Error( 'parse_error', 'Could not parse string translation response.' );
 		}
 
+		// BATCH INTEGRITY. Reject a response whose key set does not match what we
+		// sent, instead of trusting it positionally.
+		//
+		// Three blind reviewers independently found the same corruption on the
+		// live Polish homepage: the sales phone number rendered as "dostepnosc
+		// strony internetowej", a logo's alt text became "Poprzednia", and a
+		// seven-item resources list lost "Applications" while every remaining
+		// label slid up one slot.
+		//
+		// One cause. The model dropped an item and RENUMBERED the rest, so key
+		// "3" now held the translation of input 4. Each value was individually
+		// plausible, so nothing downstream could tell; the damage only shows at
+		// document level. A missing key already fell back to the original, but
+		// a SHIFTED object has every key present and is silently wrong.
+		//
+		// Count mismatch is the detectable signature. On mismatch the whole
+		// batch is failed so the queue retries it, rather than storing garbage
+		// that looks like a successful translation.
+		if ( count( $translated ) !== count( $originals ) ) {
+			return new WP_Error(
+				'acwpt_batch_mismatch',
+				sprintf(
+					'Translation response returned %d items for %d inputs; rejecting the batch to avoid a shifted mapping.',
+					count( $translated ),
+					count( $originals )
+				)
+			);
+		}
+
 		$result = array();
 		foreach ( $originals as $i => $original ) {
 			$key = (string) $i;
-			$val = isset( $translated[ $key ] ) ? (string) $translated[ $key ] : $original;
+			if ( ! array_key_exists( $key, $translated ) ) {
+				return new WP_Error(
+					'acwpt_batch_mismatch',
+					'Translation response was missing key ' . $key . '; rejecting the batch.'
+				);
+			}
+			$val = (string) $translated[ $key ];
 			$val = ACWPT_Glossary::strip_glossary_sentinels( $val );
 			$val = ACWPT_Glossary::strip_keep_sentinels( $val );
 			$val = self::typography_text_only( array( __CLASS__, 'localize_quotes' ), $val, $language );
