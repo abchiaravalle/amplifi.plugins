@@ -23,6 +23,7 @@ return array(
         'free trial'   => 'essai gratuit',
     ),
     'nuances' => array(
+        'FIDELITY: Modifier re-attached, changing what is claimed: \'de precision\' now qualifies \'composants\', so the headline reads \'balancing of PRECISION COMPONENTS\' instead of \'PRECISION BALANCING of components\'. The capability claim about Ascential\'s process/equipment becomes a description of the customer\'s parts. German keeps it correctly as \'Praezisionswuchtung von Komponenten\'.',
         'Validate every verb + object pair against real French usage instead of copying the English pair: on conçoit/développe des solutions, jamais « des possibilités » ; on fonde ses décisions sur des données.',
         'After « tels que », « comme » or « notamment », repeat the determiner before each item, and put a comma before « dont », « notamment » or « comme » introducing an explanatory list.',
         'Express attributes with French structures (dotés de, équipés de, issus de) instead of calquing English "with", and never drop the article in a French noun list.',

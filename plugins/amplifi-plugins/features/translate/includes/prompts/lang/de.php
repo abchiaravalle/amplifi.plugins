@@ -23,6 +23,7 @@ return array(
         'free trial'   => 'Kostenlose Testversion',
     ),
     'nuances' => array(
+        'FIDELITY: Factual change to a listed part type: \'paper mill shafts\' (Wellen) became \'Papiermaschinenwalzen\' = paper machine ROLLS/cylinders. Shafts and rolls are different components, so the machine\'s stated application range is altered. French renders the same item correctly as \'arbres de machines a papier\'.',
         'Attach every relative clause directly to its antecedent; never let the main verb or object intervene. Recast English \'Trusted by X who ...\' as \'X, die ..., vertrauen uns\' — not \'Hersteller vertrauen uns, die ...\'.',
         'In coordinated prepositional phrases, repeat the preposition and article for each member: \'in der Luft- und Raumfahrt oder in der Industrie\', never \'in der Luft- und Raumfahrt oder Industrie\'.',
         'Translate English \'specific\' as \'konkret\' (or \'bestimmt\') when it means one particular case; use \'spezifisch\' only in the sense \'charakteristisch für / eigen\'.',

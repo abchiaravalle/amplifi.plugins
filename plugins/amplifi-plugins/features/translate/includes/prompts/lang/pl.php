@@ -23,6 +23,7 @@ return array(
         'small business'=> 'dla małych firm',
     ),
     'nuances' => array(
+        'FIDELITY: \'working toward\' (in progress, no stated stage) became \'kończy\' = \'is finishing/completing\'. The Polish asserts he is near graduation — a factual claim about a named person\'s credentials that the English does not make. RO (\'urmează un master\') and CS (\'studuje magisterský program\') render it correctly, confirming the Polish is the outlier.',
         'Lock one courtesy register before translating and hold it in every single string, including two-word CTAs, headlines, questions and imperatives: formal Państwo forms only, never second-person singular (Masz, Zapytaj, Twój, możesz). Short marketing strings are where the register silently breaks.',
         'Never translate an English verb+noun pair word for word — verify the Polish verb actually governs that noun. Wyzwaniu się sprosta lub stawia czoła (nigdy „rozwiązać wyzwanie”, „pomóc w wyzwaniu”); rozwiązuje się problem; projektuje się systemy, nie możliwości; w życie wciela się pomysły, nie pytania.',
         'Insert a non-breaking space (U+00A0) after every one-letter word — w, z, i, o, u, a, e — in every string without exception. This is mandatory Polish typography, not a stylistic choice, and applies to headings, bullets and alt text as well as body copy.',
