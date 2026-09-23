@@ -45,6 +45,16 @@ class ACWPT_String_Queue {
 	// =========================================================================
 
 	private static function option_name( $language ) {
+		if ( ! is_string( $language ) ) {
+			// Fail loudly rather than building "acwpt_string_queue_Array" and
+			// reading a queue that cannot exist.
+			_doing_it_wrong(
+				__METHOD__,
+				'Language code must be a string, ' . gettype( $language ) . ' given.',
+				'3.3.7'
+			);
+			$language = '';
+		}
 		return self::QUEUE_OPTION_PREFIX . $language;
 	}
 
@@ -128,9 +138,22 @@ class ACWPT_String_Queue {
 		set_transient( self::LOCK_KEY, 1, 120 );
 		update_option( self::LOCK_STAMP_OPTION, time(), false );
 
-		$languages = $only_language
-			? array( $only_language )
-			: ( class_exists( 'ACWPT_Languages' ) ? ACWPT_Languages::get_enabled_codes() : array() );
+		// Accept a single code OR an array of codes.
+		//
+		// Passing an array used to produce array( array('de','pl',...) ), so
+		// $lang inside the loop was itself an array. option_name() then
+		// concatenated it into the literal option name "acwpt_string_queue_Array",
+		// which does not exist — the queue silently processed NOTHING and
+		// returned a clean-looking {"translated":0,"failed":0,"remaining":0}.
+		// The only symptom was a PHP "Array to string conversion" notice, easy
+		// to read past. A no-op that reports success is worse than a failure.
+		if ( is_array( $only_language ) ) {
+			$languages = array_values( array_filter( $only_language, 'is_string' ) );
+		} elseif ( $only_language ) {
+			$languages = array( (string) $only_language );
+		} else {
+			$languages = class_exists( 'ACWPT_Languages' ) ? ACWPT_Languages::get_enabled_codes() : array();
+		}
 
 		foreach ( (array) $languages as $lang ) {
 			$queue = get_option( self::option_name( $lang ), array() );

@@ -132,9 +132,28 @@ class ACWPT_Admin {
 		}
 
 		// never_translate: textarea, one term per line
+		//
+		// This list is brand protection: trademarks, product names and the
+		// company tagline that must survive translation verbatim. It was once
+		// silently reduced to a single entry by a script that ASSIGNED the
+		// whole settings array instead of merging into it, and the Romanian
+		// homepage shipped a translated brand promise as a result. Nothing
+		// noticed until a human looked at the page.
+		//
+		// A submitted blank is therefore treated as "field not edited", not as
+		// "delete every protected term": an empty textarea keeps whatever is
+		// stored. Clearing the list deliberately is possible by saving a single
+		// "-" line, which is unambiguous.
 		$never_in  = isset( $input['never_translate'] ) ? (string) $input['never_translate'] : '';
 		$never_arr = array_filter( array_map( 'trim', preg_split( '/\r?\n/', $never_in ) ), 'strlen' );
 		$never_arr = array_values( array_unique( $never_arr ) );
+
+		if ( empty( $never_arr ) ) {
+			$prev      = (array) get_option( 'acwpt_settings', array() );
+			$never_arr = isset( $prev['never_translate'] ) ? (array) $prev['never_translate'] : array();
+		} elseif ( array( '-' ) === $never_arr ) {
+			$never_arr = array(); // Explicit clear.
+		}
 
 		$existing       = get_option( 'acwpt_settings', array() );
 		$existing_never = isset( $existing['never_translate'] ) ? (array) $existing['never_translate'] : array();
