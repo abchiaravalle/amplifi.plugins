@@ -812,6 +812,10 @@ class ACWPT_Frontend {
 			return $html;
 		}
 
+		// Stash the SOURCE html. Cacheability is judged against this, not
+		// against the translated output — see count_unresolved_source_strings().
+		$this->source_html_for_coverage = $html;
+
 		// Protect language switcher links from being translated or re-prefixed.
 		$protected_links = array();
 		$result = preg_replace_callback(
@@ -848,6 +852,17 @@ class ACWPT_Frontend {
 			$html = str_replace( $placeholder, $link, $html );
 		}
 
+		// Record how much of the SOURCE page we could resolve.
+		//
+		// Must be measured here, before substitution replaced the English with
+		// the target language. Measuring afterwards re-extracts the TRANSLATED
+		// strings and looks them up in an en->xx store keyed on English, so
+		// virtually nothing matches: 504 of 507 "missing" on a page that was
+		// fully translated. That marked every page partial, disabled edge
+		// caching for all ten languages, and re-queued German strings to be
+		// translated into German — forever.
+		$this->coverage_missing = $this->count_unresolved_source_strings();
+
 		// 4b. Translate JSON-LD structured data.
 		//
 		// Runs after the SEO plugin has rendered its graph and after link
@@ -876,13 +891,48 @@ class ACWPT_Frontend {
 	 *
 	 * @param string $html Final page HTML.
 	 */
+	/** Unresolved source strings for this request; -1 until measured. */
+	private $coverage_missing = -1;
+
+	/** Buffered page html BEFORE substitution, for coverage measurement. */
+	private $source_html_for_coverage = '';
+
+	/**
+	 * Count source strings on this request that have no stored translation.
+	 *
+	 * Uses the buffered ORIGINAL html captured before substitution, so the
+	 * lookup keys match the store. Returns 0 when everything resolved, which
+	 * is the only state in which the page may be cached at the edge.
+	 */
+	private function count_unresolved_source_strings() {
+		if ( ! isset( $this->source_html_for_coverage ) || '' === $this->source_html_for_coverage ) {
+			return -1; // Unknown: treat as not-fully-translated.
+		}
+
+		$strings = $this->extract_translatable_strings_from_html( $this->source_html_for_coverage );
+		if ( empty( $strings ) ) {
+			return 0;
+		}
+		$strings = array_values( array_unique( $strings ) );
+		$found   = ACWPT_String_Store::get_many( $this->current_language, $strings );
+
+		return max( 0, count( $strings ) - count( $found ) );
+	}
+
 	private function mark_page_cacheability( $html ) {
 		if ( headers_sent() ) {
 			return;
 		}
 
-		$pending = ACWPT_String_Queue::pending( $this->current_language );
-		$full    = ( 0 === $pending ) && $this->page_fully_translated( $html );
+		// Coverage was measured against the SOURCE html before substitution
+		// (see process_output_buffer). Re-deriving it from $html here would
+		// inspect the translated output against an English-keyed store and
+		// always report a miss.
+		//
+		// Queue depth is deliberately NOT part of this test: a global backlog
+		// from some other page must not make THIS page uncacheable, or a busy
+		// site never caches anything.
+		$full = ( 0 === (int) $this->coverage_missing );
 
 		if ( $full ) {
 			header( 'X-ACWPT-Cacheable: 1', true );
