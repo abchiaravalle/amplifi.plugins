@@ -176,13 +176,6 @@ class ACWPT_Translator {
 	private static function localize_quotes( $text, $language ) {
 		$code = strtolower( substr( (string) $language, 0, 2 ) );
 
-		// Apostrophes are handled even when the string contains no quotes at
-		// all — the previous early return on '"' skipped them entirely, so
-		// French elisions (l'équilibrage) were never converted.
-		if ( false === strpos( $text, '"' ) ) {
-			return self::localize_apostrophes( $text, $code );
-		}
-
 		// open, close, and whether the language wants no-break spaces inside.
 		$marks = array(
 			'de' => array( '„', '“', false ),
@@ -197,6 +190,11 @@ class ACWPT_Translator {
 			'ru' => array( '«', '»', false ),
 			'zh' => array( '“', '”', false ),
 			'ja' => array( '「', '」', false ),
+			// Turkish uses straight quotes, but must still have FOREIGN marks
+			// normalised away — a German „ leaked into Turkish output because
+			// the old code returned early for any language without an entry.
+			'tr' => array( '"', '"', false ),
+			'en' => array( '"', '"', false ),
 		);
 
 		if ( ! isset( $marks[ $code ] ) ) {
@@ -205,20 +203,24 @@ class ACWPT_Translator {
 
 		list( $open, $close, $nbsp ) = $marks[ $code ];
 
-		// Normalise any FOREIGN localised opening mark to a straight quote first.
+		// Normalise any FOREIGN localised mark to a straight quote first.
 		//
 		// The model sometimes reaches for a different language's convention —
-		// German „ appearing in French or Chinese output, for example. Folding
-		// every known opening mark back to " lets the pairing logic below make a
-		// single correct decision instead of leaving a mark this language never
-		// uses.
-		$foreign_open  = array( '„', '«', '“', '「', '‟' );
-		$foreign_close = array( '“', '”', '»', '」', '‟' );
-		foreach ( array_diff( $foreign_open, array( $open ) ) as $f ) {
+		// German „ appearing in French, Chinese or Turkish output. Folding
+		// every known mark back to " lets the pairing logic below make a single
+		// correct decision instead of leaving a mark this language never uses.
+		$all_marks = array( '„', '«', '»', '“', '”', '「', '」', '‟' );
+		foreach ( array_diff( $all_marks, array( $open, $close ) ) as $f ) {
 			$text = str_replace( $f, '"', $text );
 		}
-		foreach ( array_diff( $foreign_close, array( $close, $open ) ) as $f ) {
-			$text = str_replace( $f, '"', $text );
+
+		if ( '"' === $open ) {
+			// Straight-quote language: normalisation above is the whole job.
+			return self::localize_apostrophes( $text, $code );
+		}
+
+		if ( false === strpos( $text, '"' ) && false === strpos( $text, $open ) ) {
+			return self::localize_apostrophes( $text, $code );
 		}
 
 		// Pair them up in order: first quote opens, next closes.
@@ -261,7 +263,52 @@ class ACWPT_Translator {
 			$text
 		);
 
-		return self::localize_apostrophes( $text, $code );
+		return self::localize_french_spacing( self::localize_apostrophes( $text, $code ), $code );
+	}
+
+	/**
+	 * Apply French no-break space typography.
+	 *
+	 * French requires a no-break space inside guillemets and before the
+	 * two-part punctuation marks ? ! ; :. The pairing logic above only inserts
+	 * them for quotes it converts itself, so a guillemet the model produced —
+	 * or any question mark anywhere in the string — was left with an ordinary
+	 * space. A native reviewer measured it: 1 of 3 question marks had the
+	 * correct space, and « Impossible used a plain one.
+	 *
+	 * U+202F (narrow no-break space) is the correct character before ? ! ; :
+	 * and inside guillemets per Imprimerie nationale practice; U+00A0 is the
+	 * widely-accepted fallback and is what most browsers render identically.
+	 *
+	 * @param string $text
+	 * @param string $code Two-letter language code.
+	 * @return string
+	 */
+	private static function localize_french_spacing( $text, $code ) {
+		if ( 'fr' !== $code ) {
+			return $text;
+		}
+
+		$nnbsp = "\xE2\x80\xAF"; // U+202F
+
+		// Inside guillemets: « text » — collapse whatever is there to one NNBSP.
+		$text = preg_replace( '/«[\s\x{00A0}\x{202F}]*/u', '«' . $nnbsp, $text );
+		$text = preg_replace( '/[\s\x{00A0}\x{202F}]*»/u', $nnbsp . '»', $text );
+
+		// Before ? ! ; : — but never inside a URL, where ? and : are syntax.
+		$text = preg_replace_callback(
+			'/(\S)[\s\x{00A0}\x{202F}]*([?!;:])/u',
+			function ( $m ) use ( $nnbsp ) {
+				// Leave URLs and times alone: https://  12:30
+				if ( preg_match( '#https?$|/$|\d$#u', $m[1] ) && ':' === $m[2] ) {
+					return $m[0];
+				}
+				return $m[1] . $nnbsp . $m[2];
+			},
+			$text
+		);
+
+		return $text;
 	}
 
 	/**
