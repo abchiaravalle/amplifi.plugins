@@ -29,6 +29,13 @@ return array(
         'spare parts'    => 'yedek parça',
     ),
     'nuances' => array(
+        'In subordinate clauses built with -DIK/-(y)EcEK + possessive (gördüğü, olduğu, yaptığı), always put that clause\'s own subject in the genitive: "başkalarının sınır gördüğü yerde", never "başkaları sınır gördüğü yerde". Apply it to every such clause in a sentence, not just the first.',
+        'Never pass an English term through word-for-word when the Turkish result is meaningless — degree fields, job functions, product categories. Render the established Turkish name of the field and drop redundant English words ("science business analytics" → "iş analitiği").',
+        'Keep every branch of "ister… ister…" in the same grammatical shape: all converbs, all infinitives, or all noun phrases sharing one verb (olun/olsun) at the end. Never pair a verb-bearing branch with a bare noun or postpositional phrase.',
+        'Express physical features and components with -li or "…olan", not "sahip": "kendi muylusu olan rotorlar", "dört kanallı sistem" — not "…-e sahip". Reserve "sahip olmak" for genuine ownership by a person or company.',
+        'Use only straight ASCII double quotes for quoted text in Turkish. Never emit German low quotes („ "), and never open with one mark and close with another.',
+        'Do not reproduce English noun stacks with chained Turkish genitives or "…yelpazesinde". Convert "a wide range of X surfaces" to an adjective plus plural noun: "çok çeşitli merdane yüzeylerinde".',
+        'Verify that a verb+noun collocation exists in Turkish with the complement you give it before using it; do not attach a dative infinitive to a fixed idiom ("başarmaya güç kazanmak"). If unsure, rewrite with a plain, common verb.',
         'Correlatives (ister...ister, hem...hem, ne...ne, gerek...gerek) are only correct when every branch ends in its own finite verb, or the single shared verb follows the LAST branch. A branch that ends in a bare noun or postpositional phrase ("...ister mevcut teknolojilerle,") is ungrammatical. Before delivering, read each correlative aloud branch by branch and complete the short one.',
         'Turkish is sentence case everywhere, headlines included. Capitalise only the first word of the sentence and genuine proper nouns. Postpositions (olarak, ile, için, gibi), verbs, job titles, technology names and common nouns stay lower case even in a press-release headline. Never mirror the capitalisation pattern of the English source.',
         'Punctuation marks must match at both ends. Use straight double quotes " " for Turkish quotation; never open with the German low-9 mark „ or mix mark families within one pair. Apply the same rule to parentheses, dashes and apostrophes.',

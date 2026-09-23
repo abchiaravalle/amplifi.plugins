@@ -23,6 +23,11 @@ return array(
         'free trial'   => 'prueba gratuita',
     ),
     'nuances' => array(
+        'Antes de traducir una cadena nominal inglesa, localiza el núcleo y comprueba a qué sustantivo califica cada adjetivo: «advanced NDT technologies» → «tecnologías avanzadas de ensayos no destructivos»; nunca dejes el adjetivo pegado al último sustantivo de la cadena.',
+        'Si un adjetivo califica a dos sustantivos coordinados de distinto género, ponlo en masculino plural («la monitorización y el diagnóstico remotos») o reformula; no lo dejes concordando solo con el último.',
+        'Mantén las listas de sectores, servicios o productos gramaticalmente paralelas: o todos sustantivos o todos adjetivos, anteponiendo «de» donde haga falta («de automoción, eléctrico, de bombas, armamentístico»).',
+        'Comprueba cada colocación verbo-sustantivo en español en vez de calcar el verbo inglés: «impartir» va con cursos, clases o formación; con presentaciones se usa «realizar», «hacer» o «presentar».',
+        'Reduce los posesivos calcados del inglés: usa el artículo determinado y deja como mucho un «nuestro/a» por párrafo; traduce «global customers» como «clientes de todo el mundo», no «clientes globales».',
         'Coloca el adjetivo junto al sustantivo que modifica en el original: «advanced X technologies» es «tecnologías avanzadas de X», nunca «tecnología de X avanzados».',
         'Si un adjetivo califica a dos sustantivos coordinados, ponlo en plural («la monitorización y el diagnóstico remotos») o reformula («a distancia»); no lo dejes concordando solo con el último.',
         'Mantén las listas de sectores o industrias gramaticalmente paralelas: o todos sustantivos o todos adjetivos, anteponiendo «el de»/«la de» donde haga falta (armamento → armamentístico).',

@@ -23,6 +23,12 @@ return array(
         'free trial'   => 'essai gratuit',
     ),
     'nuances' => array(
+        'Validate every verb + object pair against real French usage instead of copying the English pair: on conçoit/développe des solutions, jamais « des possibilités » ; on fonde ses décisions sur des données.',
+        'After « tels que », « comme » or « notamment », repeat the determiner before each item, and put a comma before « dont », « notamment » or « comme » introducing an explanatory list.',
+        'Express attributes with French structures (dotés de, équipés de, issus de) instead of calquing English "with", and never drop the article in a French noun list.',
+        'Use the standard French technical preposition for inspection and test methods: contrôle/CND par courants de Foucault, par ultrasons, par ressuage — not « avec » + technology name.',
+        'Apply French typography uniformly: apostrophe ’, guillemets « » with a no-break space inside, and a no-break space before ? ! ; : in every segment, not just some.',
+        'Never repeat a word root in the same clause as English does (produire les produits); vary the verb — fabriquer, réaliser, concevoir.',
         'Use the typographic apostrophe ’ (U+2019) in every French elision and contraction — never the ASCII straight quote \'.',
         'Never carry an English abstract-noun construction into French ("excellence en matière de performance"); use the plain French noun or verb a native would use ("ses performances").',
         'Check that every French pronoun (le/la/en/y) has a logical antecedent in its own sentence; where English uses a vague "it", name the referent or rewrite the clause.',

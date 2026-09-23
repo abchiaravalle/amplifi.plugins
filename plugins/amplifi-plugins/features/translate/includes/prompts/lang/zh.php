@@ -23,6 +23,12 @@ return array(
         'free trial'   => '免费试用',
     ),
     'nuances' => array(
+        'Cap any pre-nominal modifier at roughly 12 characters. If the English has a longer relative clause or participle before the noun, put the noun first and move the modifier into its own predicate clause: write 系统专为…而设计，满足… rather than 为…设计的系统.',
+        'Never let a stacked pre-modifier create a false word boundary. Read the modifier aloud: if two adjacent characters fuse into an unintended word (大规模可靠), rebuild the sentence with a separate clause (在大规模生产中…).',
+        'Do not attach English adjectives to abstract Chinese nouns such as 可能性、机会、方案 when the adjective describes how you work. Convert them to a verb phrase or move them onto a concrete noun: 以快速、精准的工程实力开创新的可能, not 快速、精准的可能性.',
+        'Do not coordinate different categories (people, knowledge, technology, data) under one verb just because English does. Check that the verb fits every object: 汇聚/集结 takes 人才 and 资源, never 头脑; split the list or change the verb.',
+        'Verify every verb-object pair against native collocation before shipping. 优化 takes 流程、安排、配置, not 需求; 提升 takes 效率、精度; 降低 takes 频次、成本. When the English verb is vague (impact, address, drive), choose the specific Chinese verb the object actually demands.',
+        'Translate academic fields and degrees as complete Chinese discipline names plus 专业, not character-by-character renderings: 组织领导力专业, 工商管理专业, 数据科学专业. Never leave an English abstract noun as a bare clipped stem.',
         '「挑战」只与应对、迎接、直面搭配；英文 solve/tackle a challenge 若指处理具体问题，译为「解决难题／问题」，绝不写「解决挑战」「攻克挑战」。',
         '中心名词前的定语控制在约 12 个汉字以内；更长的修饰成分必须拆为独立短句或后置分句（「……，适用于……」「……——他们……」），不得照搬英文的前置堆叠。',
         '行业缩写首次出现写「中文全称（英文缩写）」，此后全站统一只用中文全称；同一术语不得在不同页面中英混用（如 NDT／无损检测）。',

@@ -29,6 +29,13 @@ return array(
         'spare parts'    => 'náhradní díly',
     ),
     'nuances' => array(
+        'Keep a noun and its prepositional complement adjacent: write \'odborníci na testování a měření ze společnosti X\', never \'odborníci společnosti X na testování a měření\'. Never insert a company or brand phrase between a head noun and its modifier.',
+        'In \'ať už … nebo\' constructions always place a comma before \'nebo\', including in three-item lists, and punctuate every occurrence in the file identically.',
+        'Never coin an adjective for an industry Czech does not name that way. Use the established term or name the product instead: \'výrobci čerpadel\' / \'průmysl čerpadel\', not \'čerpací průmysl\'.',
+        'Translate slogans and wordplay for sense, not word by word. Recast them as an idiomatic Czech phrase (e.g. \'proměnit nemožné v možné\') rather than mapping each English word.',
+        'Avoid bureaucratic \'ohledně\' in customer-facing copy; use \'o\', \'k\' or \'týkající se\' depending on the collocation.',
+        'Use the Czech en dash \'–\' with spaces for interrupting or appositive dashes; never the English em dash \'—\', and keep one dash style throughout the file.',
+        'Use \'společnost\' before a company name only at first mention, then the bare name; never more than once per sentence.',
         'Carry over every item of a source enumeration — count the list items in the source and in your Czech before delivering; never silently drop an industry, product or service.',
         'Keep all members of one enumeration in the same case: do not let a genitive modifier on the first item pull the rest in (\'rotory ventilátorů, čerpadla, ozubená kola\', not \'...ventilátorů, čerpadel, ozubená kola\').',
         'Render English \'for <application/environment>\' as \'pro\' + accusative, never \'do\' + genitive: systémy pro náročné provozy, not systémy do náročných prostředí.',

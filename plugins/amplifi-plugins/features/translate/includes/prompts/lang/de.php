@@ -23,6 +23,11 @@ return array(
         'free trial'   => 'Kostenlose Testversion',
     ),
     'nuances' => array(
+        'Attach every relative clause directly to its antecedent; never let the main verb or object intervene. Recast English \'Trusted by X who ...\' as \'X, die ..., vertrauen uns\' — not \'Hersteller vertrauen uns, die ...\'.',
+        'In coordinated prepositional phrases, repeat the preposition and article for each member: \'in der Luft- und Raumfahrt oder in der Industrie\', never \'in der Luft- und Raumfahrt oder Industrie\'.',
+        'Translate English \'specific\' as \'konkret\' (or \'bestimmt\') when it means one particular case; use \'spezifisch\' only in the sense \'charakteristisch für / eigen\'.',
+        'Check adjective-noun collocations, not just single-word accuracy: if the literal German is semantically empty (e.g. \'kompromisslose Möglichkeiten\'), restructure — move the adjectives into a trailing dash apposition and pick a verb that collocates (\'Möglichkeiten erschließen\', not \'entwickeln\').',
+        'Render English attributive \'global/worldwide\' with a postposed \'weltweit\' (\'unsere Kunden weltweit\', \'unsere Standorte weltweit\'), not with attributive \'globale Kunden\'.',
         'Stelle jeden Relativsatz unmittelbar hinter sein Bezugswort und ziehe dafür Subjekt samt Attributsatz nach vorn: „Hersteller, die X benötigen, vertrauen uns.“ Klammere den Relativsatz nie hinter das Verb oder ein anderes Nomen aus, wenn dadurch ein falscher Bezug entsteht.',
         'Übertrage englische Metaphern nicht wörtlich, wenn das deutsche Wort im Fachkontext eine physikalische Bedeutung hat: „powered by <Technologie>“ heißt „auf Basis von“ oder „mit“, nie „angetrieben von/durch“ (Antrieb = mechanische Kraftübertragung). Gleiches gilt für driven by, built on, fueled by.',
         'Bilde keine Ad-hoc-Komposita aus englischen Zweiwortbegriffen, sondern nutze den etablierten Branchenbegriff, notfalls mit Präposition: transportation applications → Anwendungen in der Verkehrstechnik, plant systems → übergeordnete Werkssysteme, automated lines → automatisierte Fertigungslinien. Test: Käme das Kompositum in deutschen Fachtexten nicht vor, schreibe es aus.',

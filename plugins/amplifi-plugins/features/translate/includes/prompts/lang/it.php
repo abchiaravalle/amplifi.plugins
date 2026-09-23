@@ -23,6 +23,8 @@ return array(
         'free trial'   => 'prova gratuita',
     ),
     'nuances' => array(
+        'Respect Italian verb–noun collocations instead of calquing the English verb: «una sfida» si affronta, si supera o si raccoglie, mai «si risolve»; only «problemi» e «questioni» si risolvono.',
+        'Before finalising a sentence, scan it for shared roots and keep the source\'s own noun rather than a synonym that echoes: «answers» → «risposte», never «soluzioni» accanto a «risolvere».',
         'In any coordinated list keep every item in the same grammatical form — all adjectives, all bare nouns, or all prepositional phrases. Never mix «automobilistico» with «delle pompe».',
         'Render remote monitoring, diagnostics, access or control with «da remoto» («monitoraggio e diagnostica da remoto»); never force the adjective «remoto/remoti» to agree across mixed-gender coordinated nouns.',
         'Drop English possessive adjectives where Italian uses the bare definite article: «our customers» → «i clienti». Keep «nostro» only when ownership is genuinely contrastive, at most once per sentence.',
