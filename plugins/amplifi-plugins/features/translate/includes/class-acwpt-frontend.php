@@ -1113,6 +1113,98 @@ class ACWPT_Frontend {
 	}
 
 	/**
+	 * Keys inside embedded JSON whose VALUES are human-readable copy.
+	 *
+	 * Deliberately narrow. Translating the wrong key breaks the widget: url,
+	 * id, size, type, _id and every setting name must pass through untouched.
+	 */
+	const JSON_TEXT_KEYS = array(
+		'heading_text', 'label', 'title', 'text', 'description', 'subtitle',
+		'button_text', 'link_text', 'caption', 'placeholder', 'cta_text',
+		'tab_title', 'item_title', 'nav_label', 'menu_title',
+	);
+
+	/**
+	 * Recursively translate allowlisted values inside decoded JSON settings.
+	 *
+	 * @param mixed $node
+	 * @param bool  $changed Set true when at least one value was replaced.
+	 * @return mixed
+	 */
+	private function translate_json_text( $node, &$changed ) {
+		if ( ! is_array( $node ) ) {
+			return $node;
+		}
+
+		$out = array();
+		foreach ( $node as $key => $value ) {
+			if ( is_array( $value ) ) {
+				$out[ $key ] = $this->translate_json_text( $value, $changed );
+				continue;
+			}
+			if ( ! is_string( $value ) || ! in_array( (string) $key, self::JSON_TEXT_KEYS, true ) ) {
+				$out[ $key ] = $value;
+				continue;
+			}
+
+			$text = trim( $value );
+			if ( mb_strlen( $text ) < 3 || mb_strlen( $text ) > 300
+				|| preg_match( '#^(https?://|/|\#|[\d\s\.\-:/%]+$)#', $text ) ) {
+				$out[ $key ] = $value;
+				continue;
+			}
+
+			$t = $this->get_string_translation( $text );
+			if ( $t ) {
+				$out[ $key ] = $t;
+				$changed     = true;
+			} else {
+				$out[ $key ] = $value;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Recursively collect translatable strings from decoded JSON settings.
+	 *
+	 * @param mixed $node
+	 * @return string[]
+	 */
+	private static function collect_json_text( $node ) {
+		$found = array();
+		if ( ! is_array( $node ) ) {
+			return $found;
+		}
+
+		foreach ( $node as $key => $value ) {
+			if ( is_array( $value ) ) {
+				$found = array_merge( $found, self::collect_json_text( $value ) );
+				continue;
+			}
+			if ( ! is_string( $value ) ) {
+				continue;
+			}
+			if ( ! in_array( (string) $key, self::JSON_TEXT_KEYS, true ) ) {
+				continue;
+			}
+
+			$text = trim( $value );
+			if ( mb_strlen( $text ) < 3 || mb_strlen( $text ) > 300 ) {
+				continue;
+			}
+			// Skip anything that is clearly not prose.
+			if ( preg_match( '#^(https?://|/|\#|[\d\s\.\-:/%]+$)#', $text ) ) {
+				continue;
+			}
+			$found[] = $text;
+		}
+
+		return $found;
+	}
+
+	/**
 	 * Normalise a candidate string lifted out of raw HTML.
 	 *
 	 * Entities must be decoded BEFORE the text reaches the model. The extractors
@@ -1151,6 +1243,104 @@ class ACWPT_Frontend {
 				}
 			}
 		}
+		// WHOLE BLOCKS THAT CONTAIN INLINE MARKUP.
+		//
+		// A Polish reviewer flagged "Standing on the shoulders of nasze liczne
+		// marki, like Burke Porter" and the heading "See how we bring it all
+		// razem". Cause: the pattern below matches >text< only, so ANY inline
+		// tag shatters a sentence into fragments that are translated
+		// independently and without context:
+		//
+		//   "Standing on the shoulders of"      <- orphan
+		//   "our many brands"                   <- link label
+		//   ", like Burke Porter, we serve"     <- orphan
+		//
+		// Claude sees three unrelated snippets, translates whichever it can
+		// make sense of, and the page ships a half-English sentence. No amount
+		// of prompt tuning fixes that — the model never sees the sentence.
+		//
+		// So: capture the block's FULL inner HTML when it contains inline
+		// markup, and send that as one unit. Inline tags are preserved in the
+		// string, so the model keeps them in place. Handled before the
+		// text-only pass so the fragments are never produced.
+		if ( preg_match_all(
+			'/<(p|h[1-6]|li|td|th|figcaption|blockquote|dd|dt|caption)\b[^>]*>(.*?)<\/\1>/is',
+			$html,
+			$bm,
+			PREG_SET_ORDER
+		) ) {
+			foreach ( $bm as $bmatch ) {
+				$inner = $bmatch[2];
+
+				// Only interesting when it MIXES text and inline markup.
+				if ( false === strpos( $inner, '<' ) ) {
+					continue; // plain text: the pass below handles it
+				}
+				// Block-level children mean this is a container, not a sentence.
+				if ( preg_match( '/<(?:p|div|section|article|ul|ol|table|h[1-6])\b/i', $inner ) ) {
+					continue;
+				}
+				// Must contain real prose outside the tags.
+				$outside = trim( preg_replace( '/<[^>]+>/', '', $inner ) );
+				if ( mb_strlen( $outside ) < 8 ) {
+					continue;
+				}
+
+				$candidate = $this->normalize_candidate( $inner );
+				if ( mb_strlen( $candidate ) >= 8 && mb_strlen( $candidate ) <= 800 ) {
+					$out[] = $candidate;
+				}
+			}
+		}
+
+		// TEXT INSIDE JSON EMBEDDED IN AN ATTRIBUTE.
+		//
+		// This theme ships nav config in <script type="application/json">, so copy
+		// like "See how we bring it all together" never exists in the DOM as
+		// text — it is a value inside a JSON blob (acf-sticky-nav-data). Nothing
+		// above could see it, which is why the reviewer found headings still in
+		// English while the body was Polish. Verified by dumping the real keys
+		// off the live page rather than guessing the shape.
+		//
+		// Only a conservative allowlist of keys is read: anything that is
+		// plainly a label or heading. URLs, ids, booleans and sizes are never
+		// touched.
+		if ( preg_match_all(
+			'/<script\b[^>]*type=["\']application\/json["\'][^>]*>(.*?)<\/script>/is',
+			$html,
+			$dm,
+			PREG_SET_ORDER
+		) ) {
+			foreach ( $dm as $d ) {
+				$data = json_decode( html_entity_decode( trim( $d[1] ), ENT_QUOTES, 'UTF-8' ), true );
+				if ( ! is_array( $data ) ) {
+					continue;
+				}
+				foreach ( self::collect_json_text( $data ) as $text ) {
+					$out[] = $text;
+				}
+			}
+		}
+
+		// TEXT AFTER A NESTED BLOCK, e.g. the stat labels:
+		//   <div class="metric-text"><div class="number">70+</div> years of innovation </div>
+		//
+		// The block pass below only matches >text< with no intervening tag, and
+		// the inline-trailing pass only looks after INLINE closers. A label
+		// sitting after a nested <div> matched neither, so "years of
+		// innovation", "home countries", "expert people" and "global locations"
+		// were never extracted and shipped in English on every language.
+		if ( preg_match_all( '/<\/(?:div|p|span|h[1-6])>\s*([^<>{}]{3,120}?)\s*<\/(?:div|p|li|td)>/u', $html, $tm ) ) {
+			foreach ( $tm[1] as $text ) {
+				$text = $this->normalize_candidate( $text );
+				if ( mb_strlen( $text ) >= 3
+					&& ! preg_match( '/^[\d\s\.\-:\/\+%]+$/u', $text )
+					&& ! preg_match( '/^https?:/i', $text ) ) {
+					$out[] = $text;
+				}
+			}
+		}
+
 		// Block/text elements (p, span, div, headings, li, td, th, label, figcaption, button, strong, em, b, dt, dd, blockquote, cite, caption).
 		if ( preg_match_all( '/(<(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)\b[^>]*>)([^<]{2,})(<\/(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)>)/i', $html, $m, PREG_SET_ORDER ) ) {
 			foreach ( $m as $match ) {
@@ -1247,12 +1437,103 @@ class ACWPT_Frontend {
 	 * Run link and element translation over an HTML blob (uses string cache).
 	 */
 	private function translate_html_blob( $html ) {
+		// WHOLE-BLOCK PASS FIRST.
+		//
+		// Must run before the fragment passes below, otherwise those replace
+		// the pieces individually and the whole-block translation can never
+		// match. See the extractor for why fragments produce half-English
+		// sentences.
+		$html = preg_replace_callback(
+			'/(<(p|h[1-6]|li|td|th|figcaption|blockquote|dd|dt|caption)\b[^>]*>)(.*?)(<\/\2>)/is',
+			function ( $m ) {
+				$inner = $m[3];
+
+				if ( false === strpos( $inner, '<' ) ) {
+					return $m[0]; // plain text: later pass owns it
+				}
+				if ( preg_match( '/<(?:p|div|section|article|ul|ol|table|h[1-6])\b/i', $inner ) ) {
+					return $m[0]; // container, not a sentence
+				}
+				$outside = trim( preg_replace( '/<[^>]+>/', '', $inner ) );
+				if ( mb_strlen( $outside ) < 8 ) {
+					return $m[0];
+				}
+
+				$candidate = $this->normalize_candidate( $inner );
+				if ( mb_strlen( $candidate ) < 8 || mb_strlen( $candidate ) > 800 ) {
+					return $m[0];
+				}
+
+				$translated = $this->get_string_translation( $candidate );
+				if ( ! $translated ) {
+					return $m[0];
+				}
+
+				// Refuse a translation that dropped the inline markup — losing
+				// a link is worse than leaving the sentence in English.
+				$want = preg_match_all( '/<a\b/i', $inner );
+				$got  = preg_match_all( '/<a\b/i', $translated );
+				if ( $want !== $got ) {
+					return $m[0];
+				}
+
+				return $m[1] . $translated . $m[4];
+			},
+			$html
+		);
+
 		// Translate <a> link text.
 		$html = preg_replace_callback(
 			'/(<a\b[^>]*>)([^<]+)(<\/a>)/i',
 			array( $this, 'translate_link_text_callback' ),
 			$html
 		);
+		// Translate copy inside embedded JSON settings (Elementor data-settings).
+		//
+		// Decode, walk the allowlisted keys, re-encode. If anything fails to
+		// round-trip the original attribute is returned untouched — a widget
+		// that renders in English is recoverable, a widget with corrupt JSON
+		// is a white screen.
+		$html = preg_replace_callback(
+			'/(<script\b[^>]*type=["\']application\/json["\'][^>]*>)(.*?)(<\/script>)/is',
+			function ( $m ) {
+				$data = json_decode( html_entity_decode( trim( $m[2] ), ENT_QUOTES, 'UTF-8' ), true );
+				if ( ! is_array( $data ) ) {
+					return $m[0];
+				}
+
+				$changed = false;
+				$walked  = $this->translate_json_text( $data, $changed );
+				if ( ! $changed ) {
+					return $m[0];
+				}
+
+				$encoded = wp_json_encode( $walked, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+				if ( ! $encoded || null === json_decode( $encoded, true ) ) {
+					return $m[0]; // never emit something that will not parse
+				}
+
+				return $m[1] . $encoded . $m[3];
+			},
+			$html
+		);
+
+		// Text after a nested block (stat labels etc). Mirrors the extractor.
+		$html = preg_replace_callback(
+			'/(<\/(?:div|p|span|h[1-6])>\s*)([^<>{}]{3,120}?)(\s*<\/(?:div|p|li|td)>)/u',
+			function ( $m ) {
+				$text = $this->normalize_candidate( $m[2] );
+				if ( mb_strlen( $text ) < 3
+					|| preg_match( '/^[\d\s\.\-:\/\+%]+$/u', $text )
+					|| preg_match( '/^https?:/i', $text ) ) {
+					return $m[0];
+				}
+				$t = $this->get_string_translation( $text );
+				return $t ? $m[1] . $t . $m[3] : $m[0];
+			},
+			$html
+		);
+
 		// Translate text in block elements (same set as extract).
 		$html = preg_replace_callback(
 			'/(<(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)\b[^>]*>)([^<]{2,})(<\/(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)>)/i',
@@ -1402,6 +1683,37 @@ class ACWPT_Frontend {
 			function ( $m ) use ( $lang, $home_url ) {
 				return 'href="' . $home_url . '/' . $lang . '/' . $m[2] . '"';
 			},
+			$html
+		);
+
+		// ROOT-RELATIVE LINKS. The pass above only matches ABSOLUTE same-site
+		// URLs, so every href="/catalog/" survived untouched. Measured on the
+		// live Polish homepage: 0 of 67 relative links carried /pl/, which is
+		// what the reviewer meant by "links leave the Polish site". A visitor
+		// clicking almost any nav or footer item landed on English, and the
+		// language signal died with them.
+		//
+		// Protocol-relative (//host) and anchors (#x) must be left alone, hence
+		// the negative lookaheads.
+		$html = preg_replace_callback(
+			'/href="\/(?!\/|wp-admin|wp-content|wp-includes|wp-json|wp-login|feed|xmlrpc|wp-cron|(?:' . $codes . ')\/)([^"]*)"/',
+			function ( $m ) use ( $lang ) {
+				$path = $m[1];
+
+				// Leave asset and non-page targets where they are.
+				if ( preg_match( '/\.(css|js|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|eot|pdf|zip|mp4|webm|xml|txt)(\?|#|$)/i', $path ) ) {
+					return $m[0];
+				}
+
+				return 'href="/' . $lang . '/' . $path . '"';
+			},
+			$html
+		);
+
+		// Bare root link: href="/" -> href="/<lang>/".
+		$html = preg_replace(
+			'/href="\/(?!\/)"/',
+			'href="/' . $lang . '/"',
 			$html
 		);
 

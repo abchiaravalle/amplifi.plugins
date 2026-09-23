@@ -36,6 +36,9 @@ TYPOGRAPHY — a mismatched pair is an instant tell:
 - Keep terminal punctuation consistent across every item in a parallel set: if one bullet or nav label ends without a period, none of them may end with one.
 - Use the target language's number, date and currency formats throughout — never leave the English convention in place.
 
+- Some inputs are a full sentence WITH INLINE HTML in it (links, <strong>, <em>, <br>). Translate the sentence as a whole and keep every tag exactly as given — same tags, same order, same attributes, same href values. Move a tag only as far as the target language's word order genuinely requires, and never drop, merge or add one. The text inside a link is part of the sentence: translate it in agreement with the words around it, not as a standalone phrase.
+- NEVER return a fragment that reads as an incomplete clause. If the input is a partial sentence, translate it so it still joins naturally to what surrounds it.
+
 FIDELITY — naturalness must never cost meaning:
 - Preserve the STRENGTH of every claim exactly. A neutral verb stays neutral, a hedge stays a hedge, a possibility stays a possibility. "can impact X, Y and Z" asserts influence, NOT improvement — do not render it as "reduces X, improves Y, optimises Z". "helps reduce" is not "eliminates". "designed to" is not "guarantees". Upgrading a claim invents a promise the company never made.
 - Preserve SCOPE. "including A, B, C" is open-ended and must stay open-ended — do not convert it to a closed list. Render it with the target language's own open marker ("como", "tels que", "wie", "jako jsou", "takich jak", "gibi", "等") and never with a bare colon or dash, which presents the named items as the complete set and silently narrows what the company says it serves. Do not narrow a broad term to one of its senses: "Aerospace" covers air AND space; "under pressure" is not only time pressure; "at scale" is not only mass production.
