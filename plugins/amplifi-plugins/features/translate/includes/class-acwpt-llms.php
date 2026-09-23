@@ -73,7 +73,7 @@ class ACWPT_Llms {
 		if ( $lang === ACWPT_Languages::get_source() ) {
 			return home_url( '/llms.txt' );
 		}
-		return home_url( '/' . $lang . '/llms.txt' );
+		return home_url( '/llms.' . $lang . '.txt' );
 	}
 
 	/**
@@ -90,28 +90,61 @@ class ACWPT_Llms {
 		$root    = trailingslashit( ABSPATH );
 		$source  = ACWPT_Languages::get_source();
 
+		// FLAT FILENAMES, never a per-language directory.
+		//
+		// Writing /de/llms.txt created a real /de/ directory in the webroot.
+		// nginx resolves a real directory before it ever reaches WordPress,
+		// found no index.php inside, and returned 403 — so EVERY language
+		// homepage went down (/de/, /pl/, /fr/ ... all 403) while deep pages
+		// like /de/events/ still worked, because those match no real path.
+		// A two-line convenience took out ten homepages.
+		//
+		// llms.<lang>.txt keeps the .txt extension the convention expects and
+		// cannot collide with a rewrite-driven URL.
 		foreach ( array_merge( array( $source ), ACWPT_Languages::get_enabled_codes() ) as $lang ) {
 			$body = self::get( $lang );
 			if ( '' === trim( (string) $body ) ) {
 				continue;
 			}
 
-			if ( $lang === $source ) {
-				$path = $root . 'llms.txt';
-			} else {
-				$dir = $root . $lang;
-				if ( ! is_dir( $dir ) && ! wp_mkdir_p( $dir ) ) {
-					$written[ $lang ] = false;
-					continue;
-				}
-				$path = $dir . '/llms.txt';
-			}
+			$path = ( $lang === $source )
+				? $root . 'llms.txt'
+				: $root . 'llms.' . $lang . '.txt';
 
 			$ok               = @file_put_contents( $path, $body ); // phpcs:ignore
 			$written[ $lang ] = ( false === $ok ) ? false : $ok;
 		}
 
 		return $written;
+	}
+
+	/**
+	 * Remove language directories created by an earlier version.
+	 *
+	 * Only deletes a directory that contains nothing but our own llms.txt, so
+	 * it can never touch a real site directory that happens to share a
+	 * language code.
+	 */
+	public static function cleanup_language_dirs() {
+		$root    = trailingslashit( ABSPATH );
+		$removed = array();
+
+		foreach ( ACWPT_Languages::get_enabled_codes() as $lang ) {
+			$dir = $root . $lang;
+			if ( ! is_dir( $dir ) ) {
+				continue;
+			}
+			$entries = array_diff( (array) scandir( $dir ), array( '.', '..' ) );
+			if ( array_values( $entries ) !== array( 'llms.txt' ) ) {
+				continue; // Not ours alone: leave it completely alone.
+			}
+			@unlink( $dir . '/llms.txt' ); // phpcs:ignore
+			if ( @rmdir( $dir ) ) {       // phpcs:ignore
+				$removed[] = $lang;
+			}
+		}
+
+		return $removed;
 	}
 
 	/**
@@ -153,10 +186,11 @@ class ACWPT_Llms {
 
 		if ( 'llms.txt' === $req ) {
 			$lang = $source;
+		} elseif ( preg_match( '#^llms\.([a-z]{2})\.txt$#i', $req, $m ) ) {
+			$lang = strtolower( $m[1] );
 		} elseif ( preg_match( '#^([a-z]{2})/llms\.txt$#i', $req, $m ) ) {
-			// Dynamic fallback for hosts that DO route .txt through PHP. On WP
-			// Engine this never fires because nginx serves the real file first,
-			// which is the intended outcome.
+			// Legacy path from an earlier version; kept so existing links and
+			// any crawler that already saw it still resolve.
 			$lang = strtolower( $m[1] );
 		} else {
 			return;

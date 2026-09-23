@@ -70,6 +70,13 @@ class ACWPT_Frontend {
 
 		// Language switcher as nav menu item.
 		add_filter( 'wp_nav_menu_objects', array( $this, 'expand_language_menu_items' ), 10, 2 );
+
+		// Custom nav renderers call wp_get_nav_menu_items() directly and never
+		// run wp_nav_menu(), so wp_nav_menu_objects never fires for them. This
+		// site's header is one: the ac-tm-megamenu plugin builds its own markup,
+		// so the switcher rendered as a dead "Language" link. Expanding at the
+		// data layer covers both paths.
+		add_filter( 'wp_get_nav_menu_items', array( $this, 'expand_language_menu_items_raw' ), 20, 3 );
 		add_filter( 'nav_menu_link_attributes', array( $this, 'add_lang_link_attributes' ), 10, 4 );
 
 		// Enqueue frontend assets.
@@ -1610,6 +1617,42 @@ class ACWPT_Frontend {
 	// =========================================================================
 	// Language Switcher Nav Menu Item
 	// =========================================================================
+
+	/**
+	 * Expand the switcher at the DATA layer, for renderers that skip wp_nav_menu().
+	 *
+	 * wp_nav_menu_objects only fires inside wp_nav_menu(). A theme or plugin
+	 * that calls wp_get_nav_menu_items() and writes its own markup — as this
+	 * site's ac-tm-megamenu does — never triggers it, so the switcher appeared
+	 * as an inert "Language" item with no submenu.
+	 *
+	 * Runs on the raw item list instead, which both paths share. Guarded so it
+	 * cannot double-expand when wp_nav_menu() is used: the later filter sees
+	 * items whose URLs are already real language URLs, not the magic token.
+	 *
+	 * @param array  $items Menu items.
+	 * @param object $menu  Menu object.
+	 * @param array  $args  Query args.
+	 * @return array
+	 */
+	public function expand_language_menu_items_raw( $items, $menu = null, $args = array() ) {
+		if ( is_admin() || empty( $items ) || ! is_array( $items ) ) {
+			return $items;
+		}
+
+		$has_token = false;
+		foreach ( $items as $it ) {
+			if ( isset( $it->url ) && '#acwpt-language-switcher' === $it->url ) {
+				$has_token = true;
+				break;
+			}
+		}
+		if ( ! $has_token ) {
+			return $items;
+		}
+
+		return $this->expand_language_menu_items( $items, (object) $args );
+	}
 
 	/**
 	 * Expand the Language Switcher placeholder into real language menu items.
