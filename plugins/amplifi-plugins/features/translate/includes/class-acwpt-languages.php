@@ -48,6 +48,50 @@ class ACWPT_Languages {
 	}
 
 	/**
+	 * Open Graph locale for a language code.
+	 *
+	 * og:locale wants the underscore form with a region (de_DE), not the BCP-47
+	 * hyphen form used by hreflang (de). Facebook and LinkedIn silently ignore
+	 * a malformed value and fall back to the site default, which is how every
+	 * translated page ended up announcing itself as en_US.
+	 *
+	 * @param string $code Two-letter language code.
+	 * @return string
+	 */
+	public static function og_locale( $code ) {
+		$map = array(
+			'de' => 'de_DE',
+			'pl' => 'pl_PL',
+			'ro' => 'ro_RO',
+			'tr' => 'tr_TR',
+			'zh' => 'zh_CN',
+			'it' => 'it_IT',
+			'fr' => 'fr_FR',
+			'es' => 'es_ES',
+			'pt' => 'pt_PT',
+			'cs' => 'cs_CZ',
+			'ja' => 'ja_JP',
+			'nl' => 'nl_NL',
+			'sv' => 'sv_SE',
+			'da' => 'da_DK',
+			'fi' => 'fi_FI',
+			'no' => 'nb_NO',
+			'hu' => 'hu_HU',
+			'ru' => 'ru_RU',
+			'ko' => 'ko_KR',
+			'en' => 'en_US',
+		);
+
+		$code = strtolower( substr( (string) $code, 0, 2 ) );
+		if ( isset( $map[ $code ] ) ) {
+			return $map[ $code ];
+		}
+		// Unknown language: repeat the code as its own region (xx_XX), which is
+		// well-formed even if not canonical.
+		return $code . '_' . strtoupper( $code );
+	}
+
+	/**
 	 * Get the BCP 47 language tag for a code (falls back to the code itself).
 	 */
 	public static function bcp47( $code ) {

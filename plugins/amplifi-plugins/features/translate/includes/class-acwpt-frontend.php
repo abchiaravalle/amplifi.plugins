@@ -107,6 +107,41 @@ class ACWPT_Frontend {
 		// Fix canonical URL for translated pages.
 		add_filter( 'get_canonical_url', array( $this, 'filter_canonical_url' ), 10, 2 );
 
+		// SEO PLUGINS OWN THE <head>, so WordPress core filters are not enough.
+		//
+		// Yoast, RankMath and AIOSEO each render their own canonical, title,
+		// description and Open Graph tags and never consult get_canonical_url
+		// or document_title_parts. On this site that shipped three real SEO
+		// defects on every translated page:
+		//
+		//   - canonical pointed at an unrelated EN page, which tells Google to
+		//     index that page INSTEAD of the translation. Self-cancelling
+		//     against the hreflang cluster, and the single most damaging of the
+		//     three.
+		//   - <title> stayed English while the body was translated, so the SERP
+		//     entry a German buyer sees is in the wrong language.
+		//   - og:locale said en_US on every language, mislabelling shares.
+		//
+		// Hook each vendor's own filters so the translated values win.
+		add_filter( 'wpseo_canonical', array( $this, 'filter_seo_canonical' ), 20 );
+		add_filter( 'wpseo_opengraph_url', array( $this, 'filter_seo_canonical' ), 20 );
+		add_filter( 'wpseo_title', array( $this, 'filter_seo_text' ), 20 );
+		add_filter( 'wpseo_metadesc', array( $this, 'filter_seo_text' ), 20 );
+		add_filter( 'wpseo_opengraph_title', array( $this, 'filter_seo_text' ), 20 );
+		add_filter( 'wpseo_opengraph_desc', array( $this, 'filter_seo_text' ), 20 );
+		add_filter( 'wpseo_twitter_title', array( $this, 'filter_seo_text' ), 20 );
+		add_filter( 'wpseo_twitter_description', array( $this, 'filter_seo_text' ), 20 );
+		add_filter( 'wpseo_locale', array( $this, 'filter_seo_locale' ), 20 );
+
+		add_filter( 'rank_math/frontend/canonical', array( $this, 'filter_seo_canonical' ), 20 );
+		add_filter( 'rank_math/frontend/title', array( $this, 'filter_seo_text' ), 20 );
+		add_filter( 'rank_math/frontend/description', array( $this, 'filter_seo_text' ), 20 );
+		add_filter( 'rank_math/opengraph/url', array( $this, 'filter_seo_canonical' ), 20 );
+
+		add_filter( 'aioseo_canonical_url', array( $this, 'filter_seo_canonical' ), 20 );
+		add_filter( 'aioseo_title', array( $this, 'filter_seo_text' ), 20 );
+		add_filter( 'aioseo_description', array( $this, 'filter_seo_text' ), 20 );
+
 		// Prevent WordPress redirect_canonical from redirecting /es/blog/ → /blog/.
 		add_filter( 'redirect_canonical', array( $this, 'prevent_canonical_redirect' ), 10, 2 );
 
@@ -579,6 +614,80 @@ class ACWPT_Frontend {
 			$canonical = $this->get_translated_url( $this->current_language, $post );
 		}
 		return $canonical;
+	}
+
+	/**
+	 * Point an SEO plugin's canonical at the CURRENT language's URL.
+	 *
+	 * A translated page whose canonical points at the English URL is telling
+	 * Google "index that one instead of me". Combined with an hreflang cluster
+	 * saying the opposite, the two signals cancel and the translation may not
+	 * be indexed at all. This is the most damaging of the three head defects.
+	 *
+	 * @param string $url Canonical URL the SEO plugin computed.
+	 * @return string
+	 */
+	public function filter_seo_canonical( $url ) {
+		if ( $this->current_language === ACWPT_Languages::get_source() ) {
+			return $url;
+		}
+		if ( ! is_string( $url ) || '' === $url ) {
+			return $url;
+		}
+
+		// Already language-prefixed (hand-set canonical): leave it.
+		if ( false !== strpos( $url, '/' . $this->current_language . '/' ) ) {
+			return $url;
+		}
+
+		$home = untrailingslashit( home_url() );
+		if ( 0 !== strpos( $url, $home ) ) {
+			return $url; // Off-site canonical: not ours to rewrite.
+		}
+
+		$path = substr( $url, strlen( $home ) );
+		return $home . '/' . $this->current_language . ( '' === $path ? '/' : $path );
+	}
+
+	/**
+	 * Translate an SEO plugin's title / description / Open Graph text.
+	 *
+	 * These strings never appear in the page body, so the content pass never
+	 * sees them. A translated page kept an English <title>, which is what a
+	 * searcher actually reads in the results list.
+	 *
+	 * Cache-only by design: this runs while rendering <head>, so it must never
+	 * block on an API call. A miss is queued and served translated next time.
+	 *
+	 * @param string $text
+	 * @return string
+	 */
+	public function filter_seo_text( $text ) {
+		if ( $this->current_language === ACWPT_Languages::get_source() ) {
+			return $text;
+		}
+		if ( ! is_string( $text ) || strlen( trim( $text ) ) < 2 ) {
+			return $text;
+		}
+
+		$translated = $this->get_string_translation( $text );
+		return $translated ? $translated : $text;
+	}
+
+	/**
+	 * Report the correct locale to an SEO plugin's Open Graph output.
+	 *
+	 * og:locale stayed en_US on every translated page, so a share of the German
+	 * page announced itself as American English.
+	 *
+	 * @param string $locale
+	 * @return string
+	 */
+	public function filter_seo_locale( $locale ) {
+		if ( $this->current_language === ACWPT_Languages::get_source() ) {
+			return $locale;
+		}
+		return ACWPT_Languages::og_locale( $this->current_language );
 	}
 
 	/**
