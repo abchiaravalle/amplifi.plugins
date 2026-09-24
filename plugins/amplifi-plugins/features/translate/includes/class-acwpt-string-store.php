@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class ACWPT_String_Store {
 
-	const DB_VERSION        = '3.5.0';
+	const DB_VERSION        = '3.6.0';
 	const DB_VERSION_OPTION = 'acwpt_strings_db_version';
 
 	/**
@@ -50,6 +50,7 @@ class ACWPT_String_Store {
 			language VARCHAR(10) NOT NULL,
 			source_hash CHAR(32) NOT NULL,
 			prompt_version VARCHAR(12) NOT NULL DEFAULT '',
+			locked TINYINT(1) NOT NULL DEFAULT 0,
 			source_text TEXT NOT NULL,
 			translated_text TEXT NOT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -271,7 +272,7 @@ class ACWPT_String_Store {
 		return (array) $wpdb->get_col(
 			$wpdb->prepare(
 				'SELECT source_text FROM ' . self::table_name()
-				. ' WHERE language = %s AND prompt_version <> %s LIMIT %d',
+				. ' WHERE language = %s AND prompt_version <> %s AND locked = 0 LIMIT %d',
 				$language,
 				$version,
 				(int) $limit
@@ -293,7 +294,7 @@ class ACWPT_String_Store {
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
 				'SELECT COUNT(*) FROM ' . self::table_name()
-				. ' WHERE language = %s AND prompt_version <> %s',
+				. ' WHERE language = %s AND prompt_version <> %s AND locked = 0',
 				$language,
 				$version
 			)
@@ -372,6 +373,44 @@ class ACWPT_String_Store {
 	}
 
 	/**
+	 * Store reviewer-approved corrections and lock them.
+	 *
+	 * A locked row keeps its text through queue drains, preloads and
+	 * prompt-version refreshes; see set_many(). Re-locking with new text is the
+	 * only way to change it.
+	 *
+	 * @param string   $language
+	 * @param string[] $pairs source => approved translation
+	 * @return int Rows written.
+	 */
+	public static function lock_many( $language, array $pairs ) {
+		global $wpdb;
+		$table = self::table_name();
+		$ver   = self::current_prompt_version( $language );
+		$n     = 0;
+		foreach ( $pairs as $source => $translated ) {
+			$source     = (string) $source;
+			$translated = (string) $translated;
+			if ( '' === $source || '' === $translated ) {
+				continue;
+			}
+			$hash = md5( $source );
+			$wpdb->query(
+				$wpdb->prepare(
+					// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					"INSERT INTO {$table} (language, source_hash, source_text, translated_text, prompt_version, locked)
+					 VALUES (%s, %s, %s, %s, %s, 1)
+					 ON DUPLICATE KEY UPDATE translated_text = VALUES(translated_text), prompt_version = VALUES(prompt_version), locked = 1, updated_at = CURRENT_TIMESTAMP",
+					$language, $hash, $source, $translated, $ver
+				)
+			);
+			unset( self::$memo[ $language ][ $hash ] );
+			$n++;
+		}
+		return $n;
+	}
+
+	/**
 	 * Upsert many translations in one statement.
 	 *
 	 * @param string               $language Language code.
@@ -402,7 +441,7 @@ class ACWPT_String_Store {
 				$hash     = md5( $source );
 				array_push( $params, $language, $hash, $source, $translated, self::current_prompt_version( $language ) );
 
-				self::$memo[ $language ][ $hash ] = $translated;
+				unset( self::$memo[ $language ][ $hash ] ); // re-read: row may be locked
 			}
 
 			if ( empty( $values ) ) {
@@ -411,7 +450,16 @@ class ACWPT_String_Store {
 
 			$sql = "INSERT INTO {$table} (language, source_hash, source_text, translated_text, prompt_version) VALUES "
 				. implode( ', ', $values )
-				. ' ON DUPLICATE KEY UPDATE translated_text = VALUES(translated_text), prompt_version = VALUES(prompt_version), updated_at = CURRENT_TIMESTAMP';
+				. ' ON DUPLICATE KEY UPDATE'
+				// A LOCKED row is a reviewer-approved correction. Nothing but
+				// lock_many() may change it: not the queue, not the preloader, not
+				// the stale-prompt refresh. Without this, every prompt-pack change
+				// marked all ~1,200 approved corrections stale and the refresh would
+				// have replaced them with fresh model output, silently undoing the
+				// fixes blind reviewers asked for.
+				. ' translated_text = IF(locked = 1, translated_text, VALUES(translated_text)),'
+				. ' prompt_version = IF(locked = 1, prompt_version, VALUES(prompt_version)),'
+				. ' updated_at = IF(locked = 1, updated_at, CURRENT_TIMESTAMP)';
 
 			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			$res = $wpdb->query( $wpdb->prepare( $sql, $params ) );
