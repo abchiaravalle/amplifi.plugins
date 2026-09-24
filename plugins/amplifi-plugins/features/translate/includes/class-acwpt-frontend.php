@@ -1134,6 +1134,10 @@ class ACWPT_Frontend {
 		$found   = ACWPT_String_Store::get_many( $this->current_language, $strings );
 
 		$buffer_miss = array_values( array_diff( $strings, array_keys( $found ) ) );
+		if ( $buffer_miss ) {
+			// Already-translated output is not a missing source string.
+			$buffer_miss = array_values( array_diff( $buffer_miss, ACWPT_String_Store::known_translations( $this->current_language, $buffer_miss ) ) );
+		}
 		$this->coverage_missing_list = array_merge( $this->coverage_missing_list, $buffer_miss );
 
 		return count( $buffer_miss );
@@ -1339,6 +1343,9 @@ class ACWPT_Frontend {
 			}
 		}
 
+		if ( $missing ) {
+			$missing = array_values( array_diff( $missing, ACWPT_String_Store::known_translations( $this->current_language, $missing ) ) );
+		}
 		if ( empty( $missing ) ) {
 			return;
 		}

@@ -301,6 +301,44 @@ class ACWPT_String_Store {
 	}
 
 	/**
+	 * Which of these strings are already a stored TRANSLATION in this language?
+	 *
+	 * Used to stop finished output being treated as English source. Some
+	 * regions reach the page buffer already translated by a path that does not
+	 * fence them (video captions, a "Next" slider control, a resource-hub
+	 * link), so the coverage check counted "Erleben Sie in wenigen Minuten..."
+	 * as a missing English string and marked the page uncacheable. Only called
+	 * with the handful of strings that missed the forward lookup, so the scan
+	 * of the unindexed column stays small and rare.
+	 *
+	 * @param string   $language
+	 * @param string[] $strings
+	 * @return string[] The subset that exists as translated_text.
+	 */
+	public static function known_translations( $language, array $strings ) {
+		global $wpdb;
+		$strings = array_values( array_unique( array_filter( $strings, 'strlen' ) ) );
+		if ( ! $strings ) {
+			return array();
+		}
+		$found = array();
+		foreach ( array_chunk( $strings, 100 ) as $chunk ) {
+			$ph   = implode( ',', array_fill( 0, count( $chunk ), '%s' ) );
+			$rows = $wpdb->get_col(
+				$wpdb->prepare(
+					// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					'SELECT DISTINCT translated_text FROM ' . self::table_name() . " WHERE language = %s AND translated_text IN ({$ph})",
+					array_merge( array( $language ), $chunk )
+				)
+			);
+			foreach ( (array) $rows as $r ) {
+				$found[] = $r;
+			}
+		}
+		return $found;
+	}
+
+	/**
 	 * Upsert many translations in one statement.
 	 *
 	 * @param string               $language Language code.
