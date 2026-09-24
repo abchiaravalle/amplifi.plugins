@@ -20,6 +20,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 class ACWPT_String_Store {
 
 	const DB_VERSION        = '3.6.0';
+
+	/**
+	 * Max hashes per IN() list in a SELECT.
+	 *
+	 * WP Engine's query governor (wpengine-common: WPE_Query_Governator)
+	 * replaces any SELECT longer than 16,384 characters with an empty string,
+	 * so the query runs as nothing and returns no rows, with no error. A
+	 * 32-char hash costs ~35 characters in an IN() list, so anything from 466
+	 * hashes up returned nothing: on prod the homepage (519 strings) got 19
+	 * back. Only SELECT is governed; INSERT/UPDATE are not (a 28 KB insert
+	 * stores fine). 150 keeps every lookup well under the limit.
+	 */
+	const SQL_CHUNK = 150;
 	const DB_VERSION_OPTION = 'acwpt_strings_db_version';
 
 	/**
@@ -167,7 +180,7 @@ class ACWPT_String_Store {
 		$table = self::table_name();
 
 		// Chunk the IN() clause so a huge page cannot build an oversized query.
-		foreach ( array_chunk( $need, 500 ) as $chunk ) {
+		foreach ( array_chunk( $need, self::SQL_CHUNK ) as $chunk ) {
 			$placeholders = implode( ',', array_fill( 0, count( $chunk ), '%s' ) );
 			$params       = array_merge( array( $language ), $chunk );
 
@@ -351,7 +364,7 @@ class ACWPT_String_Store {
 				$strings
 			)
 		) ) );
-		foreach ( array_chunk( $probe, 100 ) as $chunk ) {
+		foreach ( array_chunk( $probe, self::SQL_CHUNK ) as $chunk ) {
 			$ph   = implode( ',', array_fill( 0, count( $chunk ), '%s' ) );
 			$rows = $wpdb->get_col(
 				$wpdb->prepare(
@@ -426,6 +439,7 @@ class ACWPT_String_Store {
 
 		$table   = self::table_name();
 		$written = 0;
+		$ver     = self::current_prompt_version( $language );
 
 		foreach ( array_chunk( $pairs, 200, true ) as $chunk ) {
 			$values = array();
@@ -439,7 +453,7 @@ class ACWPT_String_Store {
 				}
 				$values[] = '(%s, %s, %s, %s, %s)';
 				$hash     = md5( $source );
-				array_push( $params, $language, $hash, $source, $translated, self::current_prompt_version( $language ) );
+				array_push( $params, $language, $hash, $source, $translated, $ver );
 
 				unset( self::$memo[ $language ][ $hash ] ); // re-read: row may be locked
 			}
@@ -453,10 +467,8 @@ class ACWPT_String_Store {
 				. ' ON DUPLICATE KEY UPDATE'
 				// A LOCKED row is a reviewer-approved correction. Nothing but
 				// lock_many() may change it: not the queue, not the preloader, not
-				// the stale-prompt refresh. Without this, every prompt-pack change
-				// marked all ~1,200 approved corrections stale and the refresh would
-				// have replaced them with fresh model output, silently undoing the
-				// fixes blind reviewers asked for.
+				// the stale-prompt refresh. 'locked' is never assigned here, so
+				// every IF reads the row's original state.
 				. ' translated_text = IF(locked = 1, translated_text, VALUES(translated_text)),'
 				. ' prompt_version = IF(locked = 1, prompt_version, VALUES(prompt_version)),'
 				. ' updated_at = IF(locked = 1, updated_at, CURRENT_TIMESTAMP)';
@@ -470,6 +482,8 @@ class ACWPT_String_Store {
 
 		return $written;
 	}
+
+
 
 	public static function set( $language, $source, $translated ) {
 		return self::set_many( $language, array( $source => $translated ) );

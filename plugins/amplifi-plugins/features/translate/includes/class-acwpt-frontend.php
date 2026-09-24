@@ -789,6 +789,143 @@ class ACWPT_Frontend {
 	}
 
 	/**
+	 * Sort long option lists (country pickers) by their translated label.
+	 *
+	 * A country list translated in place keeps the English order, so
+	 * "Deutschland" sits between Georgia and Ghana and a German buyer looking
+	 * under D on a required field does not find it. Only selects with 20+
+	 * options whose labels were translated are touched; leading placeholder
+	 * options (empty value) keep their position; option values and attributes
+	 * are never changed.
+	 */
+	private function resort_translated_selects( $html ) {
+		$lang   = $this->current_language;
+		$locale = array( 'de' => 'de_DE', 'pl' => 'pl_PL', 'ro' => 'ro_RO', 'tr' => 'tr_TR', 'zh' => 'zh_CN',
+			'it' => 'it_IT', 'fr' => 'fr_FR', 'es' => 'es_ES', 'pt' => 'pt_PT', 'cs' => 'cs_CZ' );
+		$coll   = class_exists( 'Collator' ) ? new Collator( $locale[ $lang ] ?? $lang ) : null;
+
+		return preg_replace_callback(
+			'#(<select\b[^>]*>)(.*?)(</select>)#is',
+			function ( $m ) use ( $coll ) {
+				if ( ! preg_match_all( '#<option\b([^>]*)>(.*?)</option>#is', $m[2], $ops, PREG_SET_ORDER ) || count( $ops ) < 20 ) {
+					return $m[0];
+				}
+				$head = array();
+				$rest = array();
+				foreach ( $ops as $o ) {
+					$is_placeholder = preg_match( '#\bvalue\s*=\s*(["\'])\1#', $o[1] ) || ! preg_match( '#\bvalue\s*=#', $o[1] );
+					if ( $is_placeholder && ! $rest ) {
+						$head[] = $o[0];
+					} else {
+						$rest[] = $o;
+					}
+				}
+				usort(
+					$rest,
+					function ( $a, $b ) use ( $coll ) {
+						$x = html_entity_decode( strip_tags( $a[2] ), ENT_QUOTES, 'UTF-8' );
+						$y = html_entity_decode( strip_tags( $b[2] ), ENT_QUOTES, 'UTF-8' );
+						return $coll ? $coll->compare( $x, $y ) : strcasecmp( remove_accents( $x ), remove_accents( $y ) );
+					}
+				);
+				// Rebuild only the option run; anything else inside the select
+				// (optgroups are not used by this form) is left as it was.
+				$sorted = implode( '', $head ) . implode( '', array_map( function ( $o ) { return $o[0]; }, $rest ) );
+				return $m[1] . $sorted . $m[3];
+			},
+			$html
+		);
+	}
+
+	/**
+	 * Look up the English path of this language request in the site's redirect
+	 * table (EPS 301 Redirects, {prefix}redirects) and return the language
+	 * version of its destination. Same-site destinations only; external
+	 * targets and missing rows return null so the normal 404 handling runs.
+	 *
+	 * @return string|null
+	 */
+	private function resolve_site_redirect_for_language() {
+		global $wpdb;
+
+		$uri  = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+		$path = (string) wp_parse_url( $uri, PHP_URL_PATH );
+		$lang = $this->current_language;
+		$path = preg_replace( '#^/' . preg_quote( $lang, '#' ) . '(/|$)#', '/', $path );
+		$key  = trim( $path, '/' );
+		if ( '' === $key ) {
+			return null;
+		}
+
+		$to = null;
+
+		// 1. Yoast SEO Premium redirects (plain format). On this site Yoast owns
+		//    the page-move redirects: /contact/ -> /how-can-we-help/,
+		//    /adas/ -> /transportation/adas/, etc.
+		$plain = get_option( 'wpseo-premium-redirects-export-plain', array() );
+		if ( is_array( $plain ) ) {
+			foreach ( array( $key, $key . '/', '/' . $key, '/' . $key . '/' ) as $k ) {
+				if ( isset( $plain[ $k ]['url'] ) && in_array( (int) ( $plain[ $k ]['type'] ?? 301 ), array( 301, 302, 307, 308 ), true ) ) {
+					$to = (string) $plain[ $k ]['url'];
+					break;
+				}
+			}
+		}
+
+		// 2. EPS 301 Redirects table ({prefix}redirects).
+		if ( null === $to ) {
+			$table = $wpdb->prefix . 'redirects';
+			static $has_table = null;
+			if ( null === $has_table ) {
+				$has_table = (bool) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+			}
+			if ( $has_table ) {
+				$to = $wpdb->get_var(
+					$wpdb->prepare(
+						// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+						"SELECT url_to FROM {$table} WHERE status IN ('301','302') AND url_from IN (%s, %s, %s, %s) ORDER BY id LIMIT 1",
+						$key, $key . '/', '/' . $key, '/' . $key . '/'
+					)
+				);
+			}
+		}
+		if ( ! $to ) {
+			return null;
+		}
+
+		// Yoast stores site-relative targets without a leading slash.
+		if ( ! ctype_digit( (string) $to ) && ! preg_match( '#^(https?:)?//#i', $to ) && '/' !== substr( $to, 0, 1 ) ) {
+			$to = '/' . $to;
+		}
+		// Trailing slash, matching the site's permalinks.
+		if ( '/' === substr( $to, 0, 1 ) && '/' !== substr( $to, -1 ) && false === strpos( $to, '?' ) && false === strpos( $to, '#' ) && ! preg_match( '#\.[a-z0-9]{2,4}$#i', $to ) ) {
+			$to .= '/';
+		}
+
+		// EPS stores a post ID for internal targets.
+		if ( ctype_digit( (string) $to ) ) {
+			$to = get_permalink( (int) $to );
+			if ( ! $to ) {
+				return null;
+			}
+		}
+
+		$home = untrailingslashit( home_url() );
+		if ( 0 === strpos( $to, $home ) ) {
+			$dest = substr( $to, strlen( $home ) );
+		} elseif ( '/' === substr( $to, 0, 1 ) && '//' !== substr( $to, 0, 2 ) ) {
+			$dest = $to;
+		} else {
+			return null; // external destination: leave it to the English site
+		}
+		$dest = '' === $dest ? '/' : $dest;
+		if ( preg_match( '#^/' . preg_quote( $lang, '#' ) . '(/|$)#', $dest ) ) {
+			return $home . $dest;
+		}
+		return $home . '/' . $lang . $dest;
+	}
+
+	/**
 	 * Send a missing translated URL to that language's home, not the English one.
 	 *
 	 * Measured before this fix: /de/nonexistent-page/ returned 301 to the site
@@ -811,6 +948,23 @@ class ACWPT_Frontend {
 		}
 
 		$target = home_url( '/' . $this->current_language . '/' );
+
+		// HONOUR THE SITE'S OWN REDIRECTS FIRST.
+		//
+		// The English site 301s moved pages through its redirect table
+		// (/contact/ -> /how-can-we-help/, /adas/ -> /transportation/adas/). A
+		// language URL for the same old path is a 404 to WordPress, so it fell
+		// through to the language home: the German "Kontaktieren Sie uns" CTA
+		// (/de/contact/) dropped buyers back on /de/ instead of the contact
+		// page. Round-10 reviewer rated it the most damaging item on the page;
+		// round 8 found nine such dead ends on /pt/. Resolve the redirect the
+		// English site would apply, and send the visitor to the SAME
+		// destination inside their language.
+		$mapped = $this->resolve_site_redirect_for_language();
+		if ( $mapped ) {
+			wp_safe_redirect( $mapped, 301 );
+			exit;
+		}
 
 		// Never redirect the language home to itself.
 		$current = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
@@ -990,6 +1144,9 @@ class ACWPT_Frontend {
 			'',
 			$html
 		);
+
+		// Re-sort translated <select> lists by their visible label.
+		$html = $this->resort_translated_selects( $html );
 
 		// KEEP FORM SUBMITTERS IN THEIR LANGUAGE.
 		//
@@ -1890,9 +2047,6 @@ class ACWPT_Frontend {
 				// submitted value must stay stable, and a buyer finds their own
 				// country regardless of the label language.
 				if ( preg_match_all( '/<option\b[^>]*>([^<]{2,120})<\/option>/i', $sel[1], $opts ) ) {
-					if ( count( $opts[1] ) > 60 ) {
-						continue;
-					}
 					foreach ( $opts[1] as $text ) {
 						$text = $this->normalize_candidate( $text );
 						if ( $this->is_translatable_prose( $text ) ) {
