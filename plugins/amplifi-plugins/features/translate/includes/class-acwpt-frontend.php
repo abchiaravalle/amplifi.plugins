@@ -566,7 +566,33 @@ class ACWPT_Frontend {
 		if ( isset( $this->translations[ $post_id ] ) && ! empty( $this->translations[ $post_id ]->translated_title ) ) {
 			return $this->translations[ $post_id ]->translated_title;
 		}
-		return $title;
+
+		// Titles of OTHER posts (news cards, product cards, related items) come
+		// through here without a per-post translation, so they rendered English
+		// in the news grid on every language. Resolve them from the string store
+		// and queue misses, the same as any other visible string.
+		//
+		// The result is wrapped in a done-fence so the page buffer does not
+		// re-extract the translated title as if it were English source. Without
+		// the fence the buffer counted every translated headline as "missing"
+		// (fr 30, it 23, ro 17 per page) and kept the page uncacheable. The
+		// fence only goes on when output is buffered, so titles in feeds or
+		// attributes never carry markers.
+		$plain = trim( html_entity_decode( wp_strip_all_tags( (string) $title ), ENT_QUOTES, 'UTF-8' ) );
+		if ( '' === $plain || ! $this->is_translatable_prose( $plain ) ) {
+			return $title;
+		}
+		$t = $this->get_string_translation( $plain );
+		if ( ! $t ) {
+			if ( class_exists( 'ACWPT_String_Queue' ) ) {
+				ACWPT_String_Queue::enqueue( $this->current_language, array( $plain ) );
+			}
+			return $title;
+		}
+		if ( ob_get_level() > 0 && ! is_feed() && ! wp_doing_ajax() && ! doing_filter( 'wp_head' ) ) {
+			return '<!--acwpt:done-->' . $t . '<!--/acwpt:done-->';
+		}
+		return $t;
 	}
 
 	public function filter_content( $content ) {
@@ -823,6 +849,22 @@ class ACWPT_Frontend {
 			return $html;
 		}
 
+		// A fenced title can end up inside an attribute (alt="", title="",
+		// aria-label="") where a comment would render as literal text. Strip
+		// fences inside tags first, in both raw and entity-escaped form; those
+		// strings are already translated and attributes are handled elsewhere.
+		$html = preg_replace_callback(
+			'/<[a-z][^>]*(?:acwpt:done|&lt;!--acwpt)[^>]*>/i',
+			function ( $m ) {
+				return str_replace(
+					array( '<!--acwpt:done-->', '<!--/acwpt:done-->', '&lt;!--acwpt:done--&gt;', '&lt;!--/acwpt:done--&gt;' ),
+					'',
+					$m[0]
+				);
+			},
+			$html
+		);
+
 		// Set aside regions already translated upstream so no pass below re-reads
 		// them as English source. Restored just before the buffer returns.
 		$done_regions = array();
@@ -927,7 +969,11 @@ class ACWPT_Frontend {
 		}
 		// Strip any fence a filter left unconsumed (e.g. content that never
 		// reached the buffer's mask step).
-		$html = str_replace( array( '<!--acwpt:done-->', '<!--/acwpt:done-->' ), '', $html );
+		$html = str_replace(
+			array( '<!--acwpt:done-->', '<!--/acwpt:done-->', '&lt;!--acwpt:done--&gt;', '&lt;!--/acwpt:done--&gt;' ),
+			'',
+			$html
+		);
 
 		return $html;
 	}
@@ -1037,9 +1083,10 @@ class ACWPT_Frontend {
 		$strings = array_values( array_unique( $strings ) );
 		$found   = ACWPT_String_Store::get_many( $this->current_language, $strings );
 
-		$this->coverage_missing_list = array_values( array_diff( $strings, array_keys( $found ) ) );
+		$buffer_miss = array_values( array_diff( $strings, array_keys( $found ) ) );
+		$this->coverage_missing_list = array_merge( $this->coverage_missing_list, $buffer_miss );
 
-		return count( $this->coverage_missing_list );
+		return count( $buffer_miss );
 	}
 
 	private function mark_page_cacheability( $html ) {
@@ -1178,7 +1225,12 @@ class ACWPT_Frontend {
 		$cands = $this->extract_translatable_strings_from_html( $content );
 		if ( $cands ) {
 			$found = ACWPT_String_Store::get_many( $this->current_language, $cands );
-			$this->upstream_missing += max( 0, count( $cands ) - count( $found ) );
+			$miss  = array_values( array_diff( $cands, array_keys( $found ) ) );
+			$this->upstream_missing += count( $miss );
+			// Keep the strings, not just the count, so the debug transient can
+			// name them. The total above was all that survived before, so the
+			// only visible symptom was a number with nothing behind it.
+			$this->coverage_missing_list = array_merge( $this->coverage_missing_list, $miss );
 		}
 
 		$translated = $this->translate_html_blob( $content );
