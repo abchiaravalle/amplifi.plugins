@@ -186,6 +186,20 @@ class ACWPT_Translator {
 			$val = ACWPT_Glossary::strip_keep_sentinels( $val );
 			$val = self::typography_text_only( array( __CLASS__, 'localize_quotes' ), $val, $language );
 			$val = self::typography_text_only( array( __CLASS__, 'localize_thousands' ), $val, $language );
+			// PER-ITEM STRUCTURE CHECK. The count/key check above catches a
+			// DROPPED item but not a SWAPPED pair: both keys present, values
+			// exchanged. Measured on prod, pl and cs stored "Report an issue or
+			// request services from our support team." as "<span
+			// class=\"tmm-brand-word\">Lismar</span> ...", so the support form
+			// showed an NDT descriptor. A translation must carry the same tag
+			// names (ignoring <br>, which languages legitimately drop) and the
+			// same brand-span presence as its source; otherwise it belongs to a
+			// different input and is not stored. It stays missing and is
+			// retried in a later, differently-composed batch.
+			if ( self::structure_signature( $val ) !== self::structure_signature( $original ) ) {
+				error_log( 'ACWPT: rejected mismatched pair for ' . $language . ': ' . mb_substr( $original, 0, 60 ) );
+				continue;
+			}
 			$result[ $original ] = $val;
 		}
 
@@ -344,6 +358,17 @@ class ACWPT_Translator {
 		);
 
 		return self::typography_text_only( array( __CLASS__, 'localize_french_spacing' ), self::typography_text_only( array( __CLASS__, 'localize_apostrophes' ), $text, $code ), $code );
+	}
+
+	/**
+	 * Tag-name set (excluding br/wbr) plus brand-span presence. Two strings
+	 * with different signatures cannot be translations of each other.
+	 */
+	private static function structure_signature( $text ) {
+		preg_match_all( '/<\s*([a-z][a-z0-9]*)\b/i', (string) $text, $m );
+		$names = array_unique( array_diff( array_map( 'strtolower', $m[1] ), array( 'br', 'wbr' ) ) );
+		sort( $names );
+		return implode( ',', $names ) . '|' . ( false !== stripos( (string) $text, 'tmm-brand' ) ? 'B' : '' );
 	}
 
 	/**

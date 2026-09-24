@@ -732,9 +732,19 @@ class ACWPT_Frontend {
 			return $text;
 		}
 
-		$translated = $this->get_string_translation( $text );
+		// Yoast passes these strings HTML-encoded ("Test &amp; Measurement",
+		// "Ascential&#039;s"), while the store is keyed on decoded text. The
+		// encoded lookup always missed, so <title>, meta description and og:*
+		// stayed English on every language even after the queue had translated
+		// the decoded string. Measured: encoded=miss, decoded=HIT for both.
+		$decoded    = html_entity_decode( $text, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		$translated = $this->get_string_translation( $decoded );
+		if ( ! $translated && $decoded !== $text ) {
+			$translated = $this->get_string_translation( $text );
+		}
 		if ( $translated ) {
-			return $translated;
+			// Hand back in the same encoding Yoast gave us.
+			return $decoded !== $text ? esc_html( $translated ) : $translated;
 		}
 
 		// Head strings (title, meta description, og:*) are produced by the SEO
@@ -867,12 +877,18 @@ class ACWPT_Frontend {
 
 		// Set aside regions already translated upstream so no pass below re-reads
 		// them as English source. Restored just before the buffer returns.
+		//
+		// Their LINKS still need the language prefix. Masking the whole region
+		// also hid its hrefs from prefix_internal_links(), so every link inside
+		// Elementor content ("our many brands", "diverse industries", "Learn
+		// More") sent Spanish, French, Polish readers to the English page.
+		// Reviewers flagged exactly those three links. Prefix them here, then mask.
 		$done_regions = array();
 		$html = preg_replace_callback(
 			'/<!--acwpt:done-->(.*?)<!--\/acwpt:done-->/s',
 			function ( $m ) use ( &$done_regions ) {
 				$key                  = '<!--ACWPT_DONE_' . count( $done_regions ) . '-->';
-				$done_regions[ $key ] = $m[1];
+				$done_regions[ $key ] = $this->prefix_internal_links( $m[1] );
 				return $key;
 			},
 			$html
@@ -974,6 +990,40 @@ class ACWPT_Frontend {
 			'',
 			$html
 		);
+
+		// Localise English thousands separators in rendered text nodes. Runs after
+		// upstream regions are restored: the "13,000" counter is Elementor output.
+		//
+		// Figures such as the "13,000 projects" counter are never extracted as
+		// strings (a bare number is not prose), so the translator-side separator
+		// fix never touched them and every language showed "13,000", which a
+		// Spanish or German reader parses as thirteen. Applied to text between
+		// tags only, with script/style/textarea bodies masked, so attributes,
+		// data-* values and code are left alone.
+		if ( class_exists( 'ACWPT_Translator' ) && method_exists( 'ACWPT_Translator', 'localize_thousands' ) ) {
+			$masked = array();
+			$html   = preg_replace_callback(
+				'#<(script|style|textarea)\b[^>]*>.*?</\1>#is',
+				function ( $m ) use ( &$masked ) {
+					$k            = '<!--ACWPT_NUM_' . count( $masked ) . '-->';
+					$masked[ $k ] = $m[0];
+					return $k;
+				},
+				$html
+			);
+			$lang = $this->current_language;
+			$html = preg_replace_callback(
+				'/>([^<>]*\d{1,3},\d{3}[^<>]*)</u',
+				function ( $m ) use ( $lang ) {
+					return '>' . ACWPT_Translator::localize_thousands( $m[1], $lang ) . '<';
+				},
+				$html
+			);
+			if ( $masked ) {
+				$html = strtr( $html, $masked );
+			}
+		}
+
 
 		return $html;
 	}
@@ -1342,7 +1392,41 @@ class ACWPT_Frontend {
 		// Consent banner copy (features/consent), same shape.
 		'banner_title', 'banner_message', 'accept_label', 'reject_label',
 		'manage_label', 'save_label', 'toast_accepted', 'toast_rejected',
+		// amplifi-instant-search widget. Its placeholder was translated through
+		// the attribute pass while every other label stayed English, and its
+		// searchUrl pointed at the English root (reviewer, it/marketer).
+		'placeholder', 'all_label', 'empty_title', 'empty_body', 'close_label',
+		'results_label', 'hint', 'view_all', 'prefs_label', 'dns_label', 'limit_spi_label',
 	);
+
+	/**
+	 * Add the language prefix to a same-site URL found in JSON config.
+	 * Absolute URLs on this host and root-relative paths are prefixed; external
+	 * URLs, anchors, assets and already-prefixed paths are returned unchanged.
+	 */
+	private function localize_json_url( $url ) {
+		$lang = $this->current_language;
+		if ( '' === $url || ! $lang ) {
+			return $url;
+		}
+		$home  = untrailingslashit( home_url() );
+		$codes = ACWPT_Languages::get_enabled_codes();
+		$path  = null;
+		if ( 0 === strpos( $url, $home ) ) {
+			$path = substr( $url, strlen( $home ) );
+			$path = '' === $path ? '/' : $path;
+		} elseif ( '/' === substr( $url, 0, 1 ) && '//' !== substr( $url, 0, 2 ) ) {
+			$path = $url;
+		}
+		if ( null === $path
+			|| preg_match( '#^/(?:' . implode( '|', array_map( 'preg_quote', $codes ) ) . ')(/|$)#', $path )
+			|| preg_match( '#^/(wp-|feed)#', $path )
+			|| preg_match( '/\.(css|js|png|jpe?g|svg|webp|pdf|xml|txt)(\?|$)/i', $path ) ) {
+			return $url;
+		}
+		$prefixed = '/' . $lang . $path;
+		return 0 === strpos( $url, $home ) ? $home . $prefixed : $prefixed;
+	}
 
 	/**
 	 * Recursively translate allowlisted values inside decoded JSON settings.
@@ -1360,6 +1444,12 @@ class ACWPT_Frontend {
 		foreach ( $node as $key => $value ) {
 			if ( is_array( $value ) ) {
 				$out[ $key ] = $this->translate_json_text( $value, $changed );
+				continue;
+			}
+			// Same-site URLs inside JSON config (searchUrl, custom_url) keep the
+			// visitor on the English site unless they carry the language prefix.
+			if ( is_string( $value ) && in_array( (string) $key, array( 'searchUrl', 'custom_url', 'url', 'link' ), true ) ) {
+				$out[ $key ] = $this->localize_json_url( $value );
 				continue;
 			}
 			if ( ! is_string( $value ) || ! in_array( (string) $key, self::JSON_TEXT_KEYS, true ) ) {
@@ -1876,7 +1966,7 @@ class ACWPT_Frontend {
 		//
 		// Keeping the LONGEST form is correct: a whole sentence translates better
 		// than its pieces, which is the entire reason the whole-block pass exists.
-		return $this->dedupe_candidates( $out );
+		return $this->dedupe_candidates( $out, $html );
 	}
 
 	/**
@@ -1886,29 +1976,21 @@ class ACWPT_Frontend {
 	 * @param string[] $candidates
 	 * @return string[]
 	 */
-	private function dedupe_candidates( array $candidates ) {
+	private function dedupe_candidates( array $candidates, $html = '' ) {
 		$candidates = array_values( array_unique( array_filter( array_map( 'trim', $candidates ), 'strlen' ) ) );
 
-		// ONE GATE FOR EVERY PASS.
-		//
-		// is_translatable_prose() was only called from some extraction passes,
-		// so "oEmbed (JSON)" survived via the attribute path even after the gate
-		// was taught to reject it. Filtering here, at the single exit, means no
-		// pass can bypass it — whatever shape it captured, junk never reaches
-		// the translator or the coverage check.
+		// ONE GATE FOR EVERY PASS. is_translatable_prose() is applied here, at
+		// the single exit, so no extraction pass can bypass it.
 		$candidates = array_values(
 			array_filter(
 				$candidates,
 				function ( $c ) {
-					// Strings carrying markup are whole-block captures and are
-					// judged by the prose outside their tags.
 					$probe = false !== strpos( $c, '<' ) ? trim( strip_tags( $c ) ) : $c;
 					return '' !== $probe && $this->is_translatable_prose( $probe );
 				}
 			)
 		);
 
-		// Longest first, so a fragment is always compared against the whole.
 		usort(
 			$candidates,
 			function ( $a, $b ) {
@@ -1916,60 +1998,60 @@ class ACWPT_Frontend {
 			}
 		);
 
+		// Normalise the page the same way candidates are normalised, so an
+		// occurrence count compares like with like.
+		$page = '';
+		if ( '' !== $html ) {
+			$page = preg_replace( '/\s+/u', ' ', html_entity_decode( $html, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+		}
+
+		// DEDUPE BY OCCURRENCE, NOT BY CONTAINMENT.
+		//
+		// A candidate that appears inside a longer candidate is only a redundant
+		// fragment if EVERY occurrence of it on the page sits inside that longer
+		// string. Plain containment got this wrong four times:
+		//   "Manage"                              inside "General Manager"
+		//   "Start a service ticket"              inside a longer CTA sentence
+		//   "Report an issue ... support team."   inside the Bauer variant
+		//   "Elevating support, Enhancing value"  inside the nav JSON copy
+		// Each is ALSO a standalone string elsewhere on the page, so dropping it
+		// left that occurrence in English. The previous patch ("keep short
+		// labels / keep complete sentences") fixed the first three and missed
+		// the fourth because the heading contains a comma. Counting occurrences
+		// is the actual definition of redundancy, so it needs no special cases.
 		$kept = array();
 		foreach ( $candidates as $c ) {
-			// A 2,700-character terms-and-conditions block was being sent as one
-			// string. That is slow, expensive, and far more likely to come back
-			// with a shifted or truncated mapping. Leave those to the content
-			// translator rather than the string pipeline.
 			if ( mb_strlen( $c ) > 1200 ) {
+				continue; // oversized blocks belong to the content translator
+			}
+
+			$containers = array();
+			foreach ( $kept as $k ) {
+				if ( false !== mb_strpos( $k, $c ) ) {
+					$containers[] = $k;
+				}
+			}
+
+			if ( $containers && '' !== $page ) {
+				$own    = substr_count( $page, $c );
+				$inside = 0;
+				foreach ( $containers as $k ) {
+					$inside += substr_count( $page, $k ) * substr_count( $k, $c );
+				}
+				if ( $own > $inside ) {
+					$kept[] = $c; // has at least one standalone occurrence
+				}
 				continue;
 			}
 
-			$contained = false;
-
-			// SHORT LABELS ARE NEVER DEDUPED ON CONTAINMENT.
-			//
-			// Substring dedupe dropped the cookie-banner button "Manage" because
-			// it appears inside the headlines "General Manager" and "Service
-			// Manager". Those are unrelated: a 1-3 word label is almost always an
-			// independent UI string, not a fragment of the sentence it happens to
-			// occur in. Losing it re-broke the banner fixed earlier today.
-			// A candidate that is a complete unit on its own — ends in terminal
-			// punctuation, or has no sentence punctuation at all (a heading or
-			// button label) — is kept even when a longer string contains it.
-			//
-			// Round 4 of blind review found three strings left in English on
-			// every language: "Start a service ticket", "Report an issue or
-			// request services from our support team." and "Elevating support,
-			// Enhancing value". Each also occurs inside a LONGER, different
-			// string elsewhere on the page, so containment dedupe discarded the
-			// standalone copy. Reviewers noticed that the longer variant was
-			// translated and the shorter one sat next to it in English.
-			//
-			// Only mid-sentence fragments (the pieces the whole-block pass
-			// already covers) are safe to drop.
-			$plain      = trim( strip_tags( $c ) );
-			$standalone = (bool) preg_match( '/[.!?…:。！？]$/u', $plain )
-				|| ! preg_match( '/[,;.]/u', $plain );
-			$words      = preg_split( '/\s+/u', $plain );
-			if ( ! $standalone && count( $words ) > 3 ) {
-				foreach ( $kept as $k ) {
-					// Word-boundary containment only, so "Manage" can never match
-					// "Manager" even for longer candidates.
-					if ( preg_match( '/(?<![\p{L}\p{N}])' . preg_quote( $c, '/' ) . '(?![\p{L}\p{N}])/u', $k ) ) {
-						$contained = true;
-						break;
-					}
-				}
-			}
-			if ( ! $contained ) {
+			if ( ! $containers ) {
 				$kept[] = $c;
 			}
 		}
 
 		return $kept;
 	}
+
 
 	/**
 	 * Run link and element translation over an HTML blob (uses string cache).
