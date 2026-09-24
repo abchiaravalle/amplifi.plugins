@@ -44,6 +44,14 @@ class ACWPT_Preloader {
 	 * better than the previous behaviour, where one save wiped every language.
 	 */
 	public static function reconcile_dirty() {
+		// KILL SWITCH. The watchdog rebuilt and restarted this preloader after
+		// it was paused, and it re-billed ~$50 in an afternoon translating each
+		// post twice ($0.10/page) and writing half the result to a table this
+		// site does not have. The string warm (strings only, $0.03/page) is the
+		// supported path; this stays off until the option is removed.
+		if ( get_option( 'acwpt_preloader_disabled' ) ) {
+			return;
+		}
 		$dirty = ACWPT_String_Store::dirty_posts();
 		if ( ! $dirty ) {
 			return;
@@ -107,6 +115,14 @@ class ACWPT_Preloader {
 	 * chain from a recurring event, so the run resumes on its own.
 	 */
 	public static function ensure_watchdog() {
+		// KILL SWITCH. The watchdog rebuilt and restarted this preloader after
+		// it was paused, and it re-billed ~$50 in an afternoon translating each
+		// post twice ($0.10/page) and writing half the result to a table this
+		// site does not have. The string warm (strings only, $0.03/page) is the
+		// supported path; this stays off until the option is removed.
+		if ( get_option( 'acwpt_preloader_disabled' ) ) {
+			return;
+		}
 		$existing = wp_get_scheduled_event( self::WATCHDOG_HOOK );
 
 		// A non-recurring entry means wp_schedule_event() ran before the custom
@@ -137,6 +153,14 @@ class ACWPT_Preloader {
 	 * is queued work but no batch pending, the chain is broken — restart it.
 	 */
 	public static function watchdog() {
+		// KILL SWITCH. The watchdog rebuilt and restarted this preloader after
+		// it was paused, and it re-billed ~$50 in an afternoon translating each
+		// post twice ($0.10/page) and writing half the result to a table this
+		// site does not have. The string warm (strings only, $0.03/page) is the
+		// supported path; this stays off until the option is removed.
+		if ( get_option( 'acwpt_preloader_disabled' ) ) {
+			return;
+		}
 		$queue = get_option( self::QUEUE_OPTION, array() );
 
 		// Post queue stalled?
@@ -178,6 +202,14 @@ class ACWPT_Preloader {
 	 * @return int Number of items queued.
 	 */
 	public static function start_all() {
+		// KILL SWITCH. The watchdog rebuilt and restarted this preloader after
+		// it was paused, and it re-billed ~$50 in an afternoon translating each
+		// post twice ($0.10/page) and writing half the result to a table this
+		// site does not have. The string warm (strings only, $0.03/page) is the
+		// supported path; this stays off until the option is removed.
+		if ( get_option( 'acwpt_preloader_disabled' ) ) {
+			return 0;
+		}
 		$enabled = ACWPT_Languages::get_enabled_codes();
 		if ( empty( $enabled ) ) {
 			return 0;
@@ -211,6 +243,14 @@ class ACWPT_Preloader {
 	 * @param int $post_id
 	 */
 	public static function start_for_post( $post_id ) {
+		// KILL SWITCH. The watchdog rebuilt and restarted this preloader after
+		// it was paused, and it re-billed ~$50 in an afternoon translating each
+		// post twice ($0.10/page) and writing half the result to a table this
+		// site does not have. The string warm (strings only, $0.03/page) is the
+		// supported path; this stays off until the option is removed.
+		if ( get_option( 'acwpt_preloader_disabled' ) ) {
+			return false;
+		}
 		$post = get_post( $post_id );
 		if ( ! $post ) {
 			return;
@@ -268,6 +308,14 @@ class ACWPT_Preloader {
 	 * @return array Status after processing.
 	 */
 	public static function process_batch( $max = null ) {
+		// KILL SWITCH. The watchdog rebuilt and restarted this preloader after
+		// it was paused, and it re-billed ~$50 in an afternoon translating each
+		// post twice ($0.10/page) and writing half the result to a table this
+		// site does not have. The string warm (strings only, $0.03/page) is the
+		// supported path; this stays off until the option is removed.
+		if ( get_option( 'acwpt_preloader_disabled' ) ) {
+			return array();
+		}
 		if ( $max === null ) {
 			$max = self::BATCH_SIZE;
 		}
