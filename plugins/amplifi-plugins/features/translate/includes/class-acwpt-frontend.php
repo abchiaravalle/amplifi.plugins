@@ -991,6 +991,32 @@ class ACWPT_Frontend {
 			$html
 		);
 
+		// KEEP FORM SUBMITTERS IN THEIR LANGUAGE.
+		//
+		// Lead forms post to Salesforce with a hidden retURL, and inline scripts
+		// send the browser on with window.location.href = '/thank-you/'. Both
+		// pointed at the English page, so a buyer who had just handed over their
+		// details on /fr/ landed on English, then the thank-you page's countdown
+		// (location.href = '/') ejected them to the English homepage. Round-8
+		// reviewers flagged it. Approved by Adam: each language uses its own
+		// thank-you page. Only same-site, root-relative or same-host targets are
+		// rewritten; the Salesforce endpoint itself is untouched. Runs after upstream
+		// (Elementor) regions are restored: the thank-you countdown lives in one.
+		$lang  = $this->current_language;
+		$home  = untrailingslashit( home_url() );
+		$html  = preg_replace(
+			'#(name="retURL"\s+value=")(' . preg_quote( $home, '#' ) . ')?/(?!' . preg_quote( $lang, '#' ) . '/)([^"]*)"#',
+			'$1' . $home . '/' . $lang . '/$3"',
+			$html
+		);
+		$html  = preg_replace_callback(
+			'#(location\.href\s*=\s*)([\'"])/(?!/)(?!' . preg_quote( $lang, '#' ) . '/)([^\'"]*)\2#',
+			function ( $m ) use ( $lang ) {
+				return $m[1] . $m[2] . '/' . $lang . '/' . $m[3] . $m[2];
+			},
+			$html
+		);
+
 		// Localise English thousands separators in rendered text nodes. Runs after
 		// upstream regions are restored: the "13,000" counter is Elementor output.
 		//
@@ -1074,6 +1100,27 @@ class ACWPT_Frontend {
 			'Interested In', 'Choose files', 'Required', 'Please complete this field.',
 			'Get in touch', 'How can I help you today?', 'New Chat', 'Try one of these:',
 			'Type your message...', 'Send',
+			// Theme header utility bar (#custom-banner), built in inline JS.
+			// Harvested from the live page; round-8 reviewers in ro/tr flagged
+			// the whole purple bar as English on their pages.
+			'Schedule an Ascentialytics demo', 'Learn more about Ascentialytics',
+			'Login to your account', 'Submit a support request form',
+			'Learn about available Service Level Agreements', 'Call us for support',
+			'Marketplace login', 'Follow Ascential Technologies', 'Search', 'Search…',
+			'Chat Assistant', 'Viewing resources for:', 'ADAS Garage podcast',
+			'Thank you! Your download will begin shortly.', 'No messages to download.',
+			// Support-form uploader and validation messages (inline JS).
+			'Drag & drop files here, or', 'Choose files', 'Remove',
+			'Video, photo, audio, PDF, or ZIP. Up to 5 files, 250 MB each.',
+			'Please fill in all required fields marked with a red asterisk (*).',
+			'Please select a priority for this request.',
+			'Please complete the security verification before submitting.',
+			'Please wait for your file uploads to finish before submitting.',
+			'An error occurred while submitting your request. Please try again or contact support directly.',
+			// Fragments of messages the uploader builds by concatenation.
+			' is too large (max 250 MB).',
+			' is not an accepted type (video, photo, audio, PDF, or ZIP).',
+			'You can upload up to ', ' files.',
 		);
 
 		$map = array();
@@ -1091,23 +1138,50 @@ class ACWPT_Frontend {
 			}
 		}
 
-		if ( empty( $map ) ) {
+		// The uploader writes its label with innerHTML, so the DOM text node is
+		// "Drag & drop files here, or" but the source literal is "&amp;".
+		if ( isset( $map['Drag & drop files here, or'] ) ) {
+			$map['Drag &amp; drop files here, or'] = esc_html( $map['Drag & drop files here, or'] );
+		}
+
+		// Fragments of concatenated messages ("<file> is too large (max 250
+		// MB).") cannot be matched whole; they are swapped inside text nodes.
+		$frag = array();
+		foreach ( array( ' is too large (max 250 MB).', ' is not an accepted type (video, photo, audio, PDF, or ZIP).', 'You can upload up to ', ' files.' ) as $f ) {
+			$tf = $this->get_string_translation( trim( $f ) );
+			if ( $tf && $tf !== trim( $f ) ) {
+				$lead         = ' ' === substr( $f, 0, 1 ) ? ' ' : '';
+				$trail        = ' ' === substr( $f, -1 ) ? ' ' : '';
+				$frag[ $f ]   = $lead . $tf . $trail;
+			}
+		}
+
+		if ( empty( $map ) && empty( $frag ) ) {
 			return $html;
 		}
 
 		$json   = wp_json_encode( $map, JSON_UNESCAPED_UNICODE );
+		$fjson  = wp_json_encode( (object) $frag, JSON_UNESCAPED_UNICODE );
+		// Runs over the whole body: theme scripts inject the header bar, the
+		// side tab, the uploader and chat anywhere in the document. Text nodes,
+		// placeholder, aria-label, title and submit values only; form values and
+		// names are never touched. Debounced so a busy page is scanned at most
+		// once per animation frame.
 		$script = '<script id="acwpt-widget-i18n">(function(){'
-			. 'var M=' . $json . ';'
+			. 'var M=' . $json . ',F=' . $fjson . ';'
+			. 'function tx(s){var k=s.trim();if(M[k])return s.replace(k,M[k]);var o=s;for(var f in F){if(o.indexOf(f)>-1)o=o.split(f).join(F[f]);}return o;}'
+			. 'function at(e,a){var v=e.getAttribute(a);if(v){var k=v.trim();if(M[k])e.setAttribute(a,M[k]);}}'
 			. 'function tr(r){if(!r)return;'
-			. 'if(r.nodeType===3){var k=r.nodeValue.trim();if(M[k])r.nodeValue=r.nodeValue.replace(k,M[k]);return;}'
-			. 'if(r.nodeType!==1)return;'
-			. 'if(r.placeholder&&M[r.placeholder.trim()])r.placeholder=M[r.placeholder.trim()];'
-			. 'if(r.value&&r.type==="submit"&&M[r.value.trim()])r.value=M[r.value.trim()];'
+			. 'if(r.nodeType===3){var n=tx(r.nodeValue);if(n!==r.nodeValue)r.nodeValue=n;return;}'
+			. 'if(r.nodeType!==1||r.tagName==="SCRIPT"||r.tagName==="STYLE")return;'
+			. 'at(r,"placeholder");at(r,"aria-label");at(r,"title");'
+			. 'if(r.type==="submit"&&r.value&&M[r.value.trim()])r.value=M[r.value.trim()];'
 			. 'for(var i=0;i<r.childNodes.length;i++)tr(r.childNodes[i]);}'
-			. 'function run(){document.querySelectorAll("form[id^=mktoForm],.mktoForm,.lets-talk-btn,[class*=chat],[id*=chat],[class*=sentia],[id*=sentia]").forEach(tr);}'
+			. 'var q=0;function run(){q=0;tr(document.body);}'
+			. 'function soon(){if(!q){q=1;(window.requestAnimationFrame||setTimeout)(run);}}'
+			. 'var A=window.alert;window.alert=function(m){return A.call(window,typeof m==="string"?tx(m):m);};'
 			. 'if(document.readyState!=="loading")run();else document.addEventListener("DOMContentLoaded",run);'
-			. 'new MutationObserver(function(m){for(var i=0;i<m.length;i++){for(var j=0;j<m[i].addedNodes.length;j++){'
-			. 'var n=m[i].addedNodes[j];if(n.nodeType===1){run();return;}}}})'
+			. 'new MutationObserver(function(m){for(var i=0;i<m.length;i++){if(m[i].addedNodes.length){soon();return;}}})'
 			. '.observe(document.documentElement,{childList:true,subtree:true});'
 			. '})();</script>';
 
@@ -1210,7 +1284,15 @@ class ACWPT_Frontend {
 	public function translate_meta_tag_callback( $match ) {
 		$tag = $match[0];
 		if ( preg_match( '/content\s*=\s*["\']([^"\']+)["\']/i', $tag, $cm ) ) {
-			$original   = html_entity_decode( $cm[1], ENT_QUOTES, 'UTF-8' );
+			$original = html_entity_decode( $cm[1], ENT_QUOTES, 'UTF-8' );
+			// The SEO plugin has usually ALREADY translated this tag through
+			// filter_seo_text(). Re-reading that output as English source found
+			// a stale target-to-target row and swapped correct Polish for an
+			// older ungrammatical copy ("z mysla o bezpieczenstwo"), which three
+			// reviewers flagged as blocking. Finished output is left alone.
+			if ( array() !== ACWPT_String_Store::known_translations( $this->current_language, array( $original ) ) ) {
+				return $tag;
+			}
 			$translated = $this->get_string_translation( $original );
 			if ( ! $translated ) {
 				// Defer: a synchronous per-tag API call here added up to six more
@@ -1280,6 +1362,10 @@ class ACWPT_Frontend {
 		if ( $cands ) {
 			$found = ACWPT_String_Store::get_many( $this->current_language, $cands );
 			$miss  = array_values( array_diff( $cands, array_keys( $found ) ) );
+			if ( $miss ) {
+				// Same rule as the buffer path: finished output is not missing source.
+				$miss = array_values( array_diff( $miss, ACWPT_String_Store::known_translations( $this->current_language, $miss ) ) );
+			}
 			$this->upstream_missing += count( $miss );
 			// Keep the strings, not just the count, so the debug transient can
 			// name them. The total above was all that survived before, so the
@@ -1998,6 +2084,13 @@ class ACWPT_Frontend {
 				function ( $c ) {
 					if ( false !== strpos( $c, 'acwpt:done' ) || false !== strpos( $c, 'ACWPT_DONE_' ) ) {
 						return false; // already-translated output, never source
+					}
+					// A block whose only text is a <time> element is a date that
+					// WordPress already rendered in the page language (date_i18n).
+					// Treating it as English queued "22 de setembro de 2026" to be
+					// translated into Portuguese and stored it as a source row.
+					if ( false !== stripos( $c, '<time' ) && '' === trim( strip_tags( preg_replace( '#<time\b[^>]*>.*?</time>#is', '', $c ) ) ) ) {
+						return false;
 					}
 					$probe = false !== strpos( $c, '<' ) ? trim( strip_tags( $c ) ) : $c;
 					return '' !== $probe && $this->is_translatable_prose( $probe );

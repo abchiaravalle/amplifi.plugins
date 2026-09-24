@@ -406,7 +406,7 @@ class ACWPT_Preloader {
 			return;
 		}
 
-		$strings = self::extract_strings( $html );
+		$strings = array_merge( self::extract_strings( $html ), self::extract_head_strings( $html ) );
 		if ( empty( $strings ) ) {
 			return;
 		}
@@ -425,9 +425,13 @@ class ACWPT_Preloader {
 
 			$pairs = array();
 			foreach ( $translated as $source => $target ) {
-				// An unchanged value is a legitimate non-translation (brand name,
-				// number); storing it would cache a non-translation as a result.
-				if ( is_string( $target ) && '' !== $target && $target !== $source ) {
+				// STORE IDENTITY RESULTS. A brand or model name that correctly
+				// stays unchanged ("Ascentialytics", "CMT-VSR") was skipped here,
+				// so the next warm or render found it "missing" and paid to
+				// translate it again, on every pass, in every language. The
+				// string queue stopped doing this long ago; the preloader never
+				// did.
+				if ( is_string( $target ) && '' !== $target ) {
 					$pairs[ $source ] = $target;
 				}
 			}
@@ -437,6 +441,46 @@ class ACWPT_Preloader {
 				$status['strings'] = ( $status['strings'] ?? 0 ) + count( $pairs );
 			}
 		}
+	}
+
+	/**
+	 * SEO head text of the ENGLISH page: <title>, meta description, og:title,
+	 * og:description, twitter:title, twitter:description.
+	 *
+	 * These never pass through the body extractor. At render time they are
+	 * translated from the store by filter_seo_text() and translate_meta_tags(),
+	 * and only QUEUED on a miss. With the queues pinned at their cap the miss
+	 * was often dropped, so inner pages (/transportation/adas/ in German, for
+	 * one) served an English title and meta description to search engines
+	 * indefinitely. Warming them with the page closes that gap.
+	 *
+	 * @param string $html
+	 * @return string[]
+	 */
+	private static function extract_head_strings( $html ) {
+		$out = array();
+		if ( preg_match( '/<title[^>]*>(.*?)<\/title>/is', $html, $m ) ) {
+			$out[] = $m[1];
+		}
+		if ( preg_match_all(
+			'/<meta\s+[^>]*?(?:name|property)\s*=\s*["\'](?:description|og:title|og:description|twitter:title|twitter:description)["\'][^>]*>/i',
+			$html,
+			$mm
+		) ) {
+			foreach ( $mm[0] as $tag ) {
+				if ( preg_match( '/content\s*=\s*"([^"]*)"/i', $tag, $c ) || preg_match( "/content\\s*=\\s*'([^']*)'/i", $tag, $c ) ) {
+					$out[] = $c[1];
+				}
+			}
+		}
+		$clean = array();
+		foreach ( $out as $x ) {
+			$x = trim( html_entity_decode( $x, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+			if ( mb_strlen( $x ) >= 2 ) {
+				$clean[] = $x;
+			}
+		}
+		return array_values( array_unique( $clean ) );
 	}
 
 	/**

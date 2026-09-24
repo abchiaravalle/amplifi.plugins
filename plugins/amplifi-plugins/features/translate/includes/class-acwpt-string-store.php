@@ -321,8 +321,36 @@ class ACWPT_String_Store {
 		if ( ! $strings ) {
 			return array();
 		}
+		// Match on the typography-normalised form too. A stored translation
+		// carries the localised spacing ("pour :" with U+00A0/U+202F before
+		// the colon in French) while the same text read back out of the page
+		// can arrive with an ordinary space, so an exact IN() match missed it
+		// and one French heading kept the page uncacheable.
+		$norm = function ( $x ) {
+			return preg_replace( '/[\x{00A0}\x{202F}\x{2009}\s]+/u', ' ', (string) $x );
+		};
+		$want = array();
+		foreach ( $strings as $x ) {
+			$want[ $norm( $x ) ][] = $x; // several caller forms can share one key
+		}
+
 		$found = array();
-		foreach ( array_chunk( $strings, 100 ) as $chunk ) {
+		$probe = array_values( array_unique( array_merge(
+			$strings,
+			array_map(
+				function ( $x ) {
+					return preg_replace( '/ ([:;!?»])/u', "\u{00A0}$1", preg_replace( '/« /u', "«\u{00A0}", $x ) );
+				},
+				$strings
+			),
+			array_map(
+				function ( $x ) {
+					return preg_replace( '/ ([:;!?»])/u', "\u{202F}$1", $x );
+				},
+				$strings
+			)
+		) ) );
+		foreach ( array_chunk( $probe, 100 ) as $chunk ) {
 			$ph   = implode( ',', array_fill( 0, count( $chunk ), '%s' ) );
 			$rows = $wpdb->get_col(
 				$wpdb->prepare(
@@ -332,10 +360,15 @@ class ACWPT_String_Store {
 				)
 			);
 			foreach ( (array) $rows as $r ) {
-				$found[] = $r;
+				$k = $norm( $r );
+				if ( isset( $want[ $k ] ) ) {
+					foreach ( $want[ $k ] as $orig ) {
+						$found[] = $orig; // report in the caller's own form(s)
+					}
+				}
 			}
 		}
-		return $found;
+		return array_values( array_unique( $found ) );
 	}
 
 	/**
