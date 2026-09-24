@@ -1924,8 +1924,11 @@ class ACWPT_Frontend {
 		// alt is also the only description an image has: an LLM asked about a
 		// product photo has nothing else to read.
 		foreach ( array( 'alt', 'aria-label', 'title' ) as $attr ) {
-			if ( preg_match_all( '/\b' . preg_quote( $attr, '/' ) . '="([^"]{2,})"/i', $html, $am ) ) {
-				foreach ( $am[1] as $text ) {
+			// Either quote style. Themes emit placeholder='Search...' with single
+			// quotes; the double-quote-only pattern left that search box English
+			// in all ten languages (round-6 review, pt/translator).
+			if ( preg_match_all( '/\b' . preg_quote( $attr, '/' ) . '=(["\'])([^"\']{2,}?)\1/i', $html, $am ) ) {
+				foreach ( $am[2] as $text ) {
 					$text = html_entity_decode( $text, ENT_QUOTES, 'UTF-8' );
 					// Skip anything that is not prose: URLs, numbers, codes.
 					if ( preg_match( '#^(https?://|[\d\s\.\-:/]+$)#', $text ) ) {
@@ -1937,7 +1940,8 @@ class ACWPT_Frontend {
 		}
 
 		// Form placeholder attributes.
-		if ( preg_match_all( '/\bplaceholder="([^"]{2,})"/i', $html, $m ) ) {
+		if ( preg_match_all( '/\bplaceholder=(["\'])([^"\']{2,}?)\1/i', $html, $m ) ) {
+			$m[1] = $m[2];
 			foreach ( $m[1] as $text ) {
 				$out[] = html_entity_decode( $text, ENT_QUOTES, 'UTF-8' );
 			}
@@ -1985,6 +1989,9 @@ class ACWPT_Frontend {
 			array_filter(
 				$candidates,
 				function ( $c ) {
+					if ( false !== strpos( $c, 'acwpt:done' ) || false !== strpos( $c, 'ACWPT_DONE_' ) ) {
+						return false; // already-translated output, never source
+					}
 					$probe = false !== strpos( $c, '<' ) ? trim( strip_tags( $c ) ) : $c;
 					return '' !== $probe && $this->is_translatable_prose( $probe );
 				}
@@ -2303,8 +2310,9 @@ class ACWPT_Frontend {
 		// Translate accessibility and media attributes.
 		foreach ( array( 'alt', 'aria-label', 'title' ) as $attr ) {
 			$html = preg_replace_callback(
-				'/\b(' . preg_quote( $attr, '/' ) . ')="([^"]{2,})"/i',
+				'/\b(' . preg_quote( $attr, '/' ) . ')=(["\'])([^"\']{2,}?)\2/i',
 				function ( $m ) {
+					$m    = array( $m[0], $m[1], $m[3] );
 					$text = html_entity_decode( $m[2], ENT_QUOTES, 'UTF-8' );
 					if ( preg_match( '#^(https?://|[\d\s\.\-:/]+$)#', $text ) ) {
 						return $m[0];
@@ -2320,9 +2328,10 @@ class ACWPT_Frontend {
 
 		// Translate form placeholder attributes.
 		$html = preg_replace_callback(
-			'/\bplaceholder="([^"]{2,})"/i',
+			'/\bplaceholder=(?:"([^"]{2,})"|\'([^\']{2,})\')/i',
 			function ( $m ) {
-				$original   = html_entity_decode( $m[1], ENT_QUOTES, 'UTF-8' );
+				$raw        = '' !== $m[1] ? $m[1] : ( $m[2] ?? '' );
+				$original   = html_entity_decode( $raw, ENT_QUOTES, 'UTF-8' );
 				$translated = $this->get_string_translation( $original );
 				return $translated ? 'placeholder="' . esc_attr( $translated ) . '"' : $m[0];
 			},

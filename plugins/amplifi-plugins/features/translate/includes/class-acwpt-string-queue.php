@@ -66,6 +66,27 @@ class ACWPT_String_Queue {
 	 * @return int Number newly queued.
 	 */
 	public static function enqueue( $language, array $sources ) {
+		// NEVER QUEUE ALREADY-TRANSLATED OR FENCED TEXT.
+		//
+		// filter_title() wraps a translated title in <!--acwpt:done--> fences.
+		// When that fenced string later reached an extraction pass (a card
+		// title inside a larger block, a meta tag), it was queued as if it were
+		// English and got "translated" again, into the language it already
+		// was in. Measured: 20-50 such rows per language, and a second
+		// rendering of the same headline on the same page ("Vice-président
+		// senior, Opérations..." next to "vice-président senior des
+		// opérations..."), which reviewers read as two translators. A source
+		// carrying a fence marker is output, not input; it is dropped here,
+		// at the one place every enqueue path goes through.
+		$sources = array_values(
+			array_filter(
+				(array) $sources,
+				function ( $s ) {
+					return is_string( $s ) && false === strpos( $s, 'acwpt:done' ) && false === strpos( $s, 'ACWPT_DONE_' );
+				}
+			)
+		);
+
 		if ( empty( $sources ) ) {
 			return 0;
 		}
