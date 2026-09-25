@@ -1962,7 +1962,15 @@ class ACWPT_Frontend {
 		if ( preg_match( '/\{\{.*\}\}|\{%.*%\}|<%.*%>/s', $text ) ) {
 			return false; // Handlebars / Twig / Underscore placeholders
 		}
-		if ( preg_match( '/(^[\'"+;]|[\'"+;]$|\)\s*\.\s*[a-z]+\(|\+=|\.html\(|\.text\(|=>|\bfunction\s*\()/i', $text ) ) {
+		// A trailing ';' alone is NOT code: legal recitals and list items end
+		// with one ("WHEREAS, Ascential agrees to perform ... Agreement;").
+		// Treating it as a JS fragment left every such clause in English on
+		// the Polish terms pages (100-page review, round B). Only reject it
+		// when the text also looks like code: quotes/plus at an edge, or a
+		// method chain / arrow / function, or no spaces at all.
+		$looks_code = preg_match( '/(^[\'"+]|[\'"+]$|\)\s*\.\s*[a-z]+\(|\+=|\.html\(|\.text\(|=>|\bfunction\s*\()/i', $text );
+		$semi_code  = preg_match( '/(^;|;$)/', $text ) && ( false === strpos( $text, ' ' ) || preg_match( '/[=(){}\[\]]\s*;$/', $text ) );
+		if ( $looks_code || $semi_code ) {
 			return false; // string concatenation and method-chain fragments
 		}
 		if ( preg_match( '/^oEmbed\s*\((JSON|XML)\)$/i', trim( $text ) ) ) {
@@ -2257,7 +2265,12 @@ class ACWPT_Frontend {
 		}
 
 		// Block/text elements (p, span, div, headings, li, td, th, label, figcaption, button, strong, em, b, dt, dd, blockquote, cite, caption).
-		if ( preg_match_all( '/(<(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)\b[^>]*>)([^<]{2,})(<\/(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)>)/i', $html, $m, PREG_SET_ORDER ) ) {
+		// Leaf <section>/<article>/<summary>/<small> text too: a chat-transcript
+		// widget renders plain text straight into <section class=markdown-section>,
+		// which left a whole paragraph English on /pl/extended-warranties/ and
+		// /pl/events/aistech-2026/ (100-page review, round B). Only elements whose
+		// entire content is text are matched ([^<]{2,}), so containers are unaffected.
+		if ( preg_match_all( '/(<(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption|section|article|summary|small)\b[^>]*>)([^<]{2,})(<\/(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption|section|article|summary|small)>)/i', $html, $m, PREG_SET_ORDER ) ) {
 			foreach ( $m as $match ) {
 				$text = $this->normalize_candidate( $match[2] );
 				if ( $this->is_translatable_prose( $text ) ) {
@@ -2642,7 +2655,7 @@ class ACWPT_Frontend {
 
 		// Translate text in block elements (same set as extract).
 		$html = preg_replace_callback(
-			'/(<(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)\b[^>]*>)([^<]{2,})(<\/(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption)>)/i',
+			'/(<(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption|section|article|summary|small)\b[^>]*>)([^<]{2,})(<\/(?:p|span|div|h[1-6]|li|td|th|label|figcaption|button|strong|em|b|dt|dd|blockquote|cite|caption|section|article|summary|small)>)/i',
 			array( $this, 'translate_element_text_callback' ),
 			$html
 		);
@@ -2658,7 +2671,13 @@ class ACWPT_Frontend {
 					|| preg_match( '/[{}<>]/', $text ) ) {
 					return $m[0];
 				}
-				$translated = $this->get_string_translation( $text );
+				// Store keys are entity-DECODED (normalize_candidate); the page
+				// text is not ("pressure &amp; flow"). Look up the decoded form,
+				// replace the raw form, emit escaped.
+				$translated = $this->get_string_translation( $this->normalize_candidate( $text ) );
+				if ( $translated && $this->normalize_candidate( $text ) !== $text ) {
+					$translated = esc_html( $translated );
+				}
 				if ( $translated ) {
 					return str_replace( $text, $translated, $raw );
 				}
@@ -2687,7 +2706,13 @@ class ACWPT_Frontend {
 					|| preg_match( '/[{}<>]/', $text ) ) {
 					return $m[0];
 				}
-				$translated = $this->get_string_translation( $text );
+				// Store keys are entity-DECODED (normalize_candidate); the page
+				// text is not ("pressure &amp; flow"). Look up the decoded form,
+				// replace the raw form, emit escaped.
+				$translated = $this->get_string_translation( $this->normalize_candidate( $text ) );
+				if ( $translated && $this->normalize_candidate( $text ) !== $text ) {
+					$translated = esc_html( $translated );
+				}
 				if ( $translated ) {
 					return $m[1] . str_replace( $text, $translated, $raw ) . $m[3];
 				}
@@ -2707,7 +2732,13 @@ class ACWPT_Frontend {
 					|| preg_match( '/[{}<>]/', $text ) ) {
 					return $m[0];
 				}
-				$translated = $this->get_string_translation( $text );
+				// Store keys are entity-DECODED (normalize_candidate); the page
+				// text is not ("pressure &amp; flow"). Look up the decoded form,
+				// replace the raw form, emit escaped.
+				$translated = $this->get_string_translation( $this->normalize_candidate( $text ) );
+				if ( $translated && $this->normalize_candidate( $text ) !== $text ) {
+					$translated = esc_html( $translated );
+				}
 				if ( $translated ) {
 					return $m[1] . str_replace( $text, $translated, $raw ) . $m[3];
 				}
