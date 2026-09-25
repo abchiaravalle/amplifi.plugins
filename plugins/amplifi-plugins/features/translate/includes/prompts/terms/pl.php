@@ -7,6 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
  * and never stored. Source: 100-page blind review, 2026-09-25.
  */
 return array(
+	array( 'en' => '*', 'pl' => 'Informal imperatives break the formal Państwo register. For buttons and calls to action use a noun phrase or a Prosimy/Zapraszamy form, e.g. "Rozmowa z ekspertem", "Więcej informacji", "Pobierz broszurę" becomes "Broszura do pobrania", "Poznaj ofertę" becomes "Oferta".', 'not' => array( 'Porozmawiaj', 'Skontaktuj się', 'Dowiedz się', 'Pobierz', 'Sprawdź', 'Odkryj', 'Zacznij', 'Zobacz', 'Poznaj', 'Zamów', 'Wypróbuj', 'Dołącz', 'Zapisz się', 'Przeglądaj', 'Zarejestruj się', 'Zaloguj się', 'Wybierz', 'Kliknij', 'Umów', 'Zadzwoń', 'Napisz', 'Śledź', 'Obserwuj' ) ),
 	array( 'en' => '20-high / six-high mill', 'pl' => 'walcarka 20-walcowa / 6-walcowa', 'not' => array( 'walcarka dwudziestościowa', 'walcarka sześciościowa' ) ),
 	array( 'en' => '3-jaw chuck', 'pl' => 'uchwyt trójszczękowy', 'not' => array( 'uchwyt trzyczęściowy' ) ),
 	array( 'en' => 'A DESIGN / B LOGO (trademarks)', 'pl' => 'A DESIGN / B LOGO', 'not' => array( 'PROJEKT A', 'LOGO B' ) ),

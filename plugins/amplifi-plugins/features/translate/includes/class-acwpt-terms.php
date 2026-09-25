@@ -88,7 +88,9 @@ class ACWPT_Terms {
 		$hay = mb_strtolower( wp_strip_all_tags( implode( "\n", $sources ) ) );
 		$hit = array();
 		foreach ( $terms as $t ) {
-			if ( self::contains_word( $hay, mb_strtolower( $t['en'] ) ) ) {
+			// en '*' = a language-wide ban (e.g. informal imperatives under a
+			// formal register). It applies to every source string.
+			if ( '*' === $t['en'] || self::contains_word( $hay, mb_strtolower( $t['en'] ) ) ) {
 				$hit[] = $t;
 			}
 		}
@@ -107,6 +109,10 @@ class ACWPT_Terms {
 		}
 		$lines = array( 'REQUIRED TERMINOLOGY for this batch. Use exactly these renderings (inflect them as the sentence requires; never substitute a synonym, never use a form listed as wrong):' );
 		foreach ( $entries as $e ) {
+			if ( '*' === $e['en'] ) {
+				$lines[] = '- NEVER write: ' . implode( ', ', $e['not'] ) . '. ' . $e['target'];
+				continue;
+			}
 			$line = '- "' . $e['en'] . '" = "' . $e['target'] . '"';
 			if ( $e['not'] ) {
 				$line .= '  (wrong: ' . implode( ', ', array_slice( $e['not'], 0, 4 ) ) . ')';
@@ -135,6 +141,17 @@ class ACWPT_Terms {
 		$out = mb_strtolower( wp_strip_all_tags( (string) $translation ) );
 		$bad = array();
 		foreach ( $entries as $e ) {
+			if ( '*' === $e['en'] ) {
+				// Exact whole-word match only: a stem would catch legitimate
+				// formal words ('Odkryj' must not match 'odkrywamy').
+				foreach ( $e['not'] as $n ) {
+					if ( self::contains_word( $out, mb_strtolower( $n ) ) ) {
+						$bad[] = array( 'en' => '*', 'target' => $e['target'], 'found' => $n );
+						break;
+					}
+				}
+				continue;
+			}
 			if ( ! self::contains_word( $src, mb_strtolower( $e['en'] ) ) ) {
 				continue;
 			}

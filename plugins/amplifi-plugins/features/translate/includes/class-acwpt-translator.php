@@ -258,7 +258,9 @@ class ACWPT_Translator {
 
 		$note = array( 'CORRECTION: a previous translation of this string used the wrong term.' );
 		foreach ( $bad as $b ) {
-			$note[] = '- "' . $b['en'] . '" must be "' . $b['target'] . '" (inflected as needed), NOT "' . $b['found'] . '".';
+			$note[] = '*' === $b['en']
+				? '- Do NOT use "' . $b['found'] . '". ' . $b['target']
+				: '- "' . $b['en'] . '" must be "' . $b['target'] . '" (inflected as needed), NOT "' . $b['found'] . '".';
 		}
 		$user = ACWPT_Terms::prompt_block( $rows ) . "\n\n" . implode( "\n", $note )
 			. "\n\nSTRINGS TO TRANSLATE (JSON):\n" . wp_json_encode( array( '0' => $source ), JSON_UNESCAPED_UNICODE );
