@@ -82,6 +82,11 @@ class ACWPT_Prompts {
         // pack and the per-site custom blocks, so hashing it covers every input
         // without having to enumerate them.
         $assembled = self::build_strings_prompt( $lang_code, $custom );
+        // The term base is sent per batch, not in the system prompt, so fold it
+        // into the fingerprint explicitly: a term change must mark rows stale.
+        if ( class_exists( 'ACWPT_Terms' ) ) {
+            $assembled .= "\n#terms:" . md5( wp_json_encode( ACWPT_Terms::load( $lang_code ) ) );
+        }
 
         $memo[ $key ] = substr( hash( 'sha256', $assembled ), 0, 12 );
         return $memo[ $key ];

@@ -118,6 +118,15 @@ class ACWPT_Translator {
 		$system_prompt = ACWPT_Prompts::build_strings_prompt( $language, $custom );
 		$user_message  = wp_json_encode( $indexed, JSON_UNESCAPED_UNICODE );
 
+		// ENFORCED TERMINOLOGY (see ACWPT_Terms). Only the rows whose English
+		// term occurs in THIS batch are sent, ahead of the JSON payload. They
+		// go in the user turn, not the system prompt, so the cached system
+		// prompt stays byte-identical across batches.
+		$term_rows = class_exists( 'ACWPT_Terms' ) ? ACWPT_Terms::relevant( $language, $originals ) : array();
+		if ( $term_rows ) {
+			$user_message = ACWPT_Terms::prompt_block( $term_rows ) . "\n\nSTRINGS TO TRANSLATE (JSON):\n" . $user_message;
+		}
+
 		// Budget the timeout from the WHOLE request, not just the payload.
 		//
 		// Sizing on the user message alone was wrong: 20 short strings is ~2,000
@@ -203,7 +212,75 @@ class ACWPT_Translator {
 			$result[ $original ] = $val;
 		}
 
+		// TERMINOLOGY GATE. A translation containing a banned rendering of a
+		// term that occurs in its source is re-translated alone with the
+		// exact correction; if it still fails it is not stored at all.
+		if ( $term_rows && ! self::$in_term_retry ) {
+			foreach ( $result as $src => $val ) {
+				$bad = ACWPT_Terms::violations( $src, $val, $term_rows );
+				if ( ! $bad ) {
+					continue;
+				}
+				$fix = self::retry_with_terms( $src, $language, $bad );
+				if ( null === $fix ) {
+					unset( $result[ $src ] );
+					error_log( 'ACWPT: terminology gate dropped ' . $language . ' string: ' . mb_substr( $src, 0, 60 ) );
+				} else {
+					$result[ $src ] = $fix;
+				}
+			}
+		}
+
 		return $result;
+	}
+
+	/** Guard against recursion while a terminology retry runs. */
+	private static $in_term_retry = false;
+
+	/**
+	 * Re-translate one string with an explicit terminology correction.
+	 *
+	 * @param string  $source
+	 * @param string  $language
+	 * @param array[] $bad  violations from ACWPT_Terms::violations()
+	 * @return string|null  corrected translation, or null if it still violates
+	 */
+	private static function retry_with_terms( $source, $language, array $bad ) {
+		$settings = get_option( 'acwpt_settings', array() );
+		$custom   = array(
+			'never_translate'     => isset( $settings['never_translate'] ) ? (array) $settings['never_translate'] : array(),
+			'glossary'            => isset( $settings['glossary'] ) ? (array) $settings['glossary'] : array(),
+			'custom_instructions' => isset( $settings['custom_instructions'] ) ? (array) $settings['custom_instructions'] : array(),
+		);
+		$api_key = isset( $settings['api_key'] ) ? $settings['api_key'] : '';
+		$model   = isset( $settings['model'] ) && $settings['model'] !== '' ? $settings['model'] : self::$default_model;
+		$rows    = ACWPT_Terms::relevant( $language, array( $source ) );
+
+		$note = array( 'CORRECTION: a previous translation of this string used the wrong term.' );
+		foreach ( $bad as $b ) {
+			$note[] = '- "' . $b['en'] . '" must be "' . $b['target'] . '" (inflected as needed), NOT "' . $b['found'] . '".';
+		}
+		$user = ACWPT_Terms::prompt_block( $rows ) . "\n\n" . implode( "\n", $note )
+			. "\n\nSTRINGS TO TRANSLATE (JSON):\n" . wp_json_encode( array( '0' => $source ), JSON_UNESCAPED_UNICODE );
+
+		self::$in_term_retry = true;
+		$data = self::call_anthropic( $api_key, $model, ACWPT_Prompts::build_strings_prompt( $language, $custom ), $user, 4096, 120 );
+		self::$in_term_retry = false;
+		if ( is_wp_error( $data ) ) {
+			return null;
+		}
+		self::record_usage( $data, $model, 'strings' );
+		$parsed = ACWPT_Glossary::extract_first_json_object( $data['content'][0]['text'] ?? '' );
+		if ( ! is_array( $parsed ) || ! isset( $parsed['0'] ) ) {
+			return null;
+		}
+		$val = ACWPT_Glossary::strip_keep_sentinels( ACWPT_Glossary::strip_glossary_sentinels( (string) $parsed['0'] ) );
+		$val = self::typography_text_only( array( __CLASS__, 'localize_quotes' ), $val, $language );
+		$val = self::typography_text_only( array( __CLASS__, 'localize_thousands' ), $val, $language );
+		if ( self::structure_signature( $val ) !== self::structure_signature( $source ) ) {
+			return null;
+		}
+		return ACWPT_Terms::violations( $source, $val, $rows ) ? null : $val;
 	}
 
 	/**

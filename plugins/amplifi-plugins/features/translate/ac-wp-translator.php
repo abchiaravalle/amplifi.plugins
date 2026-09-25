@@ -100,6 +100,7 @@ require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-cache.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-string-store.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-string-queue.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-glossary.php';
+require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-terms.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-prompts.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-translator.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-preloader.php';
