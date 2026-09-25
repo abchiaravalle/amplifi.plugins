@@ -54,6 +54,13 @@ class ACWPT_Frontend {
 
 		// Full page output buffer to translate all visible text and prefix links.
 		add_action( 'template_redirect', array( $this, 'start_output_buffer' ), 0 );
+		if ( version_compare( get_bloginfo( 'version' ), '6.8', '>=' ) ) {
+			add_action( 'set_transient', array( $this, 'drop_translated_transient' ), 10, 2 );
+			add_action( 'set_site_transient', array( $this, 'drop_translated_site_transient' ), 10, 2 );
+		} else {
+			add_action( 'setted_transient', array( $this, 'drop_translated_transient' ), 10, 2 );
+			add_action( 'setted_site_transient', array( $this, 'drop_translated_site_transient' ), 10, 2 );
+		}
 
 		// SEO: hreflang tags.
 		add_action( 'wp_head', array( $this, 'output_hreflang_tags' ), 1 );
@@ -995,6 +1002,53 @@ class ACWPT_Frontend {
 	// =========================================================================
 	// Full Page Output Buffer
 	// =========================================================================
+
+	/**
+	 * Keep translated text out of language-neutral caches.
+	 *
+	 * Transients are shared by every language. A plugin that caches rendered
+	 * data built from get_the_title() (ac-wp-resource-center's
+	 * 'resource_hub_popular_week', 1 hour) stored whatever language built it
+	 * first: the ENGLISH /resource-hub/ showed Polish titles with the done-
+	 * fence visible as literal text ("<!--acwpt:done-->Wyważarki do śmigieł…"),
+	 * and the Polish hub showed Czech titles. Found by the round-B Polish
+	 * review, 2026-09-25.
+	 *
+	 * On a translated request, any transient whose value carries a fence is
+	 * deleted right after it is written, so only a source-language request can
+	 * populate a shared cache. Translated requests read the English value and
+	 * the buffer translates it on output as usual. Cost: the cached query is
+	 * recomputed on translated requests until an English request rebuilds it.
+	 *
+	 * @param string $transient
+	 * @param mixed  $value
+	 */
+	public function drop_translated_transient( $transient, $value = null ) {
+		if ( ! $this->current_language || $this->current_language === ACWPT_Languages::get_source() ) {
+			return;
+		}
+		static $busy = false;
+		if ( $busy ) {
+			return;
+		}
+		$blob = is_string( $value ) ? $value : wp_json_encode( $value );
+		if ( ! is_string( $blob ) || false === strpos( $blob, 'acwpt:done' ) ) {
+			return;
+		}
+		$busy = true;
+		delete_transient( $transient );
+		$busy = false;
+	}
+
+	public function drop_translated_site_transient( $transient, $value = null ) {
+		if ( ! $this->current_language || $this->current_language === ACWPT_Languages::get_source() ) {
+			return;
+		}
+		$blob = is_string( $value ) ? $value : wp_json_encode( $value );
+		if ( is_string( $blob ) && false !== strpos( $blob, 'acwpt:done' ) ) {
+			delete_site_transient( $transient );
+		}
+	}
 
 	/**
 	 * Start output buffering on translated pages to post-process the full HTML.
