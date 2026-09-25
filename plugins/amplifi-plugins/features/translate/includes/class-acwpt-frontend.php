@@ -590,6 +590,7 @@ class ACWPT_Frontend {
 			return $title;
 		}
 		if ( ob_get_level() > 0 && ! is_feed() && ! wp_doing_ajax() && ! doing_filter( 'wp_head' ) ) {
+			$this->title_reverse[ mb_strtolower( $t ) ] = $plain; // for unsplice_translated_titles()
 			return '<!--acwpt:done-->' . $t . '<!--/acwpt:done-->';
 		}
 		return $t;
@@ -1029,6 +1030,9 @@ class ACWPT_Frontend {
 			$html
 		);
 
+		// Rebuild template sentences that have a translated title spliced in.
+		$html = $this->unsplice_translated_titles( $html );
+
 		// FENCES INSIDE SCRIPTS ARE NEVER REAL FENCES.
 		//
 		// A theme script embeds the post title in JavaScript, e.g.
@@ -1260,6 +1264,118 @@ class ACWPT_Frontend {
 
 	/** Missing strings counted in regions translated upstream (Elementor). */
 	private $upstream_missing = 0;
+
+	/** translated title (lower-cased) => English title, filled by filter_title(). */
+	private $title_reverse = array();
+
+	/**
+	 * Un-splice translated titles from English template sentences.
+	 *
+	 * Theme templates build text around a post title. Every catalog page ends
+	 * with "Contact our engineering team for a custom quote or technical
+	 * consultation regarding [esc_html( tm_sentence_case( get_the_title() ) )]."
+	 * get_the_title() is translated by filter_title(), so the page carried an
+	 * ENGLISH sentence with a POLISH product name spliced in, which matches no
+	 * stored key and could never be translated: "...regarding szlifowanie cnc."
+	 * on all 20 catalog pages in the 100-page review. tm_sentence_case() also
+	 * lower-cased "CNC", because the fence markers glued to the word made it
+	 * fail the all-caps test.
+	 *
+	 * Here the title still carries its done-fence, HTML-escaped by esc_html().
+	 * For each text node containing one:
+	 *   - a node that is only the title: restore the stored translation's own
+	 *     casing ("szlifowanie cnc" -> "Szlifowanie CNC");
+	 *   - a sentence around a title: rebuild the ENGLISH sentence (trying the
+	 *     casings the theme may have applied), and if that sentence is stored,
+	 *     the whole node becomes its proper translation, with the right case
+	 *     government ("...dotyczącej szlifowania CNC."). If not stored, the
+	 *     English sentence is queued so it translates in the background.
+	 * Runs before extraction and masking, so the rest of the buffer sees clean
+	 * text.
+	 */
+	private function unsplice_translated_titles( $html ) {
+		$open  = '&lt;!--acwpt:done--&gt;';
+		$close = '&lt;!--/acwpt:done--&gt;';
+		if ( ! $this->title_reverse || false === strpos( $html, $open ) ) {
+			return $html;
+		}
+		$seg_re = '#' . preg_quote( $open, '#' ) . '(.*?)' . preg_quote( $close, '#' ) . '#us';
+
+		$forms_for = function ( $en ) {
+			return array_values( array_unique( array_filter( array(
+				function_exists( 'tm_sentence_case' ) ? tm_sentence_case( $en ) : '',
+				$en,
+				mb_strtolower( $en ),
+				ucfirst( mb_strtolower( $en ) ),
+			) ) ) );
+		};
+
+		return preg_replace_callback(
+			'#>([^<>]*?' . preg_quote( $open, '#' ) . '[^<>]*?)<#us',
+			function ( $m ) use ( $open, $close, $seg_re, $forms_for ) {
+				$node = $m[1];
+				if ( ! preg_match_all( $seg_re, $node, $segs, PREG_SET_ORDER ) ) {
+					return $m[0];
+				}
+				$titles = array();
+				foreach ( $segs as $s ) {
+					$inner = html_entity_decode( $s[1], ENT_QUOTES, 'UTF-8' );
+					$en    = $this->title_reverse[ mb_strtolower( $inner ) ] ?? null;
+					if ( ! $en ) {
+						return $m[0];
+					}
+					$titles[] = array( 'inner' => $inner, 'en' => $en );
+				}
+
+				// Only the title in this node.
+				if ( 1 === count( $segs ) && trim( $segs[0][0] ) === trim( $node ) ) {
+					$t = $this->get_string_translation( $titles[0]['en'] );
+					if ( $t && mb_strtolower( $t ) === mb_strtolower( $titles[0]['inner'] ) ) {
+						return '>' . str_replace( $segs[0][0], esc_html( $t ), $node ) . '<';
+					}
+					return '>' . str_replace( $segs[0][0], esc_html( $titles[0]['inner'] ), $node ) . '<';
+				}
+
+				// A sentence built around one or more titles.
+				$parts  = preg_split( $seg_re, $node );
+				$combos = array( array() );
+				foreach ( $titles as $ti ) {
+					$next = array();
+					foreach ( $combos as $c ) {
+						foreach ( $forms_for( $ti['en'] ) as $f ) {
+							$next[] = array_merge( $c, array( $f ) );
+						}
+					}
+					$combos = $next;
+				}
+				// $forms_for() lists the theme's own casing (tm_sentence_case) first,
+				// so combos[0] is the sentence the English page actually shows:
+				// the one most likely stored, and the one queued on a miss.
+				$first = null;
+				foreach ( $combos as $c ) {
+					$sentence = $parts[0];
+					foreach ( $c as $k => $f ) {
+						$sentence .= esc_html( $f ) . ( $parts[ $k + 1 ] ?? '' );
+					}
+					$key = $this->normalize_candidate( $sentence );
+					if ( null === $first ) {
+						$first = $key;
+					}
+					$t = $this->get_string_translation( $key );
+					if ( $t ) {
+						$lead  = preg_match( '/^\s*/u', $node, $lw ) ? $lw[0] : '';
+						$trail = preg_match( '/\s*$/u', $node, $tw ) ? $tw[0] : '';
+						return '>' . $lead . esc_html( $t ) . $trail . '<';
+					}
+				}
+				if ( $first && class_exists( 'ACWPT_String_Queue' ) ) {
+					ACWPT_String_Queue::enqueue( $this->current_language, array( $first ) );
+				}
+				return $m[0];
+			},
+			$html
+		);
+	}
 
 	/**
 	 * Emit a translation map for labels injected by third-party JS.
