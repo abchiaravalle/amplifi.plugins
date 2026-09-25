@@ -515,7 +515,19 @@ class ACWPT_Translator {
 						'model'       => $model,
 						'max_tokens'  => $max_tokens,
 						'temperature' => 0.3,
-						'system'      => $system,
+						// PROMPT CACHING. The system prompt is the base prompt plus a
+						// 40-60 KB language pack, identical on every call for a
+						// language, and was 63% of spend (11.5k input tokens per
+						// call vs 1.3k output). Marked ephemeral-cacheable, repeat
+						// calls within 5 minutes read it at 10% of the input price.
+						// No change to the text sent, so no change to output.
+						'system'      => array(
+							array(
+								'type'          => 'text',
+								'text'          => $system,
+								'cache_control' => array( 'type' => 'ephemeral' ),
+							),
+						),
 						'messages'    => array(
 							array( 'role' => 'user', 'content' => $user ),
 						),
@@ -569,9 +581,16 @@ class ACWPT_Translator {
 
 		$input_tokens  = (int) ( $data['usage']['input_tokens']  ?? 0 );
 		$output_tokens = (int) ( $data['usage']['output_tokens'] ?? 0 );
+		$cache_write   = (int) ( $data['usage']['cache_creation_input_tokens'] ?? 0 );
+		$cache_read    = (int) ( $data['usage']['cache_read_input_tokens'] ?? 0 );
 
 		$pricing = isset( self::$pricing[ $model ] ) ? self::$pricing[ $model ] : self::$pricing['claude-sonnet-4-5'];
-		$cost    = ( $input_tokens * $pricing['input'] ) + ( $output_tokens * $pricing['output'] );
+		// input_tokens excludes cached tokens; bill each class at its own rate
+		// so the monthly ceiling tracks what Anthropic actually charges.
+		$cost    = ( $input_tokens * $pricing['input'] )
+			+ ( $cache_write * $pricing['input'] * 1.25 )
+			+ ( $cache_read * $pricing['input'] * 0.10 )
+			+ ( $output_tokens * $pricing['output'] );
 
 		// Feed the monthly ceiling. Separate from acwpt_usage, which is
 		// lifetime reporting: the budget needs a per-month figure it can
