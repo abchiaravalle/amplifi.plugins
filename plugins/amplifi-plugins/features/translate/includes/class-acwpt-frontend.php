@@ -1029,6 +1029,31 @@ class ACWPT_Frontend {
 			$html
 		);
 
+		// FENCES INSIDE SCRIPTS ARE NEVER REAL FENCES.
+		//
+		// A theme script embeds the post title in JavaScript, e.g.
+		//   var productName = "(esc_js of strtolower(get_the_title()))";
+		// so a fenced title arrives JSON/JS-escaped: the closing marker becomes
+		// <!--\/acwpt:done--> (or \u003C!--...), which the mask below cannot
+		// pair. Its opening marker then paired with the NEXT real closing marker
+		// ~250 KB later, and everything between was masked as "already
+		// translated": on every catalog page the 19 copies of the rebrand modal
+		// stayed English under a "complete" header. Found by the 100-page Polish
+		// review; confirmed live (served page carried one orphan escaped closer
+		// inside tmDivisionModal's script). Strip every marker form inside
+		// <script> first; the title text itself is already translated.
+		$html = preg_replace_callback(
+			'#(<script\b[^>]*>)(.*?)(</script>)#is',
+			function ( $m ) {
+				if ( false === stripos( $m[2], 'acwpt:done' ) ) {
+					return $m[0];
+				}
+				$body = preg_replace( '#(?:<|\\\\u003[cC]|\\\\x3[cC])!--\\\\?/?acwpt:done--(?:>|\\\\u003[eE]|\\\\x3[eE])#', '', $m[2] );
+				return $m[1] . $body . $m[3];
+			},
+			$html
+		);
+
 		// Set aside regions already translated upstream so no pass below re-reads
 		// them as English source. Restored just before the buffer returns.
 		//
@@ -1037,9 +1062,13 @@ class ACWPT_Frontend {
 		// Elementor content ("our many brands", "diverse industries", "Learn
 		// More") sent Spanish, French, Polish readers to the English page.
 		// Reviewers flagged exactly those three links. Prefix them here, then mask.
+		//
+		// The region may not contain another OPENING marker: an orphan opener
+		// (its closer lost to escaping) must never pair across a later fenced
+		// item and swallow the page between them.
 		$done_regions = array();
 		$html = preg_replace_callback(
-			'/<!--acwpt:done-->(.*?)<!--\/acwpt:done-->/s',
+			'/<!--acwpt:done-->((?:(?!<!--acwpt:done-->).)*?)<!--\/acwpt:done-->/s',
 			function ( $m ) use ( &$done_regions ) {
 				$key                  = '<!--ACWPT_DONE_' . count( $done_regions ) . '-->';
 				$done_regions[ $key ] = $this->prefix_internal_links( $m[1] );
@@ -2521,9 +2550,18 @@ class ACWPT_Frontend {
 			},
 			$html
 		);
-		// Translate trailing text nodes in block elements (text after a closing inline tag).
+		// Translate trailing text nodes (text after a closing inline tag).
+		//
+		// The closing side must include INLINE parents too. Icon-led items are
+		// <span class="tm-ticker-item"><i class="fa-..."></i> Measure in 1 or
+		// 2 planes</span>: the text sits between </i> and </span>. With only
+		// block closers allowed, every such item stayed English on every
+		// catalog page (11 per page on /catalog/axle-balancing-machines/) even
+		// though the extractor had stored the translation. Found by the
+		// 100-page Polish review; the render reported "complete" because
+		// coverage counted the stored string, not the substituted page.
 		$html = preg_replace_callback(
-			'/(<\/(?:span|strong|em|a|i|b|small|sup|sub)>)([^<]{3,})(<\/(?:p|div|h[1-6]|li|td|th|label|figcaption|button|dt|dd|blockquote)>)/u',
+			'/(<\/(?:span|strong|em|a|i|b|small|sup|sub)>)([^<]{3,})(<\/(?:p|div|h[1-6]|li|td|th|label|figcaption|button|dt|dd|blockquote|span|a|strong|em|small)>)/u',
 			function ( $m ) {
 				$raw  = $m[2];
 				$text = trim( $raw );
