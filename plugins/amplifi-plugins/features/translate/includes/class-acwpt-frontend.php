@@ -1003,7 +1003,49 @@ class ACWPT_Frontend {
 		if ( ! $this->current_language || is_admin() ) {
 			return;
 		}
-		ob_start( array( $this, 'process_output_buffer' ) );
+		ob_start( array( $this, 'safe_output_buffer' ) );
+	}
+
+	/**
+	 * Never serve a blank or truncated page.
+	 *
+	 * Every preg_* call returns null when it hits a PCRE limit, and a null
+	 * anywhere in the pipeline became an EMPTY 200 response: 27 Polish pages
+	 * went blank for ~4 hours on 2026-09-25 with no error visible to
+	 * monitoring. Whatever goes wrong inside translation, the visitor gets
+	 * at worst the untranslated page. A result under 60% of the input size
+	 * or missing </html> when the input had it is treated as a failure.
+	 *
+	 * @param string $html
+	 * @return string
+	 */
+	public function safe_output_buffer( $html ) {
+		if ( ! is_string( $html ) || '' === $html ) {
+			return $html;
+		}
+		try {
+			$out = $this->process_output_buffer( $html );
+		} catch ( \Throwable $e ) {
+			error_log( 'ACWPT: buffer exception, serving source page: ' . $e->getMessage() );
+			$this->mark_fallback( 'exception' );
+			return $html;
+		}
+		$had_close = false !== stripos( $html, '</html>' );
+		if ( ! is_string( $out ) || '' === $out
+			|| strlen( $out ) < 0.6 * strlen( $html )
+			|| ( $had_close && false === stripos( $out, '</html>' ) ) ) {
+			error_log( sprintf( 'ACWPT: buffer produced %s (%d of %d bytes), serving source page. preg_last_error=%d', is_string( $out ) ? 'short output' : 'null', is_string( $out ) ? strlen( $out ) : 0, strlen( $html ), preg_last_error() ) );
+			$this->mark_fallback( is_string( $out ) ? 'short' : 'null' );
+			return $html;
+		}
+		return $out;
+	}
+
+	private function mark_fallback( $why ) {
+		if ( ! headers_sent() ) {
+			header( 'X-ACWPT-Translation: fallback-' . $why, true );
+			header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0', true );
+		}
 	}
 
 	/**
@@ -1046,6 +1088,7 @@ class ACWPT_Frontend {
 		// review; confirmed live (served page carried one orphan escaped closer
 		// inside tmDivisionModal's script). Strip every marker form inside
 		// <script> first; the title text itself is already translated.
+		$pre_strip = $html;
 		$html = preg_replace_callback(
 			'#(<script\b[^>]*>)(.*?)(</script>)#is',
 			function ( $m ) {
@@ -1053,10 +1096,13 @@ class ACWPT_Frontend {
 					return $m[0];
 				}
 				$body = preg_replace( '#(?:<|\\\\u003[cC]|\\\\x3[cC])!--\\\\?/?acwpt:done--(?:>|\\\\u003[eE]|\\\\x3[eE])#', '', $m[2] );
-				return $m[1] . $body . $m[3];
+				return $m[1] . ( null === $body ? $m[2] : $body ) . $m[3];
 			},
 			$html
 		);
+		if ( null === $html ) {
+			$html = $pre_strip; // regex engine limit: skip this pass, never blank the page
+		}
 
 		// Set aside regions already translated upstream so no pass below re-reads
 		// them as English source. Restored just before the buffer returns.
@@ -1070,16 +1116,38 @@ class ACWPT_Frontend {
 		// The region may not contain another OPENING marker: an orphan opener
 		// (its closer lost to escaping) must never pair across a later fenced
 		// item and swallow the page between them.
+		//
+		// Done with a linear string scan, NOT a regex. The tempered pattern
+		// (?:(?!open).)*? backtracks per character and exceeded PCRE limits
+		// on long pages; preg_replace_callback() then returned null and the
+		// page was served as a 200 with an EMPTY body. 27 of the 100 Polish
+		// review pages went blank that way for ~4 hours on 2026-09-25.
 		$done_regions = array();
-		$html = preg_replace_callback(
-			'/<!--acwpt:done-->((?:(?!<!--acwpt:done-->).)*?)<!--\/acwpt:done-->/s',
-			function ( $m ) use ( &$done_regions ) {
+		$open_m  = '<!--acwpt:done-->';
+		$close_m = '<!--/acwpt:done-->';
+		if ( false !== strpos( $html, $open_m ) ) {
+			$out = '';
+			$pos = 0;
+			while ( false !== ( $a = strpos( $html, $open_m, $pos ) ) ) {
+				$b = strpos( $html, $close_m, $a + strlen( $open_m ) );
+				if ( false === $b ) {
+					break; // orphan opener: leave the rest untouched
+				}
+				$next_open = strpos( $html, $open_m, $a + strlen( $open_m ) );
+				if ( false !== $next_open && $next_open < $b ) {
+					// Orphan opener before this close: drop it, resume at the next opener.
+					$out .= substr( $html, $pos, $a - $pos );
+					$pos  = $a + strlen( $open_m );
+					continue;
+				}
+				$inner                = substr( $html, $a + strlen( $open_m ), $b - $a - strlen( $open_m ) );
 				$key                  = '<!--ACWPT_DONE_' . count( $done_regions ) . '-->';
-				$done_regions[ $key ] = $this->prefix_internal_links( $m[1] );
-				return $key;
-			},
-			$html
-		);
+				$done_regions[ $key ] = $this->prefix_internal_links( $inner );
+				$out                 .= substr( $html, $pos, $a - $pos ) . $key;
+				$pos                  = $b + strlen( $close_m );
+			}
+			$html = $out . substr( $html, $pos );
+		}
 
 		// Stash the SOURCE html. Cacheability is judged against this, not
 		// against the translated output — see count_unresolved_source_strings().
