@@ -28,10 +28,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 class ACWPT_Batch {
 
 	const OPT_JOBS   = 'acwpt_batch_jobs';
+
+	/** In-flight estimated cost, recomputed at the start of each tick and grown as batches are submitted. */
+	private static $committed_live = 0.0;
 	const CRON_HOOK  = 'acwpt_batch_tick';
 	const PER_REQ    = 25;
 	const MAX_REQS   = 400;
-	const EST_PER_ST = 0.0008; // conservative $/string at batch rates, for the pre-submit budget check
+	const EST_PER_ST = 0.0019; // $/string at batch rates, measured on the first live batch ($0.00172) plus margin
 
 	public static function init() {
 		add_filter( 'cron_schedules', array( __CLASS__, 'schedule' ) );
@@ -118,9 +121,13 @@ class ACWPT_Batch {
 		}
 		set_transient( 'acwpt_batch_lock', 1, 280 );
 		try {
+			self::$committed_live = self::committed();
 			$jobs = self::jobs();
 			foreach ( $jobs as $lang => &$job ) {
+				$before = array_sum( array_map( function ( $b ) { return (float) ( $b['est'] ?? 0 ); }, (array) $job['batches'] ) );
 				self::poll( $lang, $job );
+				$after  = array_sum( array_map( function ( $b ) { return (float) ( $b['est'] ?? 0 ); }, (array) $job['batches'] ) );
+				self::$committed_live -= ( $before - $after ); // finished batches are now real spend
 				self::submit( $lang, $job );
 			}
 			unset( $job );
@@ -174,6 +181,17 @@ class ACWPT_Batch {
 		return $raw;
 	}
 
+	/** Estimated cost of all batches still in flight (spend is only recorded when results arrive). */
+	private static function committed() {
+		$sum = 0.0;
+		foreach ( self::jobs() as $j ) {
+			foreach ( (array) $j['batches'] as $b ) {
+				$sum += (float) ( $b['est'] ?? 0 );
+			}
+		}
+		return $sum;
+	}
+
 	private static function submit( $lang, array &$job ) {
 		if ( ! $job['pending'] || count( $job['batches'] ) >= 2 ) {
 			return; // at most two batches in flight per language
@@ -181,7 +199,20 @@ class ACWPT_Batch {
 		$take = array_slice( $job['pending'], 0, self::PER_REQ * self::MAX_REQS );
 		$est  = count( $take ) * self::EST_PER_ST;
 		$lim  = ACWPT_Budget::monthly_limit();
-		if ( $lim > 0 && ACWPT_Budget::spent_this_month() + $est >= $lim ) {
+		// Keep HEADROOM under the ceiling for live translation of new/edited
+		// content: a bulk re-run must never be the thing that hits the cap.
+		$head = (float) apply_filters( 'acwpt_batch_headroom', 15.0 );
+		$base = ACWPT_Budget::spent_this_month() + self::$committed_live;
+		if ( $lim > 0 && $base + $est >= $lim - $head ) {
+			// Submit a smaller batch that fits, if any.
+			$fit  = (int) floor( max( 0, $lim - $head - $base ) / self::EST_PER_ST );
+			$fit  = $fit - ( $fit % self::PER_REQ );
+			if ( $fit >= self::PER_REQ ) {
+				$take = array_slice( $take, 0, $fit );
+				$est  = count( $take ) * self::EST_PER_ST;
+			}
+		}
+		if ( $lim > 0 && $base + $est >= $lim - $head ) {
 			$job['stats']['note'] = sprintf( 'waiting for budget: $%.2f + est $%.2f would reach the $%.2f ceiling', ACWPT_Budget::spent_this_month(), $est, $lim );
 			return;
 		}
@@ -224,7 +255,8 @@ class ACWPT_Batch {
 			$job['stats']['note'] = 'submit: no batch id';
 			return;
 		}
-		$job['batches'][ $d['id'] ] = array( 'map' => $map, 'submitted' => time() );
+		$job['batches'][ $d['id'] ] = array( 'map' => $map, 'submitted' => time(), 'est' => $est );
+		self::$committed_live += $est;
 		$job['pending']             = array_slice( $job['pending'], count( $take ) );
 		$job['stats']['note']       = 'submitted ' . $d['id'] . ' (' . count( $take ) . ' strings)';
 	}
