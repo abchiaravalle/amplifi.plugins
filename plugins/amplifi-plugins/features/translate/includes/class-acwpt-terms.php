@@ -156,7 +156,12 @@ class ACWPT_Terms {
 				continue;
 			}
 			foreach ( $e['not'] as $n ) {
-				if ( self::contains_stems( $out, mb_strtolower( $n ) ) && ! self::contains_stems( $out, mb_strtolower( $e['target'] ) ) ) {
+				// For CJK the canonical form is often a substring of the banned
+				// one ("加工单元" inside "加工单元格", "调试" inside "委托调试"), so
+				// "canonical present" says nothing. Judge the banned form alone.
+				$cjk = (bool) preg_match( '/[\p{Han}\p{Hiragana}\p{Katakana}]/u', $n . $e['target'] );
+				if ( self::contains_stems( $out, mb_strtolower( $n ) )
+					&& ( $cjk || ! self::contains_stems( $out, mb_strtolower( $e['target'] ) ) ) ) {
 					$bad[] = array( 'en' => $e['en'], 'target' => $e['target'], 'found' => $n );
 					break;
 				}
@@ -169,10 +174,25 @@ class ACWPT_Terms {
 		if ( '' === $needle ) {
 			return false;
 		}
+		// Chinese/Japanese have no word spacing: a term sits between other
+		// letters, so a word-boundary match can never fire and the gate would
+		// be silently inert for zh. Plain substring there.
+		if ( preg_match( '/[\p{Han}\p{Hiragana}\p{Katakana}]/u', $needle ) ) {
+			return false !== mb_strpos( $hay, $needle );
+		}
 		return (bool) preg_match( '/(?<![\p{L}\p{N}])' . preg_quote( $needle, '/' ) . '(?![\p{L}\p{N}])/u', $hay );
 	}
 
 	private static function contains_stems( $hay, $phrase ) {
+		if ( preg_match( '/[\p{Han}\p{Hiragana}\p{Katakana}]/u', $phrase ) ) {
+			return false !== mb_strpos( $hay, trim( $phrase ) ); // no inflection in CJK
+		}
+		// A Latin-script banned form inside CJK output (English left untranslated,
+		// e.g. "Motor Graders" in a Chinese page) has no letters around it to
+		// stem against; match it literally, case-insensitively.
+		if ( preg_match( '/[\p{Han}\p{Hiragana}\p{Katakana}]/u', $hay ) ) {
+			return false !== mb_stripos( $hay, trim( $phrase ) );
+		}
 		$words = preg_split( '/\s+/u', trim( $phrase ) );
 		$parts = array();
 		foreach ( $words as $w ) {
