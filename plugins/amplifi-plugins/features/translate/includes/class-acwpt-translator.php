@@ -210,6 +210,16 @@ class ACWPT_Translator {
 				error_log( 'ACWPT: rejected mismatched pair for ' . $language . ': ' . mb_substr( $original, 0, 60 ) );
 				continue;
 			}
+			// MIXED-SCRIPT WORDS. The model occasionally emits a look-alike
+			// letter from another script inside a word: Polish "hederу" with a
+			// Cyrillic у (U+0443), found twice on one page in Polish loop r3.
+			// It renders identically, breaks search and reads as corrupted text.
+			// A Latin-script word containing a Cyrillic or Greek letter (or the
+			// reverse for Chinese is not applicable) is never correct here.
+			if ( 'zh' !== $language && self::has_mixed_script_word( $val ) && ! self::has_mixed_script_word( $original ) ) {
+				error_log( 'ACWPT: rejected mixed-script output for ' . $language . ': ' . mb_substr( $original, 0, 60 ) );
+				continue;
+			}
 			$result[ $original ] = $val;
 		}
 
@@ -438,6 +448,12 @@ class ACWPT_Translator {
 		);
 
 		return self::typography_text_only( array( __CLASS__, 'localize_french_spacing' ), self::typography_text_only( array( __CLASS__, 'localize_apostrophes' ), $text, $code ), $code );
+	}
+
+	/** A word mixing Latin letters with Cyrillic or Greek ones (e.g. "hederу" with Cyrillic у). */
+	private static function has_mixed_script_word( $text ) {
+		$plain = wp_strip_all_tags( (string) $text );
+		return (bool) preg_match( '/(?:\p{Latin}[\p{Cyrillic}\p{Greek}]|[\p{Cyrillic}\p{Greek}]\p{Latin})/u', $plain );
 	}
 
 	/**
