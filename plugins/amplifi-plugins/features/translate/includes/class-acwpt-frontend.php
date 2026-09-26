@@ -1385,11 +1385,25 @@ class ACWPT_Frontend {
 				},
 				$html
 			);
-			$lang = $this->current_language;
+			$lang       = $this->current_language;
+			$src_tokens = array();
+			if ( preg_match_all( '/(?<![\d.,])\d{1,3}(?:,\d{3})+(?![\d,]|\.\d)/u', wp_strip_all_tags( (string) $this->source_html_for_coverage ), $tm ) ) {
+				$src_tokens = array_unique( $tm[0] );
+			}
 			$html = preg_replace_callback(
 				'/>([^<>]*\d{1,3},\d{3}[^<>]*)</u',
-				function ( $m ) use ( $lang ) {
-					return '>' . ACWPT_Translator::localize_thousands( $m[1], $lang ) . '<';
+				function ( $m ) use ( $lang, $src_tokens ) {
+					// Only numbers that are thousands groups in the ENGLISH page.
+					// Applied blindly it turned correct decimal commas ("0,002 mm")
+					// into thousands ("0 002 mm"); see localize_numbers().
+					$node = $m[1];
+					foreach ( $src_tokens as $tok ) {
+						if ( false !== strpos( $node, $tok ) ) {
+							$node = ACWPT_Translator::localize_thousands( $node, $lang );
+							break;
+						}
+					}
+					return '>' . $node . '<';
 				},
 				$html
 			);

@@ -194,7 +194,8 @@ class ACWPT_Translator {
 			$val = ACWPT_Glossary::strip_glossary_sentinels( $val );
 			$val = ACWPT_Glossary::strip_keep_sentinels( $val );
 			$val = self::typography_text_only( array( __CLASS__, 'localize_quotes' ), $val, $language );
-			$val = self::typography_text_only( array( __CLASS__, 'localize_thousands' ), $val, $language );
+			$src_for_numbers = $original;
+			$val = self::typography_text_only( function ( $t, $l ) use ( $src_for_numbers ) { return self::localize_numbers( $t, $src_for_numbers, $l ); }, $val, $language );
 			// PER-ITEM STRUCTURE CHECK. The count/key check above catches a
 			// DROPPED item but not a SWAPPED pair: both keys present, values
 			// exchanged. Measured on prod, pl and cs stored "Report an issue or
@@ -278,7 +279,7 @@ class ACWPT_Translator {
 		}
 		$val = ACWPT_Glossary::strip_keep_sentinels( ACWPT_Glossary::strip_glossary_sentinels( (string) $parsed['0'] ) );
 		$val = self::typography_text_only( array( __CLASS__, 'localize_quotes' ), $val, $language );
-		$val = self::typography_text_only( array( __CLASS__, 'localize_thousands' ), $val, $language );
+		$val = self::typography_text_only( function ( $t, $l ) use ( $source ) { return self::localize_numbers( $t, $source, $l ); }, $val, $language );
 		if ( self::structure_signature( $val ) !== self::structure_signature( $source ) ) {
 			return null;
 		}
@@ -448,6 +449,88 @@ class ACWPT_Translator {
 		$names = array_unique( array_diff( array_map( 'strtolower', $m[1] ), array( 'br', 'wbr' ) ) );
 		sort( $names );
 		return implode( ',', $names ) . '|' . ( false !== stripos( (string) $text, 'tmm-brand' ) ? 'B' : '' );
+	}
+
+	/**
+	 * Localise numbers in a translation, DRIVEN BY THE ENGLISH SOURCE.
+	 *
+	 * localize_thousands() ran on the translated text and rewrote every
+	 * "d,ddd" it saw as a thousands group. In comma-decimal languages the model
+	 * correctly writes decimals with a comma, so "0,002 mm" became "0 002 mm"
+	 * (pl) and "0.002 mm" (de), and "34,984 mm" became "34 984 mm": a 1000x
+	 * error in specs and tolerances. Found by the Polish loop, round 2.
+	 *
+	 * English only uses "," for thousands and "." for decimals, so the source
+	 * says which is which:
+	 *  - a thousands token in the SOURCE ("13,000") is localised wherever it
+	 *    appears in the translation;
+	 *  - a decimal in the SOURCE ("0.002", "34.984 mm") is forced to the local
+	 *    decimal comma in the translation when it was left with a point or
+	 *    grouped with a space. The point form is only rewritten for a
+	 *    measurement (leading 0, or a unit after it in the source), so clause
+	 *    numbers like 12.1 are left alone. zh keeps English conventions.
+	 *
+	 * @param string $text   Translation (text only; markup masked by caller).
+	 * @param string $source English source string.
+	 * @param string $code   Target language.
+	 * @return string
+	 */
+	public static function localize_numbers( $text, $source, $code ) {
+		$sep = array(
+			'de' => '.', 'es' => '.', 'it' => '.', 'pt' => '.', 'ro' => '.', 'tr' => '.',
+			'fr' => "\u{202F}", 'pl' => "\u{00A0}", 'cs' => "\u{00A0}",
+		);
+		if ( ! isset( $sep[ $code ] ) || '' === (string) $text ) {
+			return $text;
+		}
+		$src = html_entity_decode( wp_strip_all_tags( (string) $source ), ENT_QUOTES, 'UTF-8' );
+
+		if ( preg_match_all( '/(?<![\d.,])\d{1,3}(?:,\d{3})+(?![\d,]|\.\d)/u', $src, $m ) ) {
+			foreach ( array_unique( $m[0] ) as $tok ) {
+				$text = preg_replace( '/(?<![\d.,])' . preg_quote( $tok, '/' ) . '(?!\d)/u', str_replace( ',', $sep[ $code ], $tok ), $text );
+			}
+		}
+
+		$units = 'mm|µm|μm|cm|km|m|in|″|"|gmm|g·mm|g-mm|mg|kg|g|t|oz|lbs?|kN|Nm|N|MPa|kPa|Pa|bar|psi|kHz|MHz|Hz|rpm|RPM|°C|°F|°|%|ms|µs|μs|s|min|h|kV|V|mA|A|kW|MW|W|hp|ml|l|L|m³|m3|dBA|dB|Ω';
+		$decimal_evidence = (bool) preg_match( '/(?<![\d.,])0\.\d|(?<![\d.,])\d+\.\d{1,2}(?![\d.])|(?<![\d.,])\d+\.\d{4,}|(?<![\d.,])\d{4,}(?![\d.,])/u', $src );
+		if ( preg_match_all( '/(?<![\d.,§])(\d+)\.(\d+)(?![\d.])(\s?(?:' . $units . ')(?![\p{L}\d]))?/u', $src, $m, PREG_SET_ORDER ) ) {
+			foreach ( $m as $d ) {
+				list( , $int, $frac ) = $d;
+				if ( false !== strpos( $src, $int . ',' . $frac ) ) {
+					continue; // the source also has this as a thousands group: ambiguous, leave it
+				}
+				// "300.000 rpm", "1.000 USD": some English source text on this
+				// site uses a European thousands point. A whole number followed
+				// by exactly ".000" is a thousands group, never a decimal
+				// (nobody writes a measurement as "300.000 mm" to mean 300).
+				if ( '0' !== $int && '000' === $frac ) {
+					continue;
+				}
+				// "3.500mm x 4.300mm", "700 mm – 1.400 mm": some source text uses a
+				// European thousands point, which is indistinguishable in form from
+				// a 3-decimal measurement ("34.984 mm"). Decide from the SOURCE: if
+				// it shows decimal-point usage anywhere (a 0.x value, a 1-2 or 4+
+				// digit fraction, or an unseparated 4+ digit integer like "2700"),
+				// the point is a decimal. With no such evidence it is ambiguous and
+				// the model's own reading is kept.
+				if ( '0' !== $int && 3 === strlen( $frac ) && ! $decimal_evidence ) {
+					continue;
+				}
+				// Grouped with a space/no-break space: never right for a decimal.
+				$text = preg_replace( '/(?<![\d.,])' . $int . '[\x{0020}\x{00A0}\x{202F}]' . $frac . '(?!\d)/u', $int . ',' . $frac, $text );
+				// Left with the English point: fix only for a measurement, and
+				// never for a version or a named standard ("Industry 4.0",
+				// "Version 2.0", "Bluetooth 5.1", "ISO 1940.1").
+				$before = mb_substr( $src, max( 0, mb_strpos( $src, $d[0] ) - 14 ), min( 14, mb_strpos( $src, $d[0] ) ) );
+				if ( preg_match( '/(?:industry|industrie|version|v|release|revision|rev|iso|din|en|iec|sae|bluetooth|usb|wi-?fi|windows|api|level|step|chapter|section|clause|\bs)\.?\s*$/i', $before ) ) {
+					continue;
+				}
+				if ( '0' === $int || ! empty( $d[3] ) ) {
+					$text = preg_replace( '/(?<![\d.,])' . $int . '\.' . $frac . '(?![\d.])/u', $int . ',' . $frac, $text );
+				}
+			}
+		}
+		return $text;
 	}
 
 	/**
