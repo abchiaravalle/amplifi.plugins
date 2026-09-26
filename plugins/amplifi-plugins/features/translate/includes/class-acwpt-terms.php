@@ -28,6 +28,28 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class ACWPT_Terms {
 
+	/**
+	 * Generic English words whose correct translation depends on context
+	 * ("section" of a contract vs of a valve, "operations" of a business vs a
+	 * machining step, "testing" as a service vs a test bench). A term base
+	 * row keyed on one of these is PROMPT GUIDANCE ONLY: the gate never
+	 * rejects a translation because of it. Enforcing them rejected correct
+	 * Polish ("Section" forced "Artykuł" into valve sections) and kept the
+	 * old text instead (Polish loop round 2). Domain terms (unbalance,
+	 * refrigerant, vibration) and brand names stay enforced.
+	 */
+	const SOFT_WORDS = array(
+		'testing', 'test', 'tests', 'feature', 'features', 'performance', 'support', 'control', 'controls',
+		'application', 'applications', 'equipment', 'correction', 'design', 'core', 'transmission',
+		'operation', 'operations', 'team', 'contact', 'machine', 'machines', 'assembly', 'section',
+		'sections', 'product', 'products', 'solution', 'solutions', 'system', 'systems', 'service',
+		'services', 'capability', 'capabilities', 'vertical', 'horizontal', 'leadership', 'inspection',
+		'calibration', 'quality', 'process', 'processes', 'industry', 'industries', 'engineering',
+		'custom', 'standard', 'insights', 'resources', 'overview', 'details', 'units', 'unit',
+		'line', 'lines', 'station', 'stations', 'cell', 'cells', 'stand', 'stands', 'bench', 'benches',
+		'career', 'careers', 'news', 'events', 'about', 'home', 'search', 'download', 'learn',
+	);
+
 	/** @var array<string,array> */
 	private static $cache = array();
 
@@ -60,7 +82,8 @@ class ACWPT_Terms {
 					$not[] = $n;
 				}
 			}
-			$out[] = array( 'en' => $en, 'target' => $tr, 'not' => $not );
+			$soft  = ! empty( $r['soft'] ) || in_array( mb_strtolower( $en ), self::SOFT_WORDS, true );
+			$out[] = array( 'en' => $en, 'target' => $tr, 'not' => $not, 'soft' => $soft );
 		}
 		// Longest English term first, so "residual unbalance" wins over "unbalance".
 		usort(
@@ -87,11 +110,24 @@ class ACWPT_Terms {
 		}
 		$hay = mb_strtolower( wp_strip_all_tags( implode( "\n", $sources ) ) );
 		$hit = array();
+		// Terms are sorted longest first. LONGEST MATCH WINS: once a term
+		// matches, its occurrences are blanked so a shorter term that only
+		// occurs inside it does not also apply. Otherwise "operations"
+		// (= działalność, bans operacje) and "assembly operations" (= operacje
+		// montażowe) both fired on the same words, no output could satisfy
+		// both, and the gate kept the old text (Polish loop round 2).
+		$work = $hay;
 		foreach ( $terms as $t ) {
 			// en '*' = a language-wide ban (e.g. informal imperatives under a
 			// formal register). It applies to every source string.
-			if ( '*' === $t['en'] || self::contains_word( $hay, mb_strtolower( $t['en'] ) ) ) {
+			if ( '*' === $t['en'] ) {
 				$hit[] = $t;
+				continue;
+			}
+			$needle = mb_strtolower( $t['en'] );
+			if ( self::contains_word( $work, $needle ) ) {
+				$hit[] = $t;
+				$work  = preg_replace( '/(?<![\p{L}\p{N}])' . preg_quote( $needle, '/' ) . '(?![\p{L}\p{N}])/u', str_repeat( ' ', 1 ), $work );
 			}
 		}
 		return $hit;
@@ -141,6 +177,9 @@ class ACWPT_Terms {
 		$out = mb_strtolower( wp_strip_all_tags( (string) $translation ) );
 		$bad = array();
 		foreach ( $entries as $e ) {
+			if ( ! empty( $e['soft'] ) ) {
+				continue; // prompt guidance only (see SOFT_WORDS)
+			}
 			if ( '*' === $e['en'] ) {
 				// Exact whole-word match only: a stem would catch legitimate
 				// formal words ('Odkryj' must not match 'odkrywamy').
@@ -194,6 +233,13 @@ class ACWPT_Terms {
 			return false !== mb_stripos( $hay, trim( $phrase ) );
 		}
 		$words = preg_split( '/\s+/u', trim( $phrase ) );
+		// A single short word stemmed to 4-5 letters matches far too much
+		// ("testy" -> "test" matched "testerów", "testowy" and other rows'
+		// canonical forms), so correct translations were rejected. Short
+		// single words match as whole words only.
+		if ( 1 === count( $words ) && mb_strlen( $words[0] ) <= 6 ) {
+			return (bool) preg_match( '/(?<![\p{L}\p{N}])' . preg_quote( $words[0], '/' ) . '(?![\p{L}\p{N}])/u', $hay );
+		}
 		$parts = array();
 		foreach ( $words as $w ) {
 			$len = mb_strlen( $w );
