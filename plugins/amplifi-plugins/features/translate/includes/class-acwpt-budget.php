@@ -59,9 +59,21 @@ class ACWPT_Budget {
 	 * Spend so far this month.
 	 */
 	public static function spent_this_month() {
+		global $wpdb;
+		$row = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", self::month_key() ) );
+		if ( null !== $row ) {
+			return (float) $row;
+		}
+		// Before the first atomic write this month: fall back to the legacy
+		// array (history, admin chart).
 		$all = (array) get_option( self::OPTION_SPEND, array() );
 		$p   = self::period();
 		return isset( $all[ $p ] ) ? (float) $all[ $p ] : 0.0;
+	}
+
+	/** One option row per month holds the live counter: acwpt_spend_2026-09. */
+	private static function month_key() {
+		return 'acwpt_spend_' . self::period();
 	}
 
 	/**
@@ -71,20 +83,76 @@ class ACWPT_Budget {
 	 * sudden jump is visible rather than being averaged away.
 	 */
 	public static function record( $cost ) {
+		global $wpdb;
 		$cost = (float) $cost;
 		if ( $cost <= 0 ) {
 			return;
 		}
-		$all = (array) get_option( self::OPTION_SPEND, array() );
-		$p   = self::period();
 
-		$all[ $p ] = ( isset( $all[ $p ] ) ? (float) $all[ $p ] : 0.0 ) + $cost;
+		// ATOMIC INCREMENT IN SQL.
+		//
+		// This used to read the month's total through get_option(), add, and
+		// write it back. With WP Engine's persistent object cache and many
+		// concurrent processes, each process read a stale cached total and
+		// overwrote the others: during a parallel re-translation the meter
+		// moved $4.60 while $34.49 was actually spent (measured from the API
+		// usage fields). The ceiling was therefore not protecting anything.
+		// One row per month, incremented by the database itself, cannot lose
+		// an update, and the read path bypasses the object cache.
+		$key = self::month_key();
+		if ( null === $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $key ) ) ) {
+			// First atomic write this month: carry over the legacy total so the
+			// switch-over never resets the month. INSERT IGNORE: if another
+			// process seeded it first, keep theirs.
+			$legacy = (array) get_option( self::OPTION_SPEND, array() );
+			$wpdb->query( $wpdb->prepare(
+				"INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'off')",
+				$key,
+				sprintf( '%.6F', (float) ( $legacy[ self::period() ] ?? 0 ) )
+			) );
+		}
+		$wpdb->query(
+			$wpdb->prepare(
+				"INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'off')
+				 ON DUPLICATE KEY UPDATE option_value = CAST(option_value AS DECIMAL(12,6)) + VALUES(option_value)",
+				$key,
+				sprintf( '%.6F', $cost )
+			)
+		);
+		wp_cache_delete( $key, 'options' );
 
+		// Keep the legacy 12-month array in step for the admin history chart
+		// (best effort; the live counter above is the source of truth).
+		$all       = (array) get_option( self::OPTION_SPEND, array() );
+		$p         = self::period();
+		$all[ $p ] = self::spent_this_month();
 		if ( count( $all ) > 12 ) {
 			krsort( $all );
 			$all = array_slice( $all, 0, 12, true );
 		}
 		update_option( self::OPTION_SPEND, $all, false );
+	}
+
+	/**
+	 * Correct the month counter to a known-true figure (e.g. after a period of
+	 * lost updates). Never lowers it below what is already recorded.
+	 */
+	public static function reconcile_month( $true_total ) {
+		global $wpdb;
+		$true_total = (float) $true_total;
+		if ( $true_total <= self::spent_this_month() ) {
+			return self::spent_this_month();
+		}
+		$wpdb->query(
+			$wpdb->prepare(
+				"INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'off')
+				 ON DUPLICATE KEY UPDATE option_value = VALUES(option_value)",
+				self::month_key(),
+				sprintf( '%.6F', $true_total )
+			)
+		);
+		wp_cache_delete( self::month_key(), 'options' );
+		return self::spent_this_month();
 	}
 
 	/**
