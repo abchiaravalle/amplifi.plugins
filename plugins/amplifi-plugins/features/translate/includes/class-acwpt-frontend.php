@@ -2892,6 +2892,51 @@ class ACWPT_Frontend {
 			},
 			$html
 		);
+		// Text after a <br> that CONTAINS INLINE MARKUP, up to the block end.
+		//
+		// Press-release boilerplate is <p><strong>About Ascential
+		// Technologies</strong><br>Ascential ... Learn more at <a>..</a>.</p>.
+		// The whole <p> is over the 800-char whole-block limit, the plain
+		// after-<br> pass below stops at the first tag, and the leading-text
+		// pass keys only the part before <a>. The extractor stores exactly this
+		// segment (text + inline markup after the <br>), but no substitution
+		// pass could look it up, so the paragraph stayed English on every
+		// press release in every language (Polish loop r1 + r2). Same guards as
+		// the whole-block pass: inline tags only, link count must survive.
+		$html = preg_replace_callback(
+			'/(<br\s*\/?>)((?:(?!<br\b|<\/?(?:p|div|section|article|ul|ol|table|h[1-6]|li|td|th)\b).)+?)(<\/(?:p|div|li|td|th|dd|blockquote)>)/is',
+			function ( $m ) {
+				$inner = $m[2];
+				if ( false === strpos( $inner, '<' ) ) {
+					return $m[0]; // plain text: the next pass owns it
+				}
+				$candidate = $this->normalize_candidate( $inner );
+				if ( mb_strlen( $candidate ) < 8 || mb_strlen( $candidate ) > 1200 ) {
+					return $m[0];
+				}
+				$translated = $this->get_string_translation( $candidate );
+				if ( $translated && preg_match_all( '/<a\b/i', $inner ) === preg_match_all( '/<a\b/i', $translated ) ) {
+					return $m[1] . $translated . $m[3];
+				}
+				// The extractor's leading-text pass keys the text BEFORE the
+				// first inline tag, entity-encoded as on the page ("designs
+				// &amp; builds … Learn more at"). That row exists for every
+				// press release; use it for the lead and leave the inline tail.
+				$lt = strpos( $inner, '<' );
+				$lead = trim( substr( $inner, 0, $lt ) );
+				if ( mb_strlen( $lead ) >= 8 ) {
+					$t = $this->get_string_translation( $lead );
+					if ( ! $t ) {
+						$t = $this->get_string_translation( $this->normalize_candidate( $lead ) );
+					}
+					if ( $t ) {
+						return $m[1] . str_replace( $lead, $t, $inner ) . $m[3];
+					}
+				}
+				return $m[0];
+			},
+			$html
+		);
 		// Translate text after <br> tags (before the closing block tag).
 		$html = preg_replace_callback(
 			'/(<br\s*\/?>)([^<]{3,})(<\/(?:p|div|h[1-6]|li|td|th|label|figcaption|button|dt|dd|blockquote)>)/u',
