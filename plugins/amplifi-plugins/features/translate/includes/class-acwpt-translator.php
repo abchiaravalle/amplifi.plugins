@@ -245,6 +245,52 @@ class ACWPT_Translator {
 		return $result;
 	}
 
+	/**
+	 * Run every per-item gate of translate_strings() on a batch result.
+	 * Same parse, integrity, typography, numbers, structure, mixed-script and
+	 * terminology checks, so the batch path can never store what the live path
+	 * would reject. Items that fail the terminology gate are returned in
+	 * 'retry' (re-batched once, with the correction block) instead of being
+	 * fixed inline, because the batch path has no synchronous retry.
+	 *
+	 * @param string[] $originals English sources, in request order.
+	 * @param string   $language
+	 * @param string   $text      Raw model output.
+	 * @return array{ok: array<string,string>, retry: string[]}|WP_Error
+	 */
+	public static function accept_batch_output( array $originals, $language, $text ) {
+		$translated = ACWPT_Glossary::extract_first_json_object( (string) $text );
+		if ( ! is_array( $translated ) || count( $translated ) !== count( $originals ) ) {
+			return new WP_Error( 'acwpt_batch_mismatch', 'batch item count mismatch' );
+		}
+		$rows = class_exists( 'ACWPT_Terms' ) ? ACWPT_Terms::relevant( $language, $originals ) : array();
+		$ok = array(); $retry = array();
+		foreach ( array_values( $originals ) as $i => $original ) {
+			if ( ! array_key_exists( (string) $i, $translated ) ) {
+				return new WP_Error( 'acwpt_batch_mismatch', 'batch item missing key ' . $i );
+			}
+			$val = (string) $translated[ (string) $i ];
+			$val = ACWPT_Glossary::strip_glossary_sentinels( $val );
+			$val = ACWPT_Glossary::strip_keep_sentinels( $val );
+			$val = self::typography_text_only( array( __CLASS__, 'localize_quotes' ), $val, $language );
+			$val = self::typography_text_only( function ( $t, $l ) use ( $original ) { return self::localize_numbers( $t, $original, $l ); }, $val, $language );
+			if ( self::structure_signature( $val ) !== self::structure_signature( $original ) ) {
+				$retry[] = $original;
+				continue;
+			}
+			if ( 'zh' !== $language && self::has_mixed_script_word( $val ) && ! self::has_mixed_script_word( $original ) ) {
+				$retry[] = $original;
+				continue;
+			}
+			if ( $rows && ACWPT_Terms::violations( $original, $val, $rows ) ) {
+				$retry[] = $original;
+				continue;
+			}
+			$ok[ $original ] = $val;
+		}
+		return array( 'ok' => $ok, 'retry' => $retry );
+	}
+
 	/** Guard against recursion while a terminology retry runs. */
 	private static $in_term_retry = false;
 

@@ -101,6 +101,7 @@ require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-string-store.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-string-queue.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-glossary.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-terms.php';
+require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-batch.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-prompts.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-translator.php';
 require_once ACWPT_PLUGIN_DIR . 'includes/class-acwpt-preloader.php';
@@ -134,6 +135,7 @@ function acwpt_init() {
 
 	ACWPT_Preloader::register();
 	ACWPT_String_Queue::register();
+	ACWPT_Batch::init();   // server-side batch re-translation (WP-Cron, 50% rate)
 	ACWPT_Frontend::instance()->init();
 
 	// JSON-LD translation and the per-language llms.txt endpoints.
