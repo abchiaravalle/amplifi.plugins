@@ -562,8 +562,44 @@ class ACWPT_Frontend {
 	// Content Filters (post body)
 	// =========================================================================
 
+	/**
+	 * True when the calling template line computes with the title (lower-/upper-
+	 * casing it for matching) rather than printing it. Cheap: one backtrace,
+	 * file reads cached per request.
+	 */
+	private function title_used_for_logic() {
+		static $lines = array();
+		foreach ( debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, 8 ) as $f ) {
+			if ( empty( $f['function'] ) || 'get_the_title' !== $f['function'] || empty( $f['file'] ) ) {
+				continue;
+			}
+			if ( false !== strpos( $f['file'], '/plugins/amplifi-plugins/' ) ) {
+				return false;
+			}
+			$file = $f['file'];
+			if ( ! isset( $lines[ $file ] ) ) {
+				$lines[ $file ] = is_readable( $file ) ? file( $file ) : array();
+			}
+			$line = $lines[ $file ][ (int) $f['line'] - 1 ] ?? '';
+			return (bool) preg_match( '/\b(?:strtolower|strtoupper|mb_strtolower|mb_strtoupper)\s*\(\s*get_the_title\s*\(/i', $line );
+		}
+		return false;
+	}
+
 	public function filter_title( $title, $post_id = 0 ) {
 		if ( ! $this->current_language || ! $post_id ) {
+			return $title;
+		}
+		// TEMPLATE LOGIC, NOT DISPLAY. Themes read get_the_title() to COMPUTE
+		// things: single-tm-product.php (lines ~158/168, after get_header())
+		// lower-cases the product title and the candidate resources' titles and
+		// scores/searches by shared words. Given translated titles, the words
+		// matched nothing in the English posts and the whole Related Resources
+		// section vanished from translated product pages (loop round 1, pl, cs,
+		// de). A title passed straight to strtolower()/strtoupper() by the
+		// caller is logic, not output: the rendered title is always printed via
+		// esc_html()/esc_attr()/json_encode() or the_title(). Detect the caller.
+		if ( $this->title_used_for_logic() ) {
 			return $title;
 		}
 		$post_type = get_post_type( $post_id );
