@@ -2417,7 +2417,7 @@ class ACWPT_Frontend {
 		}
 		// Trailing text in block elements — text that appears after a closing inline tag but
 		// before the closing block tag. Catches ". Builds sites that work reliably." after </span>.
-		if ( preg_match_all( '/(?:<\/(?:span|strong|em|a|i|b|small|sup|sub)>)([^<]{3,})(?=<\/(?:p|div|h[1-6]|li|td|th|label|figcaption|button|dt|dd|blockquote)>)/u', $html, $m ) ) {
+		if ( preg_match_all( '/(?:<\/(?:span|strong|em|a|i|b|small|sup|sub|svg)>)([^<]{3,})(?=<\/(?:p|div|h[1-6]|li|td|th|label|figcaption|button|dt|dd|blockquote|span|a|strong|em|small)>)/u', $html, $m ) ) {
 			foreach ( $m[1] as $text ) {
 				$text = trim( $text );
 				if ( strlen( $text ) >= 2
@@ -2818,7 +2818,7 @@ class ACWPT_Frontend {
 		// 100-page Polish review; the render reported "complete" because
 		// coverage counted the stored string, not the substituted page.
 		$html = preg_replace_callback(
-			'/(<\/(?:span|strong|em|a|i|b|small|sup|sub)>)([^<]{3,})(<\/(?:p|div|h[1-6]|li|td|th|label|figcaption|button|dt|dd|blockquote|span|a|strong|em|small)>)/u',
+			'/(<\/(?:span|strong|em|a|i|b|small|sup|sub|svg)>)([^<]{3,})(<\/(?:p|div|h[1-6]|li|td|th|label|figcaption|button|dt|dd|blockquote|span|a|strong|em|small)>)/u',
 			function ( $m ) {
 				$raw  = $m[2];
 				$text = trim( $raw );
@@ -2948,10 +2948,24 @@ class ACWPT_Frontend {
 		);
 
 		// Prefix internal page links (not admin, assets, feeds, or already-prefixed).
-		$html = preg_replace_callback(
-			'/href="(' . $escaped_home . ')\/(?!wp-admin|wp-content|wp-includes|wp-json|wp-login|feed|xmlrpc|wp-cron|(?:' . $codes . ')\/)([^"]*)"/',
+		//
+		// The same site under ANY host alias counts as internal. The theme's
+		// footer hard-codes https://ascentialtech.com/terms/ (bare domain, no
+		// www), which did not match home_url() (https://www.ascentialtech.com),
+		// so the Polish footer's "Warunki korzystania / Polityka prywatności /
+		// Wypisz się" all led to the English pages. Found by the Polish loop,
+		// round 1. Aliases: with and without www, http and https.
+		$host    = (string) wp_parse_url( $home_url, PHP_URL_HOST );
+		$bare    = preg_replace( '/^www\./i', '', $host );
+		$aliases = '(?:https?:)?\/\/(?:www\.)?' . preg_quote( $bare, '/' );
+		$html    = preg_replace_callback(
+			'/href="(' . $aliases . ')\/(?!wp-admin|wp-content|wp-includes|wp-json|wp-login|feed|xmlrpc|wp-cron|(?:' . $codes . ')\/)([^"]*)"/i',
 			function ( $m ) use ( $lang, $home_url ) {
-				return 'href="' . $home_url . '/' . $lang . '/' . $m[2] . '"';
+				$path = $m[2];
+				if ( preg_match( '/\.(css|js|png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|eot|pdf|zip|mp4|webm|xml|txt)(\?|#|$)/i', $path ) ) {
+					return $m[0];
+				}
+				return 'href="' . $home_url . '/' . $lang . '/' . $path . '"';
 			},
 			$html
 		);
