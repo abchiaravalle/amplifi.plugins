@@ -193,6 +193,9 @@ class ACWPT_Batch {
 	}
 
 	private static function submit( $lang, array &$job ) {
+		if ( ! empty( $job['hold'] ) ) {
+			return; // held (e.g. waiting for new rules); results of in-flight batches are still collected
+		}
 		if ( ! $job['pending'] || count( $job['batches'] ) >= 2 ) {
 			return; // at most two batches in flight per language
 		}
@@ -301,6 +304,38 @@ class ACWPT_Batch {
 				}
 			}
 			unset( $job['batches'][ $bid ] );
+		}
+	}
+
+	/**
+	 * Hold a language (no new submissions) and cancel its in-flight batches.
+	 * Requests Anthropic already processed are still billed; poll() stores them
+	 * when the batch ends. Unprocessed ones come back 'canceled' and are
+	 * re-queued (held), so nothing is lost.
+	 */
+	public static function hold_and_cancel( $lang ) {
+		$jobs = self::jobs();
+		if ( empty( $jobs[ $lang ] ) ) {
+			return array();
+		}
+		$jobs[ $lang ]['hold'] = true;
+		$out = array();
+		foreach ( array_keys( (array) $jobs[ $lang ]['batches'] ) as $bid ) {
+			$r = self::http( 'POST', '/v1/messages/batches/' . rawurlencode( $bid ) . '/cancel', new stdClass() );
+			$d = is_wp_error( $r ) ? null : json_decode( $r, true );
+			$out[ $bid ] = is_wp_error( $r ) ? 'error: ' . $r->get_error_message() : ( ( $d['processing_status'] ?? '?' ) . ' ' . wp_json_encode( $d['request_counts'] ?? array() ) );
+		}
+		$jobs[ $lang ]['stats']['note'] = 'held: waiting for new rules';
+		self::save( $jobs );
+		return $out;
+	}
+
+	/** Release a hold. */
+	public static function release( $lang ) {
+		$jobs = self::jobs();
+		if ( isset( $jobs[ $lang ] ) ) {
+			unset( $jobs[ $lang ]['hold'] );
+			self::save( $jobs );
 		}
 	}
 

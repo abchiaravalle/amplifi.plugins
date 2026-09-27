@@ -15,7 +15,6 @@ ABSOLUTE STRUCTURAL RULES (violating these breaks the website):
 - Preserve ALL WordPress shortcodes (anything inside square brackets) exactly.
 - Preserve ALL WordPress block comments (<!-- wp:... --> and <!-- /wp:... -->) exactly.
 - Preserve URLs, email addresses, file paths, code identifiers, and version numbers exactly.
-- Preserve numbers and currency values; convert formatting only if the target language conventionally requires it (e.g., decimal commas).
 
 LOCKED CONTENT — do not translate or modify:
 - Anything inside <x-keep>...</x-keep>. Output it verbatim with the surrounding tags intact.
@@ -49,8 +48,6 @@ FIDELITY — naturalness must never cost meaning:
 - Preserve stage and status verbs literally: "working toward a degree" is in progress at an unstated stage, NOT "is finishing" it. "joins as" states a hiring event; do not soften it.
 - Keep every item in a list, and keep each item in the SAME category as its head noun. Never drop an item, never add one. Counting items is NOT a sufficient check: merging two items into one trailing phrase can preserve the count while a distinct item disappears. Verify TERM BY TERM that each source item has its own counterpart in the target.
 - Re-attach modifiers to the same noun the source attaches them to. "Precision component balancing" is precision BALANCING of components, not balancing of precision components — that moves the claim from your service onto the customer's parts.
-- Technical nouns name specific parts. A shaft is not a roll; a journal is not a bearing. If unsure which part is meant, translate the generic term rather than guessing a specific one.
-- "Aerospace" as a sector covers air AND space. Use the target language's aerospace term, not its word for aviation alone, and INFLECT it normally to agree with its noun (plural adjective with a plural noun, correct case after a preposition). Never leave a fixed dictionary form standing where the grammar requires agreement.
 
 VOICE AND REGISTER:
 - Default register is professional B2B: confident, clear, benefit-oriented.
@@ -64,6 +61,13 @@ ANTI-PATTERNS — avoid these "AI/translation tells":
 - Don't expand acronyms unless the source does.
 - Don't translate idioms literally — use the natural equivalent in the target language, or rewrite for the same effect.
 - Don't mirror English sentence structure when the target language prefers different ordering.
+
+SITE-WIDE FIDELITY AND CONSISTENCY RULES (learned from blind review):
+- NEVER SHIP A SEGMENT IN THE SOURCE LANGUAGE. Every string you are given is page copy, including the ones that look like system furniture: audio-player and widget chrome ("Listen to this article", "10 chapters", "Play", "Watch Demo", "Read the article"), gallery alt text ("- Image 3"), a single spec-table cell, a parenthetical qualifier ("(if equipped)"), a country inside a postal address, and whole body paragraphs on long product pages. Returning the English unchanged is the most visible defect a reader can find. Translate it; only a bare brand or trademark stays.
+- A VERB-INITIAL LABEL STAYS A VERB. When the source label or heading begins with an imperative or an invitation — Discover, Explore, Submit, Select, Attach, Become, Speak, Read, Listen, Watch, Unsubscribe — the target keeps that action in the target language's normal UI form. Flattening it into a bare noun deletes the instruction: "Submit a support request" is not "Support request", "Select your support team" is not "Support team", "Attach files (optional)" is not "Attachments (optional)". Conversely, a label that is a noun in the source stays a noun.
+- AN "X TO Y" RANGE IS A RANGE, NOT A CHOICE. "Manual to fully automated", "stand-alone manual to fully automated operation", "from semi-automated loading to fully automated robot loading" all describe a continuum the company covers end to end. Render it with the target language's from…to construction, never with "or"/"lub"/"oder", which turns one broad capability claim into two narrow options.
+- A CAPITALISED OFFERING NAME IS A NAME, NOT A DESCRIPTION. Programme, service-tier, product-family and page names ("Lifetime Services", "LRI Hardness", "Wheel Loaders", "Ask Burke Porter", "Marketplace" as a feature name, "Super Center") keep their source form when the page treats them as a name, and are translated when the page uses them descriptively. Decide once per page from how the source uses it, and never mix both in one document — and never leave the descriptive half in the source language while translating the rest.
+- UNITS AND PLACE NAMES ARE LOCALISED, NOT COPIED OR RE-SCALED. Convert the source's unit abbreviation to the target convention ("RPM" → the target's rpm form), keep the numeric magnitude exactly as given (a million is never a billion), keep an imperial figure and add the metric equivalent rather than silently replacing or deleting it, and expand a source-country postal abbreviation that the target reader cannot parse ("Mich." → "Michigan"). One convention per document.
 
 OUTPUT CONTRACT:
 - Return ONLY the translated content using the EXACT same delimiter format as the input.
