@@ -2158,6 +2158,44 @@ class ACWPT_Frontend {
 	}
 
 	/**
+	 * Split a long plain-text block into sentence groups of at most $max chars.
+	 *
+	 * Legal pages carry clauses of 1,000-1,400 characters (/care-terms/ 7.4
+	 * indemnity, 11.1 force majeure, 12.1 confidentiality). Blocks over 1,200
+	 * characters were dropped by the extractor on purpose (too long for one
+	 * request) and so stayed English in every language. Splitting at sentence
+	 * ends keeps each piece a complete sentence, which the model translates
+	 * well, and the substitution pass reassembles them in order.
+	 * Boundary: '.', '!', '?', ';' or ':' followed by a space and an upper-case
+	 * letter, digit or opening quote; never after a single capital or common
+	 * abbreviation ("e.g.", "i.e.", "No.", "U.S."), never inside a number.
+	 *
+	 * @return string[] Empty when the text needs no split or cannot be split cleanly.
+	 */
+	private function split_long_block( $text, $max = 700 ) {
+		$text = trim( (string) $text );
+		if ( mb_strlen( $text ) <= 1200 || false !== strpos( $text, '<' ) ) {
+			return array();
+		}
+		$parts = preg_split( '/(?<=[.!?;:])(?<!\b[A-Z]\.)(?<!\be\.g\.)(?<!\bi\.e\.)(?<!\bNo\.)(?<!\bvs\.)(?<!\betc\.)\s+(?=[A-Z0-9“"(\x{201C}])/u', $text );
+		if ( count( $parts ) < 2 ) {
+			return array();
+		}
+		$out = array(); $cur = '';
+		foreach ( $parts as $sp ) {
+			if ( '' === $cur ) { $cur = $sp; continue; }
+			if ( mb_strlen( $cur ) + 1 + mb_strlen( $sp ) <= $max ) { $cur .= ' ' . $sp; } else { $out[] = $cur; $cur = $sp; }
+		}
+		if ( '' !== $cur ) { $out[] = $cur; }
+		foreach ( $out as $o ) {
+			if ( mb_strlen( $o ) > 1200 ) {
+				return array(); // one sentence longer than a request: leave it
+			}
+		}
+		return $out;
+	}
+
+	/**
 	 * Normalise a candidate string lifted out of raw HTML.
 	 *
 	 * Entities must be decoded BEFORE the text reaches the model. The extractors
@@ -2547,6 +2585,14 @@ class ACWPT_Frontend {
 		//
 		// Keeping the LONGEST form is correct: a whole sentence translates better
 		// than its pieces, which is the entire reason the whole-block pass exists.
+		// LONG PLAIN BLOCKS are extracted as sentence groups (see split_long_block()).
+		if ( preg_match_all( '/<(p|li|td|dd|blockquote)\b[^>]*>([^<]{1201,})<\/\1>/u', $html, $lm ) ) {
+			foreach ( $lm[2] as $raw ) {
+				foreach ( $this->split_long_block( $this->normalize_candidate( $raw ) ) as $chunk ) {
+					$out[] = $chunk;
+				}
+			}
+		}
 		return $this->dedupe_candidates( $out, $html );
 	}
 
@@ -2648,6 +2694,27 @@ class ACWPT_Frontend {
 	 * Run link and element translation over an HTML blob (uses string cache).
 	 */
 	private function translate_html_blob( $html ) {
+		// LONG PLAIN BLOCKS: reassemble from sentence-group translations. Only
+		// when EVERY group is stored, so a block is never half-translated.
+		$html = preg_replace_callback(
+			'/(<(p|li|td|dd|blockquote)\b[^>]*>)([^<]{1201,})(<\/\2>)/u',
+			function ( $m ) {
+				$chunks = $this->split_long_block( $this->normalize_candidate( $m[3] ) );
+				if ( ! $chunks ) {
+					return $m[0];
+				}
+				$tr = array();
+				foreach ( $chunks as $c ) {
+					$t = $this->get_string_translation( $c );
+					if ( ! $t ) {
+						return $m[0];
+					}
+					$tr[] = $t;
+				}
+				return $m[1] . esc_html( implode( ' ', $tr ) ) . $m[4];
+			},
+			$html
+		);
 		// WHOLE-BLOCK PASS FIRST.
 		//
 		// Must run before the fragment passes below, otherwise those replace
