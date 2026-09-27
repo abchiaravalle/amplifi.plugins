@@ -34,7 +34,7 @@ class ACWPT_Batch {
 	const CRON_HOOK  = 'acwpt_batch_tick';
 	const PER_REQ    = 25;
 	const MAX_REQS   = 400;
-	const EST_PER_ST = 0.0019; // $/string at batch rates, measured on the first live batch ($0.00172) plus margin
+	const EST_PER_ST = 0.0010; // $/string at batch rates: measured $0.00066 on 26,629 pt/fr/es strings ($17.93), plus margin
 
 	public static function init() {
 		add_filter( 'cron_schedules', array( __CLASS__, 'schedule' ) );
