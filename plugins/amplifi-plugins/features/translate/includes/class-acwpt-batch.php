@@ -34,7 +34,7 @@ class ACWPT_Batch {
 	const CRON_HOOK  = 'acwpt_batch_tick';
 	const PER_REQ    = 25;
 	const MAX_REQS   = 400;
-	const EST_PER_ST = 0.0010; // $/string at batch rates: measured $0.00066 (pt/fr/es) - $0.00086 (de/it/cs/ro); 0.0010 = margin
+	const EST_PER_ST = 0.0016; // $/string: measured 0.00066 (pt/fr/es) .. 0.00144 (pl r6, larger rule packs); 0.0016 = margin
 
 	public static function init() {
 		add_filter( 'cron_schedules', array( __CLASS__, 'schedule' ) );
@@ -198,11 +198,23 @@ class ACWPT_Batch {
 		if ( ! empty( $job['hold'] ) ) {
 			return; // held (e.g. waiting for new rules); results of in-flight batches are still collected
 		}
-		if ( ! $job['pending'] || count( $job['batches'] ) >= 2 ) {
+		if ( ! $job['pending'] || count( $job['batches'] ) >= ( empty( $job['cap'] ) ? 2 : 1 ) ) {
 			return; // at most two batches in flight per language
 		}
 		$take = array_slice( $job['pending'], 0, self::PER_REQ * self::MAX_REQS );
 		$est  = count( $take ) * self::EST_PER_ST;
+		// BATCH SLICE: one submitted batch may use at most 25% of the job cap.
+		// A batch cannot be stopped half-way once sent, so a single 2,032-string
+		// batch overran a $2.50 cap by $0.16 when the per-string cost came in
+		// above estimate. Smaller slices keep the overrun bounded by one slice.
+		if ( ! empty( $job['cap'] ) ) {
+			$slice = (int) floor( ( (float) $job['cap'] * 0.25 ) / self::EST_PER_ST );
+			$slice = max( self::PER_REQ, $slice - ( $slice % self::PER_REQ ) );
+			if ( count( $take ) > $slice ) {
+				$take = array_slice( $take, 0, $slice );
+				$est  = count( $take ) * self::EST_PER_ST;
+			}
+		}
 		// PER-JOB HARD CAP (approved per run). Spent so far + everything this
 		// job still has in flight + this batch must stay under it; otherwise a
 		// smaller batch that fits is sent, or nothing.
