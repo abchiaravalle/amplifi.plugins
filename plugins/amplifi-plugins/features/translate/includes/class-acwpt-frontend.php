@@ -674,9 +674,32 @@ class ACWPT_Frontend {
 			return $title_parts;
 		}
 		// Translate page title part.
+		//
+		// The per-post translation row (the legacy whole-post cache) was the only
+		// source consulted here. Pages that never had one, or whose row is stale
+		// or holds the English title, kept the English page name in <title> while
+		// only the brand suffix got translated: measured on 40 sampled pages,
+		// pt 25, tr 22, ro 20, cs 19, de/fr 8, pl/es/it 6, zh 4. The string store
+		// has the title for all of them. Use the store whenever the post row is
+		// missing, empty, or identical to the English title.
 		$queried = get_queried_object();
+		$done    = false;
 		if ( $queried && $queried instanceof WP_Post && isset( $this->translations[ $queried->ID ] ) ) {
-			$title_parts['title'] = $this->translations[ $queried->ID ]->translated_title;
+			$tt = (string) $this->translations[ $queried->ID ]->translated_title;
+			if ( '' !== trim( $tt ) && $tt !== $queried->post_title && $tt !== ( $title_parts['title'] ?? '' ) ) {
+				$title_parts['title'] = $tt;
+				$done = true;
+			}
+		}
+		if ( ! $done && ! empty( $title_parts['title'] ) ) {
+			$plain = trim( html_entity_decode( wp_strip_all_tags( (string) $title_parts['title'] ), ENT_QUOTES, 'UTF-8' ) );
+			$t     = $this->get_string_translation( $plain );
+			if ( ! $t && function_exists( 'tm_sentence_case' ) ) {
+				$t = $this->get_string_translation( tm_sentence_case( $plain ) );
+			}
+			if ( $t ) {
+				$title_parts['title'] = $t;
+			}
 		}
 		// Translate the site name part.
 		if ( isset( $title_parts['site'] ) ) {
