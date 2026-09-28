@@ -209,6 +209,28 @@ class ACWPT_Terms {
 		return $bad;
 	}
 
+	/**
+	 * True when a queued "source" is really text in the target language
+	 * (e.g. Polish queued for Polish). Heuristic, used only to keep junk out of
+	 * the paid queue: target-specific letters present AND no English function
+	 * word, or CJK text for zh.
+	 */
+	public static function looks_like_language( $text, $lang ) {
+		$p = ' ' . mb_strtolower( trim( html_entity_decode( wp_strip_all_tags( (string) $text ), ENT_QUOTES, 'UTF-8' ) ) ) . ' ';
+		$letters = array(
+			'pl' => '/[ąćęłńśźż]/u', 'cs' => '/[čďěňřšťůž]/u', 'de' => '/[äöüß]/u', 'tr' => '/[çğışı]/u',
+			'ro' => '/[ăâîșşțţ]/u', 'fr' => '/[àâçèéêëîïôœùûÿ]/u', 'es' => '/[áéíñóúü¿¡]/u', 'pt' => '/[ãõçáâéêíóôú]/u',
+			'it' => '/[àèéìòù]/u', 'zh' => '/\p{Han}/u',
+		);
+		if ( empty( $letters[ $lang ] ) || ! preg_match( $letters[ $lang ], $p ) ) {
+			return false;
+		}
+		if ( 'zh' === $lang ) {
+			return ! preg_match( '/[a-z]{3,}/', $p );
+		}
+		return ! preg_match( '/\s(the|and|of|to|for|with|our|your|we|is|are|this|that|from)\s/u', $p );
+	}
+
 	private static function contains_word( $hay, $needle ) {
 		if ( '' === $needle ) {
 			return false;

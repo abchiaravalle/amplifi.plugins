@@ -155,6 +155,48 @@ class ACWPT_Budget {
 		return self::spent_this_month();
 	}
 
+	/** Monthly USD allowance for live (non-batch) translation. 0 = live translation off. */
+	public static function live_allowance() {
+		return (float) get_option( 'acwpt_live_allowance', 0 );
+	}
+
+	private static function live_key() {
+		return 'acwpt_live_spend_' . self::period();
+	}
+
+	public static function live_spent() {
+		global $wpdb;
+		return (float) $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", self::live_key() ) );
+	}
+
+	/** Atomic, like record(). */
+	public static function record_live( $cost ) {
+		global $wpdb;
+		$cost = (float) $cost;
+		if ( $cost <= 0 ) {
+			return;
+		}
+		$wpdb->query( $wpdb->prepare(
+			"INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'off')
+			 ON DUPLICATE KEY UPDATE option_value = CAST(option_value AS DECIMAL(12,6)) + VALUES(option_value)",
+			self::live_key(),
+			sprintf( '%.6F', $cost )
+		) );
+		wp_cache_delete( self::live_key(), 'options' );
+	}
+
+	/** @return true|WP_Error */
+	public static function live_check() {
+		$a = self::live_allowance();
+		if ( $a <= 0 ) {
+			return new WP_Error( 'acwpt_live_off', 'Live translation is off (no live allowance set). New text keeps serving in English until translated by a quoted batch run.' );
+		}
+		if ( self::live_spent() >= $a ) {
+			return new WP_Error( 'acwpt_live_allowance', sprintf( 'Live translation allowance reached: $%.2f of $%.2f this month.', self::live_spent(), $a ) );
+		}
+		return true;
+	}
+
 	/**
 	 * Is there budget left to make a call?
 	 *

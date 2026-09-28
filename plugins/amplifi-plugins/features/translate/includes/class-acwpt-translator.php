@@ -724,6 +724,14 @@ class ACWPT_Translator {
 		if ( is_wp_error( $budget ) ) {
 			return $budget;
 		}
+		// LIVE ALLOWANCE. Everything that is not a capped batch job (the visitor
+		// queue, llms.txt, admin actions) draws from a separate monthly
+		// allowance, so live translation can never eat a quoted program's money
+		// or run unmetered. 0 / unset = live translation OFF.
+		$live = ACWPT_Budget::live_check();
+		if ( is_wp_error( $live ) ) {
+			return $live;
+		}
 
 		$response = wp_remote_post(
 			'https://api.anthropic.com/v1/messages',
@@ -820,6 +828,7 @@ class ACWPT_Translator {
 		// lifetime reporting: the budget needs a per-month figure it can
 		// compare against a limit.
 		ACWPT_Budget::record( $cost );
+		ACWPT_Budget::record_live( $cost );
 
 		$month = gmdate( 'Y-m' );
 		$usage = get_option( 'acwpt_usage', array() );

@@ -87,6 +87,31 @@ class ACWPT_String_Queue {
 			)
 		);
 
+		// NEVER QUEUE JUNK. Measured in the stale queue (28,796 entries): bare
+		// punctuation (' or ', ', '), lone function words ('your', 'we'), and
+		// text already in the target language (Polish queued as source).
+		$stop = array( 'a', 'an', 'the', 'and', 'or', 'of', 'to', 'in', 'on', 'for', 'we', 'you', 'your', 'our', 'us', 'it', 'is', 'are', 'be', 'by', 'at', 'as', 'with', 'from', 'this', 'that', 'party' );
+		$sources = array_values(
+			array_filter(
+				$sources,
+				function ( $s ) use ( $stop ) {
+					$plain = trim( html_entity_decode( wp_strip_all_tags( $s ), ENT_QUOTES, 'UTF-8' ) );
+					$content = preg_replace( '/\b(?:' . implode( '|', $stop ) . ')\b/iu', '', $plain );
+					if ( ! preg_match( '/\p{L}{2,}/u', $content ) ) {
+						return false; // no content word: punctuation, numbers, symbols, bare 'or'/'and'
+					}
+					if ( ! preg_match( '/\s/u', $plain ) && in_array( mb_strtolower( $plain ), $stop, true ) ) {
+						return false; // a single function word is never a translatable unit
+					}
+					return true;
+				}
+			)
+		);
+		if ( class_exists( 'ACWPT_Terms' ) && method_exists( 'ACWPT_Terms', 'looks_like_language' ) ) {
+			$lang_for_check = $language;
+			$sources = array_values( array_filter( $sources, function ( $s ) use ( $lang_for_check ) { return ! ACWPT_Terms::looks_like_language( $s, $lang_for_check ); } ) );
+		}
+
 		if ( empty( $sources ) ) {
 			return 0;
 		}
@@ -190,7 +215,12 @@ class ACWPT_String_Queue {
 			// again. Rows now carry the prompt fingerprint they were made with,
 			// so an improved pack marks them stale and they refresh here, a
 			// bounded batch at a time, while continuing to serve.
-			if ( empty( $queue ) && class_exists( 'ACWPT_String_Store' ) ) {
+			// OFF BY DEFAULT (2026-09-28). This silently re-translated older rows
+			// in every language whenever a rule changed, outside any quoted run:
+			// it spent ~$3.50 during a $3.00-capped Polish step. Rule-driven
+			// re-runs are quoted, capped ACWPT_Batch jobs; the queue only serves
+			// genuinely new text. Opt in with option acwpt_stale_refresh = 1.
+			if ( empty( $queue ) && class_exists( 'ACWPT_String_Store' ) && get_option( 'acwpt_stale_refresh' ) ) {
 				$stale = ACWPT_String_Store::stale_sources( $lang, self::BATCH_SIZE );
 				foreach ( $stale as $src ) {
 					$queue[ $src ] = 1;
