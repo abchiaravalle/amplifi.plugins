@@ -291,6 +291,66 @@ class ACWPT_Translator {
 		return array( 'ok' => $ok, 'retry' => $retry );
 	}
 
+	/**
+	 * MEANING CHECK: a second, narrow pass over translated strings.
+	 *
+	 * Strict reviews showed rules cut terminology and grammar errors but not
+	 * meaning errors (4.0 -> 4.1 per page): dropped or added qualifiers
+	 * ("sharpening its focus" -> "focuses"), strengthened/softened claims,
+	 * a noun narrowed or broadened ("blank ECMs" -> "new ECMs"), a modifier
+	 * attached to the wrong noun. Those are one-off, so no rule anticipates
+	 * them; a comparison of each pair against its source does.
+	 *
+	 * The checker only reports a pair when the meaning differs, with a
+	 * corrected translation. It never restyles; a fluent, faithful string
+	 * comes back unchanged. Corrections pass the same gates as translations.
+	 *
+	 * @param array<string,string> $pairs source => translation
+	 * @param string               $language
+	 * @return array{fixed: array<string,string>, flagged: int, calls: int}|WP_Error
+	 */
+	public static function meaning_check( array $pairs, $language ) {
+		$settings = get_option( 'acwpt_settings', array() );
+		$api_key  = isset( $settings['api_key'] ) ? $settings['api_key'] : '';
+		$model    = isset( $settings['model'] ) && $settings['model'] ? $settings['model'] : self::$default_model;
+		if ( '' === $api_key || ! $pairs ) {
+			return array( 'fixed' => array(), 'flagged' => 0, 'calls' => 0 );
+		}
+		$lang_name = class_exists( 'ACWPT_Languages' ) ? ACWPT_Languages::name( $language, false ) : $language;
+		$system = "You are a senior {$lang_name} translation reviewer for an industrial B2B website (balancing machines, test stands, NDT, automation). "
+			. "You check ONLY whether each {$lang_name} translation says exactly what the English says. Report a pair only if the meaning differs: "
+			. "information added or dropped (including qualifiers, modifiers, possessives, 'and'/'or', ranges), a claim made stronger or weaker, "
+			. "a term narrowed or broadened, a modifier attached to the wrong noun, a changed number/unit/model code, or English left untranslated. "
+			. "Do NOT report style, word order, register or a preferred synonym when the meaning is the same. Brand and product names stay in English. "
+			. "For each reported pair return a corrected {$lang_name} translation that keeps everything else in the current translation (wording, register, HTML tags) and changes only what fixes the meaning. "
+			. 'Return JSON only: {"issues":[{"i":"<index>","why":"<= 12 words","fix":"<corrected translation>"}]} or {"issues":[]}.';
+		$out = array( 'fixed' => array(), 'flagged' => 0, 'calls' => 0 );
+		foreach ( array_chunk( $pairs, 20, true ) as $chunk ) {
+			$items = array(); $keys = array_keys( $chunk );
+			foreach ( $keys as $i => $src ) { $items[] = array( 'i' => (string) $i, 'en' => $src, 'tr' => $chunk[ $src ] ); }
+			$data = self::call_anthropic( $api_key, $model, $system, wp_json_encode( $items, JSON_UNESCAPED_UNICODE ), 8192, 90 );
+			$out['calls']++;
+			if ( is_wp_error( $data ) ) {
+				return $data;
+			}
+			self::record_usage( $data, $model, 'strings' );
+			$res = ACWPT_Glossary::extract_first_json_object( $data['content'][0]['text'] ?? '' );
+			foreach ( (array) ( $res['issues'] ?? array() ) as $iss ) {
+				$i = isset( $iss['i'] ) ? (int) $iss['i'] : -1;
+				if ( ! isset( $keys[ $i ] ) || empty( $iss['fix'] ) ) { continue; }
+				$src = $keys[ $i ]; $fix = (string) $iss['fix'];
+				$out['flagged']++;
+				$fix = self::typography_text_only( array( __CLASS__, 'localize_quotes' ), $fix, $language );
+				$fix = self::typography_text_only( function ( $t, $l ) use ( $src ) { return self::localize_numbers( $t, $src, $l ); }, $fix, $language );
+				if ( self::structure_signature( $fix ) !== self::structure_signature( $src ) ) { continue; }
+				if ( 'zh' !== $language && self::has_mixed_script_word( $fix ) && ! self::has_mixed_script_word( $src ) ) { continue; }
+				if ( class_exists( 'ACWPT_Terms' ) && ACWPT_Terms::violations( $src, $fix, ACWPT_Terms::relevant( $language, array( $src ) ) ) ) { continue; }
+				$out['fixed'][ $src ] = $fix;
+			}
+		}
+		return $out;
+	}
+
 	/** Guard against recursion while a terminology retry runs. */
 	private static $in_term_retry = false;
 
