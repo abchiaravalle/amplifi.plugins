@@ -125,9 +125,15 @@ class ACWPT_Terms {
 				continue;
 			}
 			$needle = mb_strtolower( $t['en'] );
-			if ( self::contains_word( $work, $needle ) ) {
+			// ENGLISH PLURALS. Keys are singular ('balancing machine') but pages
+			// say 'balancing machines' 440 times; the plural never matched, so
+			// 861 of 5,299 rows across all ten term bases were skipped exactly
+			// where the term is most common. The last English word may take -s
+			// or -es (not for CJK keys, not when the key already ends in s).
+			$rx = self::en_key_regex( $needle );
+			if ( preg_match( $rx, $work ) ) {
 				$hit[] = $t;
-				$work  = preg_replace( '/(?<![\p{L}\p{N}])' . preg_quote( $needle, '/' ) . '(?![\p{L}\p{N}])/u', str_repeat( ' ', 1 ), $work );
+				$work  = preg_replace( $rx, ' ', $work );
 			}
 		}
 		return $hit;
@@ -229,6 +235,18 @@ class ACWPT_Terms {
 			return ! preg_match( '/[a-z]{3,}/', $p );
 		}
 		return ! preg_match( '/\s(the|and|of|to|for|with|our|your|we|is|are|this|that|from)\s/u', $p );
+	}
+
+	/** Word-bounded regex for an English key, allowing a plural -s/-es on its last word. */
+	private static function en_key_regex( $needle ) {
+		if ( preg_match( '/[\p{Han}\p{Hiragana}\p{Katakana}]/u', $needle ) ) {
+			return '/' . preg_quote( $needle, '/' ) . '/u';
+		}
+		$q = preg_quote( $needle, '/' );
+		if ( preg_match( '/[a-z]$/', $needle ) && ! preg_match( '/s$/', $needle ) ) {
+			$q .= '(?:s|es)?';
+		}
+		return '/(?<![\p{L}\p{N}])' . $q . '(?![\p{L}\p{N}])/u';
 	}
 
 	private static function contains_word( $hay, $needle ) {
