@@ -3038,6 +3038,33 @@ class ACWPT_Frontend {
 			},
 			$html
 		);
+		// ROTATING HERO WORDS: `var words = ['balancing', 'leak detection', ...];`
+		// in an inline script (page-tm-catalog.php). The script swaps the word into
+		// a translated H1, so every cycle showed English inside Spanish/Polish
+		// ('Su leak detection de confianza'). Each item is translated through the
+		// store (same keys as the catalog's category labels); untranslated items
+		// keep the original so the animation never breaks.
+		$html = preg_replace_callback(
+			'/(var\s+words\s*=\s*\[)((?:\s*\'[^\'\\\\<>]{2,40}\'\s*,?)+)(\s*\];)/u',
+			function ( $m ) {
+				$items = preg_replace_callback(
+					"/'([^'\\\\<>]{2,40})'/u",
+					function ( $w ) {
+						$t = $this->get_string_translation( $w[1] );
+						if ( ! $t ) {
+							$t = $this->get_string_translation( ucfirst( $w[1] ) );
+							if ( $t && ! preg_match( '/^\p{Lu}{2}/u', $t ) ) {
+								$t = mb_strtolower( mb_substr( $t, 0, 1 ) ) . mb_substr( $t, 1 );
+							}
+						}
+						return $t ? "'" . str_replace( array( '\\', "'" ), array( '\\\\', "\\'" ), $t ) . "'" : $w[0];
+					},
+					$m[2]
+				);
+				return $m[1] . $items . $m[3];
+			},
+			$html
+		);
 		// Translate accessibility and media attributes.
 		foreach ( array( 'alt', 'aria-label', 'title' ) as $attr ) {
 			$html = preg_replace_callback(
@@ -3049,6 +3076,37 @@ class ACWPT_Frontend {
 						return $m[0];
 					}
 					$translated = $this->get_string_translation( $text );
+					// THEME FALLBACK ALT: "<product title> - Image N" (single-tm-product.php
+					// when an image has no alt). The whole string is never stored, so it
+					// stayed English on every product gallery in every language. Translate
+					// the title through the store and the word "Image" from a fixed table.
+					if ( ! $translated && preg_match( '/^(.+?)\s+-\s+Image\s+(\d+)$/u', preg_replace( '/<!--\/?acwpt:done-->/', '', $text ), $im ) ) {
+						$img = array( 'pl' => 'Zdjęcie', 'de' => 'Bild', 'es' => 'Imagen', 'fr' => 'Image', 'it' => 'Immagine', 'pt' => 'Imagem', 'cs' => 'Obrázek', 'ro' => 'Imagine', 'tr' => 'Görsel', 'zh' => '图' );
+						$lang = $this->current_language;
+						$t_title = $this->get_string_translation( $im[1] );
+						if ( ! $t_title && function_exists( 'tm_sentence_case' ) ) {
+							$t_title = $this->get_string_translation( tm_sentence_case( $im[1] ) );
+						}
+						// The theme calls get_the_title() for the alt, so the title part is
+						// usually ALREADY translated here ("Fresado CNC - Image 1"). If the
+						// prefix is not an English key, keep it as the translated title.
+						if ( ! $t_title && isset( $this->title_reverse[ mb_strtolower( $im[1] ) ] ) ) {
+							$t_title = $im[1];
+						}
+						if ( ! $t_title && ! preg_match( '/^[\x20-\x7E]+$/', $im[1] ) ) {
+							$t_title = $im[1]; // non-ASCII prefix: already in the target language
+						}
+						if ( ! $t_title && $this->get_string_translation( $im[1] ) === null && in_array( $im[1], (array) $this->title_reverse, true ) === false && ACWPT_String_Store::get( $lang, $im[1] ) === null ) {
+							// Prefix is neither a stored English key nor a known translation: if it equals
+							// the stored translation of some title on this page, reuse it as is.
+							foreach ( (array) $this->title_reverse as $tr_lc => $en ) {
+								if ( mb_strtolower( $im[1] ) === $tr_lc ) { $t_title = $im[1]; break; }
+							}
+						}
+						if ( $t_title && isset( $img[ $lang ] ) ) {
+							$translated = 'zh' === $lang ? $t_title . ' - ' . $img[ $lang ] . ' ' . $im[2] : $t_title . ' - ' . $img[ $lang ] . ' ' . $im[2];
+						}
+					}
 					return $translated
 						? $m[1] . '="' . esc_attr( $translated ) . '"'
 						: $m[0];

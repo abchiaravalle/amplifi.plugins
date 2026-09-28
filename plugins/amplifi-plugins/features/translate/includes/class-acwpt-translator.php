@@ -504,13 +504,29 @@ class ACWPT_Translator {
 			$text = str_replace( $f, '"', $text );
 		}
 
+		// INCH MARKS ARE NOT QUOTES. '32.68" x 21.65"' was paired into
+		// '32,68« x 21,65»' (es/fr/it/pt) or '„..”' (pl/ro/cs): the pairing
+		// below treats every straight " as a quotation mark. A " right after a
+		// digit (optionally after a space) is the inch unit: shield it and
+		// restore it as the double prime ″ (U+2033), the unit symbol.
+		$inch = "\x{E000}";
+		$text = preg_replace( '/(?<=\d)(\s?)"/u', '$1' . $inch, $text );
+		// Marks the model already turned into quotes right after a number are
+		// inches too, when the source uses inches (checked by the caller via
+		// localize_inches); nothing else is touched here.
+
+		// Localised marks the model itself put right after a number in a
+		// dimension ("32,68« x 21,65»", "35„ x 39”"): inch marks, not quotes.
+		$text = preg_replace( '/(?<=\d)[«»„“”](?=\s*(?:[x×]\s*\d|\)|,|;|$|\s*(?:long|wide|high|diameter|dia\b)))/u', $inch, $text );
+		$text = preg_replace( '/(?<=\d)[«»„“”](?=\s*[x×])/u', $inch, $text );
+
 		if ( '"' === $open ) {
 			// Straight-quote language: normalisation above is the whole job.
-			return self::typography_text_only( array( __CLASS__, 'localize_apostrophes' ), $text, $code );
+			return str_replace( $inch, '″', self::typography_text_only( array( __CLASS__, 'localize_apostrophes' ), $text, $code ) );
 		}
 
 		if ( false === strpos( $text, '"' ) && false === strpos( $text, $open ) ) {
-			return self::typography_text_only( array( __CLASS__, 'localize_apostrophes' ), $text, $code );
+			return str_replace( $inch, '″', self::typography_text_only( array( __CLASS__, 'localize_apostrophes' ), $text, $code ) );
 		}
 
 		// Pair them up in order: first quote opens, next closes.
@@ -553,7 +569,7 @@ class ACWPT_Translator {
 			$text
 		);
 
-		return self::typography_text_only( array( __CLASS__, 'localize_french_spacing' ), self::typography_text_only( array( __CLASS__, 'localize_apostrophes' ), $text, $code ), $code );
+		return str_replace( $inch, '″', self::typography_text_only( array( __CLASS__, 'localize_french_spacing' ), self::typography_text_only( array( __CLASS__, 'localize_apostrophes' ), $text, $code ), $code ) );
 	}
 
 	/** A word mixing Latin letters with Cyrillic or Greek ones (e.g. "hederу" with Cyrillic у). */
