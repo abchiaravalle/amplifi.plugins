@@ -361,8 +361,16 @@ class ACWPT_Frontend {
 		// Persist to the unbounded string store. The previous implementation kept
 		// everything in a single option capped at 500 entries, which silently
 		// evicted (and later re-billed) the oldest strings on any real site.
+		// Only rows that are NOT already stored. Re-writing every resolved
+		// string on each hourly repopulate bumped updated_at on thousands of
+		// unchanged rows (no API cost, but it corrupted every 'what changed'
+		// measurement and every re-run cut-off based on updated_at).
 		if ( $cache ) {
-			ACWPT_String_Store::set_many( $this->current_language, $cache );
+			$have = ACWPT_String_Store::get_many( $this->current_language, array_keys( $cache ) );
+			$new  = array_diff_key( $cache, $have );
+			if ( $new ) {
+				ACWPT_String_Store::set_many( $this->current_language, $new );
+			}
 		}
 
 		if ( null !== $populated_at ) {
