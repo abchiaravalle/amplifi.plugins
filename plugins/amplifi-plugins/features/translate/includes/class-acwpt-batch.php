@@ -34,7 +34,7 @@ class ACWPT_Batch {
 	const CRON_HOOK  = 'acwpt_batch_tick';
 	const PER_REQ    = 25;
 	const MAX_REQS   = 400;
-	const EST_PER_ST = 0.0010; // $/string at batch rates: measured $0.00066 on 26,629 pt/fr/es strings ($17.93), plus margin
+	const EST_PER_ST = 0.0010; // $/string at batch rates: measured $0.00066 (pt/fr/es) - $0.00086 (de/it/cs/ro); 0.0010 = margin
 
 	public static function init() {
 		add_filter( 'cron_schedules', array( __CLASS__, 'schedule' ) );
@@ -75,7 +75,7 @@ class ACWPT_Batch {
 	 * @param string   $model
 	 * @return int number queued (locked rows excluded)
 	 */
-	public static function enqueue_language( $lang, array $sources, $model = 'claude-sonnet-4-6' ) {
+	public static function enqueue_language( $lang, array $sources, $model = 'claude-sonnet-4-6', $cap = 0.0 ) {
 		global $wpdb;
 		$t      = ACWPT_String_Store::table_name();
 		$locked = array();
@@ -87,12 +87,14 @@ class ACWPT_Batch {
 		}
 		$todo = array_values( array_filter( array_unique( $sources ), function ( $s ) use ( $locked ) { return '' !== trim( $s ) && ! isset( $locked[ md5( $s ) ] ); } ) );
 		$jobs = self::jobs();
+		$carry = isset( $jobs[ $lang ]['batches'] ) ? (array) $jobs[ $lang ]['batches'] : array(); // keep billed in-flight batches
 		$jobs[ $lang ] = array(
 			'model'    => $model,
 			'pending'  => $todo,
 			'retried'  => array(),
-			'batches'  => array(),
+			'batches'  => $carry,
 			'stats'    => array( 'queued' => count( $todo ), 'stored' => 0, 'failed' => 0, 'cost' => 0.0 ),
+			'cap'      => (float) $cap, // hard USD cap for this job (0 = none); approved per run
 			'created'  => time(),
 		);
 		self::save( $jobs );
@@ -201,6 +203,24 @@ class ACWPT_Batch {
 		}
 		$take = array_slice( $job['pending'], 0, self::PER_REQ * self::MAX_REQS );
 		$est  = count( $take ) * self::EST_PER_ST;
+		// PER-JOB HARD CAP (approved per run). Spent so far + everything this
+		// job still has in flight + this batch must stay under it; otherwise a
+		// smaller batch that fits is sent, or nothing.
+		if ( ! empty( $job['cap'] ) ) {
+			$inflight = 0.0;
+			foreach ( (array) $job['batches'] as $b ) { $inflight += (float) ( $b['est'] ?? 0 ); }
+			$room = (float) $job['cap'] - (float) $job['stats']['cost'] - $inflight;
+			if ( $est > $room ) {
+				$fit  = (int) floor( max( 0, $room ) / self::EST_PER_ST );
+				$fit -= $fit % self::PER_REQ;
+				if ( $fit < self::PER_REQ ) {
+					$job['stats']['note'] = sprintf( 'job cap reached: spent $%.2f + in flight $%.2f of cap $%.2f', $job['stats']['cost'], $inflight, $job['cap'] );
+					return;
+				}
+				$take = array_slice( $take, 0, $fit );
+				$est  = count( $take ) * self::EST_PER_ST;
+			}
+		}
 		$lim  = ACWPT_Budget::monthly_limit();
 		// Keep HEADROOM under the ceiling for live translation of new/edited
 		// content: a bulk re-run must never be the thing that hits the cap.
