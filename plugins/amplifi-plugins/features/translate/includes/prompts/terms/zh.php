@@ -77,7 +77,6 @@ return array(
 	array( 'en' => 'Work Product', 'zh' => '工作成果', 'not' => array( '劳动产品', '工作产品' ) ),
 	array( 'en' => 'WHEREAS', 'zh' => '鉴于', 'not' => array() ),
 	array( 'en' => 'RECITALS', 'zh' => '鉴于条款', 'not' => array( '朗诵部分', '陈述朗读' ) ),
-	array( 'en' => 'Section', 'zh' => '条款', 'not' => array( '章节部分', '小节内容' ) ),
 	array( 'en' => 'Exhibit', 'zh' => '附件', 'not' => array() ),
 	array( 'en' => 'Name:', 'zh' => '姓名：', 'not' => array( '公司名称：', '名字叫作：' ) ),
 	array( 'en' => 'Date:', 'zh' => '日期：', 'not' => array() ),

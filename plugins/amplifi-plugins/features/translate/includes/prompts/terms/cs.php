@@ -320,7 +320,6 @@ return array(
 	array( 'en' => 'testing', 'cs' => 'testování', 'not' => array( 'zkoušení kvality', 'testace' ) ),
 	array( 'en' => 'Aerospace & industrials', 'cs' => 'Letectví, kosmonautika a průmysl', 'not' => array( 'Letecko-kosmický průmysl a průmyslové aplikace', 'Letectví a průmysl', 'Sektor letecko-kosmický a průmyslový', 'Letecký a průmyslový sektor' ) ),
 	array( 'en' => 'Exhibit', 'cs' => 'Příloha', 'not' => array( 'Exponát', 'Výstava', 'Exhibit' ) ),
-	array( 'en' => 'Section', 'cs' => 'Článek', 'not' => array( 'Sekce', 'Oddíl', 'Paragraf' ) ),
 	array( 'en' => 'RECITALS', 'cs' => 'PREAMBULE', 'not' => array( 'RECITÁLY', 'ÚVODNÍ USTANOVENÍ RECITÁLY' ) ),
 	array( 'en' => 'Products', 'cs' => 'Produkty', 'not' => array( 'Výrobky', 'Zboží' ) ),
 	array( 'en' => 'Ascential Indemnity', 'cs' => 'Odškodnění ze strany společnosti Ascential', 'not' => array( 'Ascential odškodnění', 'Ascential Indemnity' ) ),

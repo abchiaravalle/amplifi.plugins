@@ -371,7 +371,6 @@ return array(
 	array( 'en' => 'WHEREAS', 'fr' => 'ATTENDU QUE', 'not' => array( 'TANDIS QUE', 'ALORS QUE', 'PENDANT QUE' ) ),
 	array( 'en' => 'RECITALS', 'fr' => 'PRÉAMBULE', 'not' => array( 'RÉCITALS', 'RÉCITS', 'NARRATIONS' ) ),
 	array( 'en' => 'Exhibit', 'fr' => 'Annexe', 'not' => array( 'Exposition', 'Pièce exposée' ) ),
-	array( 'en' => 'Section', 'fr' => 'Article', 'not' => array( 'Rubrique', 'Tronçon' ) ),
 	array( 'en' => 'Deliverables', 'fr' => 'Livrables', 'not' => array( 'Éléments livrables', 'Produits à livrer', 'Livraisons' ) ),
 	array( 'en' => 'Work Product', 'fr' => 'Résultats des Travaux', 'not' => array( 'Produit du Travail', 'Produit de travail', 'Œuvre de travail' ) ),
 	array( 'en' => 'Ascential Indemnity', 'fr' => 'Indemnisation par Ascential', 'not' => array( 'Indemnité Ascential', 'Indemnisation Ascential' ) ),

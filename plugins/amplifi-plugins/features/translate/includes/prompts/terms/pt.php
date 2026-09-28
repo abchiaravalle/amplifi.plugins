@@ -337,7 +337,6 @@ return array(
 	array( 'en' => 'testing', 'pt' => 'ensaios', 'not' => array( 'testagem' ) ),
 	array( 'en' => 'Aerospace & industrials', 'pt' => 'Aeroespacial e industrial', 'not' => array( 'Setor aeroespacial e industrial', 'Aeroespacial e indústrias' ) ),
 	array( 'en' => 'Exhibit', 'pt' => 'Anexo', 'not' => array( 'Exposição', 'Exibição' ) ),
-	array( 'en' => 'Section', 'pt' => 'Cláusula', 'not' => array( 'Secção' ) ),
 	array( 'en' => 'RECITALS', 'pt' => 'CONSIDERANDOS', 'not' => array( 'RECITAIS' ) ),
 	array( 'en' => 'Products', 'pt' => 'Produtos', 'not' => array( 'Produtos e artigos' ) ),
 	array( 'en' => 'Ascential Indemnity', 'pt' => 'Indemnização da Ascential', 'not' => array( 'Indenização Ascential' ) ),

@@ -521,7 +521,6 @@ return array(
 	array( 'en' => 'WHEREAS', 'it' => 'PREMESSO CHE', 'not' => array( 'LADDOVE', 'MENTRE' ) ),
 	array( 'en' => 'RECITALS', 'it' => 'PREMESSE', 'not' => array( 'RECITAZIONI', 'CONSIDERANDI' ) ),
 	array( 'en' => 'Exhibit', 'it' => 'Allegato', 'not' => array( 'Esibizione', 'Mostra' ) ),
-	array( 'en' => 'Section', 'it' => 'Articolo', 'not' => array( 'Sezione di legge' ) ),
 	array( 'en' => 'Work Product', 'it' => 'Prodotto del Lavoro', 'not' => array( 'Prodotto di lavoro', 'Opera lavorativa' ) ),
 	array( 'en' => 'Ascential Indemnity', 'it' => 'Manleva di Ascential', 'not' => array( 'Indennità Ascential', 'Indennizzo di Ascential' ) ),
 	array( 'en' => 'Date:', 'it' => 'Data:', 'not' => array(  ) ),

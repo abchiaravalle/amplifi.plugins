@@ -408,7 +408,6 @@ return array(
 	array( 'en' => 'Deliverables', 'es' => 'Entregables', 'not' => array( 'Resultados a entregar', 'Prestaciones entregables', 'Productos de entrega' ) ),
 	array( 'en' => 'Work Product', 'es' => 'Producto del Trabajo', 'not' => array( 'Resultado Laboral', 'Obra de Trabajo' ) ),
 	array( 'en' => 'Exhibit', 'es' => 'Anexo', 'not' => array( 'Exhibición', 'Apéndice numerado' ) ),
-	array( 'en' => 'Section', 'es' => 'Cláusula', 'not' => array( 'Sección' ) ),
 	array( 'en' => 'Ascential Indemnity', 'es' => 'Indemnización de Ascential', 'not' => array( 'Ascential Indemnity' ) ),
 	array( 'en' => 'Name:', 'es' => 'Nombre y apellidos:', 'not' => array( 'Denominación:', 'Razón social:' ) ),
 	array( 'en' => 'Date:', 'es' => 'Fecha:', 'not' => array( 'Datos:' ) ),

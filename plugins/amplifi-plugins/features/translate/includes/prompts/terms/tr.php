@@ -496,7 +496,6 @@ return array(
 	array( 'en' => 'WHEREAS', 'tr' => 'ŞÖYLE Kİ', 'not' => array( 'OYSA Kİ', 'BUNA KARŞILIK', 'İKEN' ) ),
 	array( 'en' => 'RECITALS', 'tr' => 'GİRİŞ HÜKÜMLERİ', 'not' => array( 'NAKİLLER', 'OKUMALAR', 'ANLATIMLAR' ) ),
 	array( 'en' => 'Exhibit', 'tr' => 'Ek', 'not' => array( 'Sergi', 'Teşhir', 'Delil' ) ),
-	array( 'en' => 'Section', 'tr' => 'Madde', 'not' => array( 'Kısım', 'Kesit' ) ),
 	array( 'en' => 'Name:', 'tr' => 'Ad Soyad:', 'not' => array( 'İsim:', 'Nam:', 'Unvan:' ) ),
 	array( 'en' => 'Date:', 'tr' => 'Tarih:', 'not' => array( 'Veriler:', 'Hurma:', 'Bilgiler:' ) ),
 	array( 'en' => 'Registered office', 'tr' => 'Kayıtlı merkez', 'not' => array( 'Tescilli ofis', 'Kaydolmuş büro' ) ),
