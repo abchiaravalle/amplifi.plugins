@@ -149,19 +149,36 @@ class ACWPT_Terms {
 		if ( ! $entries ) {
 			return '';
 		}
-		$lines = array( 'REQUIRED TERMINOLOGY for this batch. Use exactly these renderings (inflect them as the sentence requires; never substitute a synonym, never use a form listed as wrong):' );
+		// Generic words (SOFT_WORDS: operations, section, testing, performance,
+		// support...) have several senses. Presenting their one stored rendering
+		// as REQUIRED forced it into every context ('operations/maintenance
+		// procedures' -> the business sense; 'multi-section pump' -> a legal
+		// clause), which strict reviewers scored as meaning errors in several
+		// languages. They are now listed separately as the site's preferred
+		// rendering FOR THAT SENSE, never forced when the source means
+		// something else. Domain terms stay required.
+		$req = array(); $soft = array();
 		foreach ( $entries as $e ) {
 			if ( '*' === $e['en'] ) {
-				$lines[] = '- NEVER write: ' . implode( ', ', $e['not'] ) . '. ' . $e['target'];
+				$req[] = '- NEVER write: ' . implode( ', ', $e['not'] ) . '. ' . $e['target'];
 				continue;
 			}
 			$line = '- "' . $e['en'] . '" = "' . $e['target'] . '"';
-			if ( $e['not'] ) {
+			if ( empty( $e['soft'] ) && $e['not'] ) {
 				$line .= '  (wrong: ' . implode( ', ', array_slice( $e['not'], 0, 4 ) ) . ')';
 			}
-			$lines[] = $line;
+			if ( empty( $e['soft'] ) ) { $req[] = $line; } else { $soft[] = $line; }
 		}
-		return implode( "\n", $lines );
+		$out = array();
+		if ( $req ) {
+			$out[] = 'REQUIRED TERMINOLOGY for this batch. Use exactly these renderings (inflect them as the sentence requires; never substitute a synonym, never use a form listed as wrong):';
+			$out   = array_merge( $out, $req );
+		}
+		if ( $soft ) {
+			$out[] = 'CONTEXT-DEPENDENT WORDS. These general words have more than one meaning. Use the rendering below ONLY where the English word is used in that sense; where it means something else (e.g. a hydraulic "section" vs a legal "section", machine "operation" vs business "operations"), translate the meaning actually used in the sentence:';
+			$out   = array_merge( $out, $soft );
+		}
+		return implode( "\n", $out );
 	}
 
 	/**
