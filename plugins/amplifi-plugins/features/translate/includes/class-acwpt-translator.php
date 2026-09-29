@@ -14,6 +14,8 @@ class ACWPT_Translator {
 		'claude-haiku-4-5'  => array( 'input' => 0.000001,  'output' => 0.000005 ),
 		'claude-sonnet-4-5' => array( 'input' => 0.000003,  'output' => 0.000015 ),
 		'claude-sonnet-4-6' => array( 'input' => 0.000003,  'output' => 0.000015 ),
+		'claude-sonnet-5'   => array( 'input' => 0.000002,  'output' => 0.000010 ),
+		'claude-sonnet-5-5' => array( 'input' => 0.000002,  'output' => 0.000010 ), // anthropic.com/pricing 2026-09-29: $2 in / $10 out per MTok, cache read $0.20, write $2.50
 		'claude-opus-4-5'   => array( 'input' => 0.000015,  'output' => 0.000075 ),
 		'claude-opus-4-6'   => array( 'input' => 0.000015,  'output' => 0.000075 ),
 	);

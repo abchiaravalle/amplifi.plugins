@@ -75,7 +75,7 @@ class ACWPT_Batch {
 	 * @param string   $model
 	 * @return int number queued (locked rows excluded)
 	 */
-	public static function enqueue_language( $lang, array $sources, $model = 'claude-sonnet-4-6', $cap = 0.0 ) {
+	public static function enqueue_language( $lang, array $sources, $model = 'claude-sonnet-5-5', $cap = 0.0 ) {
 		global $wpdb;
 		$t      = ACWPT_String_Store::table_name();
 		$locked = array();
