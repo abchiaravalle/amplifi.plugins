@@ -308,7 +308,7 @@ return array(
 	array( 'en' => 'vacuum rise test', 'de' => 'Vakuumanstiegsprüfung', 'not' => array( 'Unterdruckanstiegstest', 'Vakuumsteigtest' ) ),
 	array( 'en' => 'validate performance', 'de' => 'Leistung validieren', 'not' => array( 'Wirkung überprüfen', 'Performance verifizieren' ) ),
 	array( 'en' => 'valve body unit', 'de' => 'Ventilblock', 'not' => array( 'Ventilkörper-Einheit', 'Ventilgehäuseeinheit' ) ),
-	array( 'en' => 'vibration', 'de' => 'Schwingungen', 'not' => array( 'Vibrationen', 'Vibrierungen' ) ),
+	array( 'en' => 'vibration', 'de' => 'Schwingungen', 'not' => array( 'Vibrierungen' ) ),
 	array( 'en' => 'volume flexibility', 'de' => 'Mengenflexibilität', 'not' => array( 'Volumenflexibilität', 'Stückzahlvariabilität' ) ),
 	array( 'en' => 'walking beam system', 'de' => 'Hubbalkensystem', 'not' => array( 'Wanderbalken-System', 'Gehbalkensystem' ) ),
 	array( 'en' => 'warranty coverage', 'de' => 'Garantieumfang', 'not' => array( 'Garantieversicherung', 'Gewährleistungsversicherung' ) ),

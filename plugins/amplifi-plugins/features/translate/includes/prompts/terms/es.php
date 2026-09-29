@@ -47,7 +47,7 @@ return array(
 	// --- Balancing and rotating machinery ---
 	array( 'en' => 'unbalance', 'es' => 'desequilibrio', 'not' => array( 'desbalance', 'desbalanceo', 'falta de equilibrio' ) ),
 	array( 'en' => 'residual unbalance', 'es' => 'desequilibrio residual', 'not' => array( 'desbalance residual', 'desequilibrio remanente' ) ),
-	array( 'en' => 'balancing', 'es' => 'equilibrado', 'not' => array( 'balanceo', 'balanceado' ) ),
+	array( 'en' => 'balancing', 'es' => 'equilibrado', 'not' => array( 'balanceado' ) ),
 	array( 'en' => 'balancing machine', 'es' => 'equilibradora', 'not' => array( 'máquina de balanceo', 'balanceadora', 'máquina de equilibrado' ) ),
 	array( 'en' => 'Balancing Machines', 'es' => 'Máquinas equilibradoras', 'not' => array( 'Máquinas de balanceo', 'Balanceadoras' ) ),
 	array( 'en' => 'Automotive Industry Balancers', 'es' => 'Equilibradoras para la industria del automóvil', 'not' => array( 'Balanceadores para automoción' ) ),
@@ -491,7 +491,7 @@ return array(
 	array( 'en' => 'runout', 'es' => 'descentramiento', 'not' => array( 'batimiento' ) ),
 	array( 'en' => 'expansion sleeve', 'es' => 'casquillo expansor', 'not' => array( 'manguito de expansión', 'casquillo expansible' ) ),
 	array( 'en' => 'roll surface', 'es' => 'superficie del cilindro', 'not' => array( 'superficie del rodillo' ) ),
-	array( 'en' => 'leak test', 'es' => 'ensayo de estanqueidad', 'not' => array( 'prueba de fugas', 'ensayo de fugas' ) ),
+	array( 'en' => 'leak test', 'es' => 'ensayo de estanqueidad', 'not' => array( 'prueba de fugas' ) ),
 	array( 'en' => 'Quality Grade', 'es' => 'Grado de calidad', 'not' => array( 'Categoría de calidad' ) ),
 	array( 'en' => 'ECM software', 'es' => 'software del ECM', 'not' => array( 'software ECM', 'software de la ECM' ) ),
 	array( 'en' => 'controller module', 'es' => 'módulo controlador', 'not' => array( 'módulo de control del', 'del módulo de control' ) ),
