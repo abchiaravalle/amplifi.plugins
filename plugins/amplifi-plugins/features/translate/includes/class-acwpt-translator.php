@@ -362,6 +362,40 @@ class ACWPT_Translator {
 		return (bool) preg_match( '/^claude-(haiku|sonnet|opus)-4/', (string) $model );
 	}
 
+	/**
+	 * Model-generation-specific request parameters.
+	 *  - claude-*-4: temperature 0.3 (as before).
+	 *  - newer models (Sonnet 5.5): temperature is rejected (400), and adaptive
+	 *    thinking is ON by default. Measured on a 20-string translation batch:
+	 *    4,455 of 5,944 output tokens were thinking, ~4x the cost of the same
+	 *    batch on Sonnet 4.6, and the text arrived in content[1] behind an empty
+	 *    thinking block. Translation needs no up-front reasoning, so thinking is
+	 *    turned off the documented way for this model: {"type":"between_tools"}.
+	 */
+	public static function model_extra_params( $model ) {
+		if ( self::model_accepts_temperature( $model ) ) {
+			return array( 'temperature' => 0.3 );
+		}
+		if ( preg_match( '/^claude-sonnet-5-5/', (string) $model ) ) {
+			return array( 'thinking' => array( 'type' => 'between_tools' ) );
+		}
+		return array();
+	}
+
+	/**
+	 * All text blocks of a Messages API response, joined. Newer models can put a
+	 * thinking block first, so content[0] is not always the text.
+	 */
+	public static function response_text( $data ) {
+		$out = '';
+		foreach ( (array) ( $data['content'] ?? array() ) as $b ) {
+			if ( isset( $b['type'] ) && 'text' === $b['type'] && isset( $b['text'] ) ) {
+				$out .= $b['text'];
+			}
+		}
+		return $out;
+	}
+
 	/** Guard against recursion while a terminology retry runs. */
 	private static $in_term_retry = false;
 
@@ -831,7 +865,7 @@ class ACWPT_Translator {
 				),
 				'body'    => wp_json_encode(
 					array_merge(
-						self::model_accepts_temperature( $model ) ? array( 'temperature' => 0.3 ) : array(),
+						self::model_extra_params( $model ),
 						array(
 						'model'       => $model,
 						'max_tokens'  => $max_tokens,
@@ -873,9 +907,14 @@ class ACWPT_Translator {
 			return new WP_Error( 'anthropic_error', 'Anthropic API error: ' . $msg );
 		}
 
-		if ( empty( $data['content'][0]['text'] ) ) {
-			return new WP_Error( 'empty_response', 'Anthropic returned an empty response.' );
+		// Normalise: text may not be in content[0] (thinking block first).
+		$text = self::response_text( $data );
+		if ( '' === $text ) {
+			// Billed tokens were spent even though no text came back: meter them.
+			self::record_usage( $data, $model, 'strings' );
+			return new WP_Error( 'empty_response', 'Anthropic returned an empty response (stop_reason: ' . ( $data['stop_reason'] ?? '?' ) . ').' );
 		}
+		$data['content'] = array( array( 'type' => 'text', 'text' => $text ) );
 
 		// A good response clears any recorded billing failure, so destructive
 		// actions are unblocked once the account is funded again.

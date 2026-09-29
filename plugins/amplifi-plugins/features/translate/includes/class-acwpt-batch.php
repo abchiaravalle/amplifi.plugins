@@ -272,7 +272,7 @@ class ACWPT_Batch {
 			$reqs[]      = array(
 				'custom_id' => $id,
 				'params'    => array_merge(
-					ACWPT_Translator::model_accepts_temperature( $job['model'] ) ? array( 'temperature' => 0.3 ) : array(),
+					ACWPT_Translator::model_extra_params( $job['model'] ),
 					array(
 						'model'      => $job['model'],
 						'max_tokens' => 8192,
@@ -324,7 +324,7 @@ class ACWPT_Batch {
 				}
 				$msg = $r['result']['message'];
 				$job['stats']['cost'] += self::cost( $msg, $job['model'] );
-				$out = ACWPT_Translator::accept_batch_output( $src, $lang, $msg['content'][0]['text'] ?? '' );
+				$out = ACWPT_Translator::accept_batch_output( $src, $lang, ACWPT_Translator::response_text( $msg ) );
 				if ( is_wp_error( $out ) ) {
 					self::requeue( $job, $src );
 					continue;
