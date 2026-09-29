@@ -353,6 +353,15 @@ class ACWPT_Translator {
 		return $out;
 	}
 
+	/**
+	 * Whether a model accepts the 'temperature' parameter. Newer models (Sonnet 5.5)
+	 * reject it with "`temperature` is deprecated for this model"; sending it made
+	 * every request fail. Default: only the 4.x generation gets it.
+	 */
+	public static function model_accepts_temperature( $model ) {
+		return (bool) preg_match( '/^claude-(haiku|sonnet|opus)-4/', (string) $model );
+	}
+
 	/** Guard against recursion while a terminology retry runs. */
 	private static $in_term_retry = false;
 
@@ -821,10 +830,11 @@ class ACWPT_Translator {
 					'content-type'      => 'application/json',
 				),
 				'body'    => wp_json_encode(
-					array(
+					array_merge(
+						self::model_accepts_temperature( $model ) ? array( 'temperature' => 0.3 ) : array(),
+						array(
 						'model'       => $model,
 						'max_tokens'  => $max_tokens,
-						'temperature' => 0.3,
 						// PROMPT CACHING. The system prompt is the base prompt plus a
 						// 40-60 KB language pack, identical on every call for a
 						// language, and was 63% of spend (11.5k input tokens per
@@ -841,6 +851,7 @@ class ACWPT_Translator {
 						'messages'    => array(
 							array( 'role' => 'user', 'content' => $user ),
 						),
+						)
 					)
 				),
 			)

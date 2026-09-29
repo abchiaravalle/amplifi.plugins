@@ -271,12 +271,14 @@ class ACWPT_Batch {
 			$map[ $id ]  = array_values( $chunk );
 			$reqs[]      = array(
 				'custom_id' => $id,
-				'params'    => array(
-					'model'       => $job['model'],
-					'max_tokens'  => 8192,
-					'temperature' => 0.3,
-					'system'      => array( array( 'type' => 'text', 'text' => $system, 'cache_control' => array( 'type' => 'ephemeral' ) ) ),
-					'messages'    => array( array( 'role' => 'user', 'content' => $user ) ),
+				'params'    => array_merge(
+					ACWPT_Translator::model_accepts_temperature( $job['model'] ) ? array( 'temperature' => 0.3 ) : array(),
+					array(
+						'model'      => $job['model'],
+						'max_tokens' => 8192,
+						'system'     => array( array( 'type' => 'text', 'text' => $system, 'cache_control' => array( 'type' => 'ephemeral' ) ) ),
+						'messages'   => array( array( 'role' => 'user', 'content' => $user ) ),
+					)
 				),
 			);
 		}
