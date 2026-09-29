@@ -71,8 +71,8 @@ return array(
         'Lock one Italian noun for the CRM/service object across an entire form: English «case», «request», «ticket» and «issue» must not surface as four different nouns in adjacent fields of the same widget. Choose «richiesta» (or «segnalazione») and reuse it; «Caso» is a raw carry-over of the Salesforce object name.',
     ),
     'avoid' => array(
-        'Any tu or voi form in any string — Scopri, Contattaci, Leggi, Richiedi, Scegli, il tuo, aiutarti, potete, compilate, vi risponderemo — including short CTAs, headlines, section headings, placeholders, alt/aria text and metadata.',
-        'Mixing registers inside one page or component: «Scopra come integriamo…» in a heading above «Scopri come…» in the paragraph under it is the single most damaging defect reviewers find.',
+        'Any tu or voi form in running text, headlines, section headings, alt/aria text or metadata (il tuo, aiutarti, potete, compilate, vi risponderemo). Exception: a UI control (button, link, CTA, menu item) takes the 2nd-person imperative without possessive, like the site navigation: «Scopri di più», «Richiedi un preventivo», «Parla con un esperto».',
+        'Mixing registers inside running text: «Scopra come integriamo…» in a heading above «Scopri come…» in the paragraph under it. Running text is Lei; UI controls are the imperative «Scopri/Richiedi/Contatta…», as in the navigation.',
         '«bilanciamento» for the balancing of rotors, turbines, turbochargers, fans and cores (it belongs to loads, budgets and chemical equations), and «equilibratura contrattuale» for contract balancing, which denotes nothing to an Italian buyer.',
         '«analitiche» for «analytics» — «analitico» is an adjective and cannot be pressed into service as a noun on the English model.',
         '«controlli» for «controls» in a product or capability list: on this site «controlli» is locked to inspection («controlli non distruttivi»), so reusing it for automation makes two adjacent menu entries mean the same thing (use «sistemi di controllo»).',
