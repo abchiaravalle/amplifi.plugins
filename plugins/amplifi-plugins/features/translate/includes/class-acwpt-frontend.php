@@ -2569,7 +2569,7 @@ class ACWPT_Frontend {
 		//
 		// alt is also the only description an image has: an LLM asked about a
 		// product photo has nothing else to read.
-		foreach ( array( 'alt', 'aria-label', 'title' ) as $attr ) {
+		foreach ( array( 'alt', 'aria-label', 'title', 'data-tooltip' ) as $attr ) {
 			// Either quote style. Themes emit placeholder='Search...' with single
 			// quotes; the double-quote-only pattern left that search box English
 			// in all ten languages (round-6 review, pt/translator).
@@ -3089,7 +3089,7 @@ class ACWPT_Frontend {
 			$html
 		);
 		// Translate accessibility and media attributes.
-		foreach ( array( 'alt', 'aria-label', 'title' ) as $attr ) {
+		foreach ( array( 'alt', 'aria-label', 'title', 'data-tooltip' ) as $attr ) {
 			$html = preg_replace_callback(
 				'/\b(' . preg_quote( $attr, '/' ) . ')=(["\'])([^"\']{2,}?)\2/i',
 				function ( $m ) {

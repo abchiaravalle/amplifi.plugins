@@ -118,6 +118,59 @@ class ACWPT_Glossary {
     }
 
     /**
+     * POSITIONAL PARSE. Sonnet 5.5 often starts the object with keys and then
+     * drops them mid-way: {"0":"a","1":"b","2":"c","3":"d","e","f",...,"t"}.
+     * That is invalid JSON, so the batch was rejected (4 items for 20). Read the
+     * top-level container as a sequence of JSON strings: a string followed by
+     * ':' is a key; every other string is the next value. Accept only when
+     * every explicit key equals its position and the value count is exactly
+     * $n, so a skipped or duplicated item still fails instead of shifting.
+     *
+     * @return array<string,string>|null
+     */
+    public static function parse_positional( $text, $n ) {
+        if ( ! is_string( $text ) || '' === $text || $n < 1 ) {
+            return null;
+        }
+        $start = strcspn( $text, '{[' );
+        if ( $start >= strlen( $text ) ) {
+            return null;
+        }
+        $len = strlen( $text ); $i = $start + 1; $vals = array(); $pending_key = null;
+        while ( $i < $len ) {
+            $ch = $text[ $i ];
+            if ( '"' === $ch ) {
+                $j = $i + 1; $buf = '';
+                while ( $j < $len ) {
+                    $c = $text[ $j ];
+                    if ( '\\' === $c && $j + 1 < $len ) { $buf .= $c . $text[ $j + 1 ]; $j += 2; continue; }
+                    if ( '"' === $c ) { break; }
+                    $buf .= $c; $j++;
+                }
+                $str = json_decode( '"' . $buf . '"' );
+                if ( null === $str ) { $str = stripcslashes( $buf ); }
+                $k = $j + 1;
+                while ( $k < $len && ctype_space( $text[ $k ] ) ) { $k++; }
+                if ( $k < $len && ':' === $text[ $k ] ) {
+                    $pending_key = $str; $i = $k + 1; continue;
+                }
+                if ( null !== $pending_key && (string) $pending_key !== (string) count( $vals ) ) {
+                    return null; // explicit key out of order: do not guess
+                }
+                $vals[] = (string) $str; $pending_key = null; $i = $j + 1; continue;
+            }
+            if ( '}' === $ch || ']' === $ch ) { break; }
+            $i++;
+        }
+        if ( count( $vals ) !== (int) $n ) {
+            return null;
+        }
+        $out = array();
+        foreach ( $vals as $idx => $v ) { $out[ (string) $idx ] = $v; }
+        return $out;
+    }
+
+    /**
      * Recover "index": "value" pairs from a malformed JSON response.
      *
      * Models occasionally emit a value containing an unescaped ASCII double

@@ -198,21 +198,22 @@ class ACWPT_Batch {
 		if ( ! empty( $job['hold'] ) ) {
 			return; // held (e.g. waiting for new rules); results of in-flight batches are still collected
 		}
-		if ( ! $job['pending'] || count( $job['batches'] ) >= ( empty( $job['cap'] ) ? 2 : 1 ) ) {
+		if ( ! $job['pending'] || count( $job['batches'] ) >= ( empty( $job['cap'] ) ? 2 : 4 ) ) {
 			return; // at most two batches in flight per language
 		}
 		$take = array_slice( $job['pending'], 0, self::PER_REQ * self::MAX_REQS );
-		$est  = count( $take ) * self::EST_PER_ST;
+		$rate = preg_match( '/^claude-sonnet-5/', (string) $job['model'] ) ? 0.0012 : self::EST_PER_ST;
+		$est  = count( $take ) * $rate;
 		// BATCH SLICE: one submitted batch may use at most 25% of the job cap.
 		// A batch cannot be stopped half-way once sent, so a single 2,032-string
 		// batch overran a $2.50 cap by $0.16 when the per-string cost came in
 		// above estimate. Smaller slices keep the overrun bounded by one slice.
 		if ( ! empty( $job['cap'] ) ) {
-			$slice = (int) floor( ( (float) $job['cap'] * 0.25 ) / self::EST_PER_ST );
+			$slice = (int) floor( ( (float) $job['cap'] * 0.40 ) / $rate );
 			$slice = max( self::PER_REQ, $slice - ( $slice % self::PER_REQ ) );
 			if ( count( $take ) > $slice ) {
 				$take = array_slice( $take, 0, $slice );
-				$est  = count( $take ) * self::EST_PER_ST;
+				$est  = count( $take ) * $rate;
 			}
 		}
 		// PER-JOB HARD CAP (approved per run). Spent so far + everything this
@@ -223,14 +224,14 @@ class ACWPT_Batch {
 			foreach ( (array) $job['batches'] as $b ) { $inflight += (float) ( $b['est'] ?? 0 ); }
 			$room = (float) $job['cap'] - (float) $job['stats']['cost'] - $inflight;
 			if ( $est > $room ) {
-				$fit  = (int) floor( max( 0, $room ) / self::EST_PER_ST );
+				$fit  = (int) floor( max( 0, $room ) / $rate );
 				$fit -= $fit % self::PER_REQ;
 				if ( $fit < self::PER_REQ ) {
 					$job['stats']['note'] = sprintf( 'job cap reached: spent $%.2f + in flight $%.2f of cap $%.2f', $job['stats']['cost'], $inflight, $job['cap'] );
 					return;
 				}
 				$take = array_slice( $take, 0, $fit );
-				$est  = count( $take ) * self::EST_PER_ST;
+				$est  = count( $take ) * $rate;
 			}
 		}
 		$lim  = ACWPT_Budget::monthly_limit();
@@ -240,11 +241,11 @@ class ACWPT_Batch {
 		$base = ACWPT_Budget::spent_this_month() + self::$committed_live;
 		if ( $lim > 0 && $base + $est >= $lim - $head ) {
 			// Submit a smaller batch that fits, if any.
-			$fit  = (int) floor( max( 0, $lim - $head - $base ) / self::EST_PER_ST );
+			$fit  = (int) floor( max( 0, $lim - $head - $base ) / $rate );
 			$fit  = $fit - ( $fit % self::PER_REQ );
 			if ( $fit >= self::PER_REQ ) {
 				$take = array_slice( $take, 0, $fit );
-				$est  = count( $take ) * self::EST_PER_ST;
+				$est  = count( $take ) * $rate;
 			}
 		}
 		if ( $lim > 0 && $base + $est >= $lim - $head ) {
@@ -389,9 +390,11 @@ class ACWPT_Batch {
 	/** Batch pricing: 50% of standard, on every token class; recorded against the monthly ceiling. */
 	private static function cost( array $msg, $model ) {
 		$u  = $msg['usage'] ?? array();
-		$in = 0 === strpos( $model, 'claude-haiku' ) ? 1e-6 : 3e-6;
+		// Per-model rates (Sonnet 5.5 is $2/$10, not Sonnet 4.x's $3/$15).
+		$in  = 0 === strpos( $model, 'claude-haiku' ) ? 1e-6 : ( preg_match( '/^claude-sonnet-5/', $model ) ? 2e-6 : 3e-6 );
+		$out = $in * 5;
 		$c  = ( ( $u['input_tokens'] ?? 0 ) * $in + ( $u['cache_creation_input_tokens'] ?? 0 ) * $in * 1.25
-			+ ( $u['cache_read_input_tokens'] ?? 0 ) * $in * 0.1 + ( $u['output_tokens'] ?? 0 ) * $in * 5 ) * 0.5;
+			+ ( $u['cache_read_input_tokens'] ?? 0 ) * $in * 0.1 + ( $u['output_tokens'] ?? 0 ) * $out ) * 0.5;
 		ACWPT_Budget::record( $c );
 		return $c;
 	}

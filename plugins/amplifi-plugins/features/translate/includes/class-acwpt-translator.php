@@ -176,6 +176,13 @@ class ACWPT_Translator {
 		// batch is failed so the queue retries it, rather than storing garbage
 		// that looks like a successful translation.
 		if ( count( $translated ) !== count( $originals ) ) {
+			// Keys dropped mid-object (Sonnet 5.5): recover by position, strictly.
+			$pos = ACWPT_Glossary::parse_positional( $text, count( $originals ) );
+			if ( is_array( $pos ) ) {
+				$translated = $pos;
+			}
+		}
+		if ( count( $translated ) !== count( $originals ) ) {
 			return new WP_Error(
 				'acwpt_batch_mismatch',
 				sprintf(
@@ -265,6 +272,12 @@ class ACWPT_Translator {
 	 */
 	public static function accept_batch_output( array $originals, $language, $text ) {
 		$translated = ACWPT_Glossary::extract_first_json_object( (string) $text );
+		if ( ! is_array( $translated ) || count( $translated ) !== count( $originals ) ) {
+			$pos = ACWPT_Glossary::parse_positional( (string) $text, count( $originals ) );
+			if ( is_array( $pos ) ) {
+				$translated = $pos;
+			}
+		}
 		if ( ! is_array( $translated ) || count( $translated ) !== count( $originals ) ) {
 			return new WP_Error( 'acwpt_batch_mismatch', 'batch item count mismatch' );
 		}
