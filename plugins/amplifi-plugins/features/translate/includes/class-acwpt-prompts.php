@@ -96,10 +96,42 @@ class ACWPT_Prompts {
      * Build the system prompt for batch string translation (JSON return).
      */
     public static function build_strings_prompt( $lang_code, array $custom ) {
+        $settings = get_option( 'acwpt_settings', array() );
+        if ( isset( $settings['prompt_style'] ) && 'short' === $settings['prompt_style'] ) {
+            return self::build_strings_prompt_short( $lang_code, $custom );
+        }
         $sections   = array( self::base_prompt() );
         $sections[] = self::language_section( $lang_code );
         $sections[] = self::custom_section( $lang_code, $custom );
         $sections[] = self::strings_output_contract();
+        return self::join_sections( $sections );
+    }
+
+    /**
+     * SHORT strings prompt: accuracy-first framing, essential rules, the
+     * language's name/register/quote marks and its short UI lexicon, the
+     * custom section and the output contract. No nuance/avoid lists.
+     */
+    public static function build_strings_prompt_short( $lang_code, array $custom ) {
+        $base = include ACWPT_PLUGIN_DIR . 'includes/prompts/base-prompt-short.php';
+        $pack = self::load_pack( $lang_code );
+        $lines = array();
+        $lines[] = 'TARGET LANGUAGE: ' . ( $pack['name'] ?? $lang_code );
+        if ( ! empty( $pack['register'] ) ) {
+            $lines[] = 'REGISTER: ' . $pack['register'];
+        }
+        $marks = array( 'de' => '„…“', 'cs' => '„…“', 'pl' => '„…”', 'ro' => '„…”', 'fr' => '« … » (no-break spaces)', 'es' => '«…»', 'it' => '«…»', 'pt' => '«…»', 'zh' => '“…” (full-width)', 'tr' => '"…"' );
+        if ( isset( $marks[ $lang_code ] ) ) {
+            $lines[] = 'QUOTATION MARKS: ' . $marks[ $lang_code ];
+        }
+        if ( ! empty( $pack['b2b_terminology'] ) ) {
+            $t = array();
+            foreach ( $pack['b2b_terminology'] as $en => $tr ) {
+                $t[] = $en . ' = ' . $tr;
+            }
+            $lines[] = 'UI WORDS: ' . implode( '; ', $t );
+        }
+        $sections = array( $base, implode( "\n", $lines ), self::custom_section( $lang_code, $custom ), self::strings_output_contract() );
         return self::join_sections( $sections );
     }
 

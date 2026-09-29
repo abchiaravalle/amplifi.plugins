@@ -118,7 +118,10 @@ class ACWPT_Translator {
 		}
 
 		$system_prompt = ACWPT_Prompts::build_strings_prompt( $language, $custom );
-		$user_message  = wp_json_encode( $indexed, JSON_UNESCAPED_UNICODE );
+		// ITEM COUNT. Sonnet 5.5 often returned fewer items than it was sent
+		// (1 of 20, 19 of 20) and the batch had to be rejected. State the count.
+		$n            = count( $indexed );
+		$user_message = 'There are ' . $n . ' strings, keys "0" to "' . ( $n - 1 ) . '". Return a JSON object with exactly ' . $n . ' keys: one translation for every key, including short, repeated or partial strings.' . "\n\n" . wp_json_encode( $indexed, JSON_UNESCAPED_UNICODE );
 
 		// ENFORCED TERMINOLOGY (see ACWPT_Terms). Only the rows whose English
 		// term occurs in THIS batch are sent, ahead of the JSON payload. They
