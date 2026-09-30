@@ -27,7 +27,7 @@ return array(
 	array( 'en' => 'Garage', 'zh' => 'Garage', 'not' => array( '车库', '维修间' ) ),
 	array( 'en' => 'Vice President of Sales for Ascential Care', 'zh' => 'Ascential Care 销售副总裁', 'not' => array( 'Ascential Care 业务销售副总裁' ) ),
 	array( 'en' => 'Executive Vice President of Ascential Care', 'zh' => 'Ascential Care 执行副总裁', 'not' => array( 'Ascential Care 业务执行副总裁' ) ),
-	array( 'en' => 'united under one roof', 'zh' => '汇聚于同一旗下', 'not' => array( '整合为一体', '同一屋檐之下' ) ),
+	array( 'en' => 'united under one roof', 'zh' => '归于同一旗下', 'not' => array( '汇聚于同一旗下', '整合为一体', '同一屋檐之下' ) ),
 	array( 'en' => 'Titan', 'zh' => 'Titan', 'not' => array( '泰坦系统', '巨人系统' ) ),
 	array( 'en' => 'Sentia', 'zh' => 'Sentia', 'not' => array() ),
 	array( 'en' => 'Galileo', 'zh' => 'Galileo', 'not' => array() ),
