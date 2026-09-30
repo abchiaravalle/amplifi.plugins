@@ -691,7 +691,7 @@ return array(
 	array( 'en' => 'Asset Performance Management', 'es' => 'gestión del rendimiento de activos', 'not' => array( 'gestión del rendimiento de los equipos', 'gestión del rendimiento de equipos' ) ),
 	array( 'en' => 'list price', 'es' => 'precio de catálogo', 'not' => array( 'precio de lista' ) ),
 	array( 'en' => 'first alert monitoring', 'es' => 'monitorización de alerta temprana', 'not' => array( 'monitorización First Alert', 'monitorización de primeras alertas', 'monitorización de primera alerta' ) ),
-	array( 'en' => 'update & refresh', 'es' => 'actualización y renovación', 'not' => array( 'actualización y puesta al día' ) ),
+	array( 'en' => 'update & refresh', 'es' => 'actualización y repaso', 'not' => array( 'actualización y renovación', 'actualización y puesta al día' ) ),
 	array( 'en' => 'Next day', 'es' => 'Al día siguiente', 'not' => array( 'Día siguiente' ) ),
 	array( 'en' => 'On request', 'es' => 'Bajo petición', 'not' => array( 'Previa solicitud', 'Bajo solicitud' ) ),
 	array( 'en' => 'troubleshooting', 'es' => 'resolución de problemas', 'not' => array( 'diagnóstico de averías' ) ),
@@ -760,4 +760,8 @@ return array(
 	array( 'en' => 'vibration insulator', 'es' => 'aislador de vibraciones', 'not' => array( 'aislante de vibración', 'aislantes de vibración', 'aislantes de vibraciones' ) ),
 	array( 'en' => 'Service Manager, Americas', 'es' => 'responsable del servicio técnico en las Américas', 'not' => array( 'responsable del servicio técnico de las Américas' ) ),
 	array( 'en' => 'collision avoidance', 'es' => 'anticolisión', 'not' => array( 'evitación de colisiones' ) ),
+	array( 'en' => 'Ascential Technologies Test & Measurement Systems', 'es' => 'la división Test & Measurement Systems de Ascential Technologies', 'not' => array( 'Los sistemas de Test & Measurement de Ascential Technologies', 'los sistemas de Test & Measurement de Ascential Technologies' ) ),
+	array( 'en' => 'Ascential T&M', 'es' => 'Ascential T&M', 'not' => array( 'T&M de Ascential' ) ),
+	array( 'en' => 'semi-automated', 'es' => 'semiautomático', 'not' => array( 'semiautomatizado', 'semiautomatizada', 'semiautomatizadas' ) ),
+	array( 'en' => 'phase offset', 'es' => 'offset de las fases', 'not' => array( 'desfase de fase', 'desfase de las fases' ) ),
 );
