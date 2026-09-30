@@ -279,6 +279,10 @@ return array(
 	array( 'en' => 'Vibration Absorbing Cast', 'es' => 'Fundición absorbente de vibraciones', 'not' => array( 'Fundición amortiguadora de vibraciones' ) ),
 	array( 'en' => 'Magnetizing System for Permanent Magnets', 'es' => 'Sistema de magnetización para imanes permanentes', 'not' => array( 'Sistema magnetizador de imanes fijos' ) ),
 
+	array( 'en' => 'electrical feedback', 'es' => 'realimentación eléctrica', 'not' => array( 'retroalimentación eléctrica', 'feedback eléctrico' ) ),
+	array( 'en' => 'world\'s first', 'es' => 'primer … del mundo', 'not' => array( 'primer fabricante mundial', 'primera mundial' ) ),
+	array( 'en' => 'our promise to you', 'es' => 'la promesa que le hacemos', 'not' => array( 'promesa con usted', 'nuestra promesa con usted' ) ),
+
 	// --- Aerospace ---
 	array( 'en' => 'Aerospace & industrials', 'es' => 'Aeroespacial e industrial', 'not' => array( 'Aeronáutica e industria', 'Sector aeroespacial e industrias', 'Aviación e industrial' ) ),
 	array( 'en' => 'rotor wing aircraft', 'es' => 'aeronaves de ala rotatoria', 'not' => array( 'aviones de hélice', 'aeronaves de hélice' ) ),
