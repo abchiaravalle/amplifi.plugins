@@ -153,7 +153,7 @@ return array(
 	array( 'en' => 'learning management system (LMS)', 'pl' => 'system zarządzania szkoleniami (LMS)', 'not' => array( 'system zarządzania nauką' ) ),
 	array( 'en' => 'like-minded companies', 'pl' => 'firmy o zbieżnej wizji', 'not' => array( 'firmy o podobnych poglądach' ) ),
 	array( 'en' => 'load capacity', 'pl' => 'obciążalność', 'not' => array( 'pojemność' ) ),
-	array( 'en' => 'LPM', 'pl' => 'l/min', 'not' => array(  ) ),
+	array( 'en' => 'LPM', 'pl' => 'LPM', 'not' => array( 'l/min' ) ),
 	array( 'en' => 'lube & scavenge pumps', 'pl' => 'pompy smarowania i odsysania oleju', 'not' => array( 'pompy smarowania i odpowietrzania' ) ),
 	array( 'en' => 'lubrication', 'pl' => 'smarowanie', 'not' => array( 'wymiana oleju' ) ),
 	array( 'en' => 'machine tools', 'pl' => 'obrabiarki', 'not' => array( 'maszyny technologiczne', 'maszyny do obróbki' ) ),
@@ -952,7 +952,6 @@ return array(
 	array( 'en' => '| Unsubscribe', 'pl' => '| Rezygnacja z subskrypcji', 'not' => array( '| Wypisz się', '| Zrezygnuj z subskrypcji' ) ),
 
 	// round 6 (pl)
-	array( 'en' => 'rpm', 'pl' => 'obr./min', 'not' => array( 'obr/min', 'obrotów na minutę' ) ),
 	array( 'en' => 'inverter', 'pl' => 'falownik', 'not' => array( 'inwerter', 'inwertera', 'inwerterów' ) ),
 	array( 'en' => 'Inverter test stands', 'pl' => 'stanowiska testowe falowników', 'not' => array( 'stanowiska testowe inwerterów', 'stanowiska badań falowników' ) ),
 	array( 'en' => 'Wheel loaders', 'pl' => 'ładowarki kołowe', 'not' => array( 'Kołowe ładowarki', 'Wheel Loaders' ) ),
@@ -1143,9 +1142,9 @@ return array(
 	array( 'en' => 'rotational speed', 'pl' => 'prędkość obrotowa', 'not' => array( 'prędkość rotacyjna', 'szybkość obrotowa' ) ),
 	array( 'en' => 'minimal operator interaction', 'pl' => 'minimalny udział operatora', 'not' => array( 'minimalna interakcja operatora', 'minimalna interakcja z operatorem' ) ),
 	array( 'en' => 'small footprint', 'pl' => 'niewielka powierzchnia zabudowy', 'not' => array( 'mały ślad', 'mała powierzchnia zajmowana' ) ),
-	array( 'en' => 'PSI', 'pl' => 'psi', 'not' => array( 'funtów na cal kwadratowy' ) ),
+	array( 'en' => 'PSI', 'pl' => 'PSI', 'not' => array( 'funtów na cal kwadratowy' ) ),
 	array( 'en' => 'roll grinding machine', 'pl' => 'szlifierka do walców', 'not' => array( 'maszyna do szlifowania walców', 'szlifierka rolek' ) ),
-	array( 'en' => 'HP', 'pl' => 'KM', 'not' => array( 'KM (HP)', 'koni mechanicznych' ) ),
+	array( 'en' => 'HP', 'pl' => 'HP', 'not' => array( 'KM', 'KM (HP)', 'koni mechanicznych' ) ),
 	array( 'en' => 'almost completely automated', 'pl' => 'niemal w pełni zautomatyzowany', 'not' => array( 'prawie całkowicie zautomatyzowany', 'prawie kompletnie zautomatyzowany' ) ),
 	array( 'en' => 'differential', 'pl' => 'mechanizm różnicowy', 'not' => array( 'dyferencjał' ) ),
 	array( 'en' => 'axial piston pump', 'pl' => 'pompa wielotłoczkowa osiowa', 'not' => array( 'pompa tłokowa aksjalna' ) ),

@@ -477,7 +477,7 @@ return array(
 	array( 'en' => '<Model> Refrigerant Charging Brochure', 'es' => 'Folleto <Model>: carga de refrigerante', 'not' => array( 'Folleto de recarga de refrigerante' ) ),
 	array( 'en' => 'Titan <Application> System', 'es' => 'Sistema Titan para <aplicación>', 'not' => array( 'Titan System' ) ),
 	array( 'en' => 'Reload stylesheet', 'es' => 'Recargar hoja de estilos', 'not' => array( 'Recargar estilo' ) ),
-	array( 'en' => 'LPM', 'es' => 'l/min', 'not' => array(  ) ),
+	array( 'en' => 'LPM', 'es' => 'LPM', 'not' => array( 'l/min' ) ),
 
 	// round 2 (es)
 	array( 'en' => 'Image', 'es' => 'Imagen', 'not' => array( 'Image' ) ),
@@ -674,8 +674,8 @@ return array(
 	array( 'en' => 'Editorial Contacts', 'es' => 'Contactos para medios', 'not' => array( 'Contactos editoriales', 'Editorial Contacts' ) ),
 	array( 'en' => 'press release', 'es' => 'nota de prensa', 'not' => array( 'comunicado de prensa', 'lanzamiento de prensa' ) ),
 	array( 'en' => 'brochure', 'es' => 'folleto', 'not' => array( 'brochure', 'prospecto' ) ),
-	array( 'en' => 'GPM', 'es' => 'gal/min', 'not' => array( 'galones por minuto' ) ),
-	array( 'en' => 'HP', 'es' => 'hp', 'not' => array(  ) ),
+	array( 'en' => 'GPM', 'es' => 'GPM', 'not' => array( 'gal/min', 'galones por minuto' ) ),
+	array( 'en' => 'HP', 'es' => 'HP', 'not' => array(  ) ),
 	array( 'en' => 'two-plane', 'es' => 'en dos planos', 'not' => array( 'de dos planos', 'biplano' ) ),
 	array( 'en' => 'bob-weight', 'es' => 'masa de simulación', 'not' => array( 'peso bob', 'pesa bob' ) ),
 	array( 'en' => 'leading edge', 'es' => 'de vanguardia', 'not' => array( 'de filo', 'borde principal' ) ),

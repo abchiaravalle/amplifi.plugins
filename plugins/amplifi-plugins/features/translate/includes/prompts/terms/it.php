@@ -801,7 +801,6 @@ return array(
 	array( 'en' => 'passenger car', 'it' => 'autovettura', 'not' => array( 'auto passeggeri', 'vettura passeggeri' ) ),
 	array( 'en' => 'wheel hub', 'it' => 'mozzo ruota', 'not' => array( 'hub della ruota', 'centro ruota' ) ),
 	array( 'en' => 'dyno', 'it' => 'banco dinamometrico', 'not' => array( 'dyno', 'dinamometro' ) ),
-	array( 'en' => 'rpm', 'it' => 'giri/min', 'not' => array(  ) ),
 	array( 'en' => 'gear pump', 'it' => 'pompa a ingranaggi', 'not' => array( 'pompa a ingranaggio', 'pompa di ingranaggi' ) ),
 	array( 'en' => 'axial piston pump', 'it' => 'pompa a pistoni assiali', 'not' => array( 'pompa a pistone assiale' ) ),
 	array( 'en' => 'positive displacement pump', 'it' => 'pompa volumetrica', 'not' => array( 'pompa a cilindrata positiva', 'pompa a spostamento positivo' ) ),

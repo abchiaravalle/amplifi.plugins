@@ -160,7 +160,7 @@ return array(
 	array( 'en' => 'learning management system (LMS)', 'pt' => 'sistema de gestão da aprendizagem (LMS)', 'not' => array( 'sistema de gerenciamento de aprendizagem' ) ),
 	array( 'en' => 'like-minded companies', 'pt' => 'empresas com a mesma visão', 'not' => array( 'empresas de mente semelhante' ) ),
 	array( 'en' => 'load capacity', 'pt' => 'capacidade de carga', 'not' => array( 'capacidade de carregamento' ) ),
-	array( 'en' => 'LPM', 'pt' => 'l/min', 'not' => array( 'litros pro minuto' ) ),
+	array( 'en' => 'LPM', 'pt' => 'LPM', 'not' => array( 'l/min', 'litros pro minuto' ) ),
 	array( 'en' => 'lube & scavenge pumps', 'pt' => 'bombas de lubrificação e de recuperação', 'not' => array( 'bombas de lubrificação e limpeza' ) ),
 	array( 'en' => 'lubrication', 'pt' => 'lubrificação', 'not' => array( 'lubricação' ) ),
 	array( 'en' => 'machine tools', 'pt' => 'máquinas-ferramenta', 'not' => array( 'ferramentas de máquina', 'máquinas ferramentas' ) ),

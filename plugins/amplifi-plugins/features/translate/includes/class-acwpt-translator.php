@@ -222,6 +222,10 @@ class ACWPT_Translator {
 				error_log( 'ACWPT: rejected mismatched pair for ' . $language . ': ' . mb_substr( $original, 0, 60 ) );
 				continue;
 			}
+			if ( ! self::plausible_pair( $original, $val, $language ) || ! self::owner_rules_ok( $original, $val ) ) {
+				error_log( 'ACWPT: rejected (alignment/owner rules) for ' . $language . ': ' . mb_substr( $original, 0, 60 ) );
+				continue;
+			}
 			// MIXED-SCRIPT WORDS. The model occasionally emits a look-alike
 			// letter from another script inside a word: Polish "hederу" with a
 			// Cyrillic у (U+0443), found twice on one page in Polish loop r3.
@@ -304,6 +308,10 @@ class ACWPT_Translator {
 				continue;
 			}
 			if ( ! self::plausible_pair( $original, $val, $language ) ) {
+				$retry[] = $original;
+				continue;
+			}
+			if ( ! self::owner_rules_ok( $original, $val ) ) {
 				$retry[] = $original;
 				continue;
 			}
@@ -463,6 +471,43 @@ class ACWPT_Translator {
 			$r = $lt / $ls;
 			list( $lo, $hi ) = in_array( $language, array( 'zh', 'ja', 'ko' ), true ) ? array( 0.12, 1.6 ) : array( 0.35, 3.2 );
 			if ( $r < $lo || $r > $hi ) { return false; }
+		}
+		return true;
+	}
+
+	/**
+	 * OWNER RULES (Adam, 2026-09-30): names are never translated; specifications
+	 * and unit symbols are never changed. Enforced in code, not only in the prompt.
+	 *  - Unit symbols: every RPM/LPM/GPM/HP/PSI/MPa/bar/kW/Nm/V/A/kg/mm/″ token in
+	 *    the source must appear in the translation with the same letters and case.
+	 *  - Names: every protected name (site's never-translate list + people's names
+	 *    kept in acwpt_protected_names) that appears in the source must appear in
+	 *    the translation letter-for-letter (an ending may follow it).
+	 * Returns true when both hold.
+	 */
+	public static function owner_rules_ok( $original, $translation, &$why = null ) {
+		$src = html_entity_decode( wp_strip_all_tags( (string) $original ), ENT_QUOTES, 'UTF-8' );
+		$tr  = html_entity_decode( wp_strip_all_tags( (string) $translation ), ENT_QUOTES, 'UTF-8' );
+		// Units: count per exact symbol (case-sensitive) after a number or as a column header.
+		$unit_rx = '/(?<![\p{L}])(RPM|rpm|LPM|lpm|GPM|gpm|CFM|HP|hp|PSI|psi|MPa|bar|kW|kVA|Nm|N·m|mm|cm|kg|lbs?|°C|°F|Hz|kHz|V|A|″|")(?![\p{L}])/u';
+		preg_match_all( $unit_rx, $src, $sm );
+		preg_match_all( $unit_rx, $tr, $tm );
+		$need = array_count_values( array_map( function ( $u ) { return '"' === $u ? '″' : $u; }, $sm[1] ) );
+		$have = array_count_values( array_map( function ( $u ) { return '"' === $u ? '″' : $u; }, $tm[1] ) );
+		foreach ( $need as $u => $n ) {
+			// Only enforce symbols that are clearly units here: after a digit somewhere in the source, or the unit words.
+			if ( in_array( $u, array( 'V', 'A', 'mm', 'cm', 'kg', 'Hz', 'bar', '″' ), true ) && ! preg_match( '/\d\s*' . preg_quote( $u, '/' ) . '(?![\p{L}])/u', $src ) ) { continue; }
+			if ( ( $have[ $u ] ?? 0 ) < $n ) { $why = 'unit ' . $u; return false; }
+		}
+		// Names.
+		$settings = get_option( 'acwpt_settings', array() );
+		$names = array_merge( (array) ( $settings['never_translate'] ?? array() ), (array) get_option( 'acwpt_protected_names', array() ) );
+		foreach ( $names as $nm ) {
+			$nm = trim( (string) $nm );
+			if ( '' === $nm ) { continue; }
+			// whole-word in the source; in the translation the full spelling must appear, an ending may follow
+			if ( ! preg_match( '/(?<![\p{L}])' . preg_quote( $nm, '/' ) . '(?![\p{L}])/u', $src ) ) { continue; }
+			if ( false === mb_strpos( $tr, $nm ) ) { $why = 'name ' . $nm; return false; }
 		}
 		return true;
 	}
