@@ -1275,7 +1275,7 @@ return array(
 	array( 'en' => 'CEO', 'pl' => 'prezes', 'not' => array( 'CEO dywizji', 'dyrektor wykonawczy' ) ),
 	array( 'en' => 'targeted', 'pl' => 'ukierunkowany', 'not' => array( 'celowymi', 'celowe', 'celowych' ) ),
 	array( 'en' => 'Calibration & Support', 'pl' => 'kalibracja i wsparcie', 'not' => array( 'kalibracja i support', 'kalibracja i obsługa' ) ),
-	array( 'en' => 'Get a service quote', 'pl' => 'Prosimy o zapytanie o wycenę serwisu', 'not' => array( 'Zachęcamy do kontaktu w sprawie oferty serwisowej', 'oferty serwisowej' ) ),
+	array( 'en' => 'Get a service quote', 'pl' => 'Poproś o wycenę serwisu', 'not' => array( 'Prosimy o zapytanie o wycenę serwisu', 'Zachęcamy do kontaktu w sprawie oferty serwisowej', 'oferty serwisowej' ) ),
 	array( 'en' => 'critical spare part', 'pl' => 'krytyczne części zamienne', 'not' => array( 'części zamienne krytyczne', 'części zamiennych krytycznych' ) ),
 	array( 'en' => 'system health check', 'pl' => 'przegląd stanu technicznego układu', 'not' => array( 'przegląd stanu technicznego systemu', 'Przegląd stanu technicznego systemu' ) ),
 	array( 'en' => 'multiple disciplines', 'pl' => 'wielu specjalizacji', 'not' => array( 'wielu dyscyplin', 'różnych dyscyplin' ) ),
@@ -1297,4 +1297,7 @@ return array(
 	array( 'en' => 'Maximum diameter of a work piece', 'pl' => 'Maksymalna średnica wyważanego elementu', 'not' => array( 'przedmiotu obrabianego' ) ),
 	array( 'en' => 'indexer', 'pl' => 'stół podziałowy', 'not' => array( 'indeksator', 'indeksatorem', 'indeksatora' ) ),
 	array( 'en' => 'Custom test station', 'pl' => 'stanowisko testowe wykonywane na zamówienie', 'not' => array( 'stanowisko do badań na zamówienie', 'Stanowisko do badań na zamówienie' ) ),
+	array( 'en' => 'Brushing & polishing machine', 'pl' => 'szczotkarki i polerki', 'not' => array( 'maszyny do szczotkowania i polerowania', 'maszyn do szczotkowania i polerowania' ) ),
+	array( 'en' => 'RPM', 'pl' => 'RPM', 'not' => array( 'obr./min', 'obr/min' ) ),
+	array( 'en' => 'quick-change fixturing', 'pl' => 'szybka wymiana przyrządów mocujących', 'not' => array( 'szybkiej wymiany uchwytów mocujących', 'szybką wymianę uchwytów mocujących', 'szybka wymiana uchwytów mocujących' ) ),
 );
