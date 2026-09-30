@@ -748,7 +748,7 @@ return array(
 	array( 'en' => 'conveyors and rollers', 'de' => 'Förderbänder und Walzen', 'not' => array( 'Förderbänder und Rollen' ) ),
 	array( 'en' => 'high-speed machining', 'de' => 'Hochgeschwindigkeitsbearbeitung', 'not' => array( 'Hochdrehzahlbearbeitung', 'Hochdrehzahl-Bearbeitung' ) ),
 	array( 'en' => 'Vertical Machine Specifications', 'de' => 'Technische Daten der Vertikalmaschinen', 'not' => array( 'Spezifikationen der Vertikalmaschine' ) ),
-	array( 'en' => 'ISO 2953 reduction ratio', 'de' => 'Unwuchtreduktionsverhältnis nach ISO 2953', 'not' => array( 'Unwuchtreduzierverhältnis', 'Reduktionsverhältnis nach ISO 2953' ) ),
+	array( 'en' => 'ISO 2953 reduction ratio', 'de' => 'Unwuchtreduzierverhältnis nach ISO 2953', 'not' => array( 'Unwuchtreduktionsverhältnis', 'Reduktionsverhältnis nach ISO 2953' ) ),
 	array( 'en' => 'embedded vibration insulator', 'de' => 'integrierter Schwingungsisolator', 'not' => array( 'eingebetteter Schwingungsisolator' ) ),
 	array( 'en' => 'permanent and rotor-specific calibration', 'de' => 'permanente und rotorspezifische Kalibrierung', 'not' => array( 'dauerhafte und rotorspezifische Kalibrierung' ) ),
 	array( 'en' => 'safety standards compliant with', 'de' => 'die Konformität mit der Sicherheitsnorm', 'not' => array( 'Sicherheitsnormen nach', 'Sicherheitsstandards in Übereinstimmung mit', 'Sicherheitsstandards gemäß' ) ),
