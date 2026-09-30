@@ -1304,4 +1304,7 @@ return array(
 	array( 'en' => 'Turbo Balancing Machine', 'pl' => 'Wyważarka do turbosprężarek', 'not' => array( 'Wyważarka turbo', 'wyważarka turbo' ) ),
 	array( 'en' => 'fluid power test system', 'pl' => 'stanowisko testowe z zakresu napędów hydraulicznych i pneumatycznych', 'not' => array(  ) ),
 	array( 'en' => 'cable windings', 'pl' => 'uzwojenia kablowe', 'not' => array( 'uzwojenia z kabli', 'uzwojeń z kabli' ) ),
+	array( 'en' => 'over belt drive', 'pl' => 'górny napęd pasowy', 'not' => array( 'napęd pasowy nadległy', 'napędem pasowym nadległym', 'nadległy napęd pasowy' ) ),
+	array( 'en' => 'multi-axis', 'pl' => 'wieloosiowy', 'not' => array( 'wielosiowy', 'wielosiowa', 'wielosiowej' ) ),
+	array( 'en' => 'low to medium volume production', 'pl' => 'produkcja małoseryjna i średnioseryjna', 'not' => array( 'serii produkcyjnych od małych do średnich', 'serii produkcyjnych o wolumenie od małego do średniego' ) ),
 );
