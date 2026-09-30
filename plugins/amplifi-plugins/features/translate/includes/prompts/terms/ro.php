@@ -836,4 +836,8 @@ return array(
 	array( 'en' => 'empowering', 'ro' => 'a le oferi mai multă putere de acțiune', 'not' => array( 'a-i consolida', 'a consolida', 'împuternicirea' ) ),
 	array( 'en' => 'seamless operations', 'ro' => 'operațiuni fără întreruperi', 'not' => array( 'activitate fluidă', 'operațiuni fluide' ) ),
 	array( 'en' => 'Joins Ascential Technologies', 'ro' => 'se alătură companiei Ascential Technologies', 'not' => array( 'se alătură Ascential Technologies', 'se alătură la Ascential Technologies' ) ),
+	array( 'en' => 'fluid power rotary motion applications', 'ro' => 'destinat aplicațiilor de acționări hidraulice și pneumatice cu mișcare de rotație', 'not' => array( 'pentru aplicații de mișcare de rotație în acționări hidraulice și pneumatice', 'pentru aplicații de mișcare de rotație din domeniul acționărilor hidraulice și pneumatice' ) ),
+	array( 'en' => 'under slung', 'ro' => 'antrenare suspendată', 'not' => array( 'cu curea dedesubt', 'curea dedesubt' ) ),
+	array( 'en' => 'cost of failure is high', 'ro' => 'o defecțiune costă foarte mult', 'not' => array( 'costul eșecului este ridicat', 'costul eșecului este mare' ) ),
+	array( 'en' => 'pallet changing', 'ro' => 'schimbarea paleților', 'not' => array( 'schimbarea paletelor', 'schimbare de palete' ) ),
 );
