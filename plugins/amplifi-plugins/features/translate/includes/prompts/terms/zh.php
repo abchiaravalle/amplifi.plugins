@@ -694,4 +694,7 @@ return array(
 	array( 'en' => 'APAC', 'zh' => '亚太区', 'not' => array( 'APAC 区域', 'APAC 地区', 'APAC区域' ) ),
 	array( 'en' => 'provided at start-up', 'zh' => '设备调试投产时提供', 'not' => array( '启动时提供', '开机时提供' ) ),
 	array( 'en' => 'Three Rivers', 'zh' => '三河城（Three Rivers）', 'not' => array( 'Three Rivers 基地' ) ),
+	array( 'en' => 'Test & Measurement Systems', 'zh' => '测试与测量系统事业部', 'not' => array( 'Test & Measurement Systems', 'Test &amp; Measurement Systems' ) ),
+	array( 'en' => 'Test &amp; Measurement Systems', 'zh' => '测试与测量系统事业部', 'not' => array( 'Test & Measurement Systems', 'Test &amp; Measurement Systems' ) ),
+	array( 'en' => 'propshaft driveshaft', 'zh' => '传动轴/驱动轴', 'not' => array( '传动轴动平衡', '汽车传动轴宣传册' ) ),
 );
