@@ -859,4 +859,6 @@ return array(
 	array( 'en' => 'fluid power rotary motion applications', 'cs' => 'aplikace rotačního pohybu v hydraulice a pneumatice', 'not' => array( 'aplikace hydrauliky a pneumatiky s rotačním pohybem', 'rotační aplikace hydrauliky a pneumatiky' ) ),
 	array( 'en' => 'magnetic field strength', 'cs' => 'intenzita magnetického pole', 'not' => array( 'síla magnetického pole', 'síly magnetického pole', 'pevnost magnetického pole' ) ),
 	array( 'en' => 'DC idle voltage', 'cs' => 'stejnosměrné napětí naprázdno', 'not' => array( 'klidové napětí DC', 'Klidové napětí DC', 'napětí DC při volnoběhu' ) ),
+	array( 'en' => 'specialty production run', 'cs' => 'specializovaná výrobní série', 'not' => array( 'speciální výrobní série', 'speciálních výrobních sérií', 'speciální výrobní běhy' ) ),
+	array( 'en' => 'rotor specific calibration', 'cs' => 'kalibrace pro konkrétní rotor', 'not' => array( 'kalibrace specifická pro rotor', 'kalibraci specifickou pro rotor', 'rotorově specifická kalibrace' ) ),
 );
