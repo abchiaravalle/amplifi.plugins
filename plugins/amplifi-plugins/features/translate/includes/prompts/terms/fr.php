@@ -112,7 +112,7 @@ return array(
 	array( 'en' => 'Refrigerant Fluid & Gas Charging Machines', 'fr' => 'machines de charge en fluide frigorigène et en gaz', 'not' => array( 'machines de charge de fluide réfrigérant et de gaz' ) ),
 	array( 'en' => 'refrigeration', 'fr' => 'réfrigération', 'not' => array( 'refroidissement', 'climatisation' ) ),
 	array( 'en' => 'Leak Detection & Refrigeration', 'fr' => 'Détection de fuites et réfrigération', 'not' => array( 'Détection de fuites et fluide frigorigène' ) ),
-	array( 'en' => 'Atmosphere – Refrigerants', 'fr' => 'Atmosphère – Fluides frigorigènes', 'not' => array( 'Atmosphère – Réfrigérants' ) ),
+	array( 'en' => 'Atmosphere – Refrigerants', 'fr' => 'Atmosphère – fluides frigorigènes', 'not' => array( 'Atmosphère – Fluides frigorigènes', 'Atmosphère – Réfrigérants' ) ),
 	array( 'en' => 'leak detection', 'fr' => 'détection de fuites', 'not' => array( 'détection d’étanchéité', 'détection de fuite d’air', 'dépistage de fuites' ) ),
 	array( 'en' => 'gross leak test', 'fr' => 'essai de fuite grossière', 'not' => array( 'test de fuite brute', 'essai de grosse fuite', 'essai de fuite bruto' ) ),
 	array( 'en' => 'fine leak', 'fr' => 'fuite fine', 'not' => array( 'petite fuite', 'fuite amende', 'micro-fuite légère' ) ),
@@ -754,4 +754,8 @@ return array(
 	array( 'en' => 'labor, travel, and parts', 'fr' => 'main-d’œuvre, frais de déplacement et pièces', 'not' => array( 'main-d’œuvre, déplacement et pièces', 'main-d’œuvre, déplacements et pièces' ) ),
 	array( 'en' => 'Industries', 'fr' => 'Secteurs', 'not' => array( 'Industries' ) ),
 	array( 'en' => 'Specialty Industries', 'fr' => 'Industries spécialisées', 'not' => array( 'Industrie de spécialité', 'Secteurs spécialisés' ) ),
+	array( 'en' => '24/7', 'fr' => '24 h/24, 7 j/7', 'not' => array( '24 h/24 et 7 j/7', '24/7', '24h/24 7j/7' ) ),
+	array( 'en' => 'highest standards', 'fr' => 'exigences les plus élevées', 'not' => array( 'normes les plus élevées', 'standards les plus élevés' ) ),
+	array( 'en' => 'Education and Engagement', 'fr' => 'la formation et les échanges', 'not' => array( 'l’information et l’engagement', 'l’éducation et l’engagement' ) ),
+	array( 'en' => 'Company Division', 'fr' => 'sa division', 'not' => array( 'la division de l’entreprise' ) ),
 );

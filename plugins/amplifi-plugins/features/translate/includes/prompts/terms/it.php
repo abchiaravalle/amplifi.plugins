@@ -48,6 +48,7 @@ return array(
 	array( 'en' => 'torque vectoring', 'it' => 'torque vectoring', 'not' => array( 'vettorizzazione di coppia' ) ),
 	array( 'en' => 'right-shoring', 'it' => 'right-shoring', 'not' => array( 'ricollocazione', 'delocalizzazione' ) ),
 	array( 'en' => 'restbus simulation', 'it' => 'simulazione restbus', 'not' => array( 'simulazione del bus di riposo', 'simulazione a bus residuo' ) ),
+	array( 'en' => 'residual bus simulation', 'it' => 'simulazione restbus', 'not' => array( 'simulazione del bus residuo', 'simulazione di bus residuo' ) ),
 	array( 'en' => 'customer journey', 'it' => 'customer journey', 'not' => array( 'viaggio del cliente' ) ),
 	array( 'en' => 'life sciences', 'it' => 'scienze della vita', 'not' => array( 'scienze vitali', 'Medicale e life sciences' ) ),
 	array( 'en' => 'whitepaper', 'it' => 'whitepaper', 'not' => array( 'libro bianco', 'carta bianca' ) ),
@@ -949,4 +950,7 @@ return array(
 	array( 'en' => 'rebranded', 'it' => 'con la nuova denominazione', 'not' => array( 'rinominata', 'rinominato', 'di recente rinominata' ) ),
 	array( 'en' => 'rebrand', 'it' => 'cambia nome', 'not' => array( 'cambia marchio', 'rinomina' ) ),
 	array( 'en' => 'units from', 'it' => 'macchine', 'not' => array( 'unità di', 'unità da' ) ),
+	array( 'en' => 'asset', 'it' => 'asset', 'not' => array( 'beni strumentali', 'cespiti' ) ),
+	array( 'en' => 'shipping policy', 'it' => 'condizioni di spedizione', 'not' => array( 'politica di spedizione', 'politica delle spedizioni' ) ),
+	array( 'en' => 'On-station correction', 'it' => 'Correzione in macchina', 'not' => array( 'Correzione in stazione', 'Correzione sulla stazione' ) ),
 );
