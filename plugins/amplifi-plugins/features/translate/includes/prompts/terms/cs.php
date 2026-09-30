@@ -788,7 +788,7 @@ return array(
 	array( 'en' => 'local response', 'cs' => 'místní odezva', 'not' => array( 'místní reakce', 'lokální reakce' ) ),
 	array( 'en' => 'Ascential facility', 'cs' => 'pobočka Ascential', 'not' => array( 'zařízení Ascential' ) ),
 	array( 'en' => 'One division. Every solution.', 'cs' => 'Jedna divize. Všechna řešení.', 'not' => array( 'Každé řešení' ) ),
-	array( 'en' => 'speed and torque instrumentation', 'cs' => 'přístrojové vybavení pro měření otáček a krouticího momentu', 'not' => array( 'přístrojové vybavení pro otáčky', 'vybavení pro otáčky a krouticí moment' ) ),
+	array( 'en' => 'speed and torque instrumentation', 'cs' => 'přístrojové vybavení pro měření otáček a krouticího momentu', 'not' => array( 'přístrojové vybavení pro otáčky', 'vybavení pro vstupní a výstupní otáčky', 'vybavení pro otáčky a krouticí moment' ) ),
 	array( 'en' => 'regenerative power', 'cs' => 'rekuperace výkonu', 'not' => array( 'regenerativní výkon', 'regenerační výkon' ) ),
 	array( 'en' => 'gantry milling system', 'cs' => 'portálový frézovací systém', 'not' => array( 'systém portálového frézování', 'systémem portálového frézování' ) ),
 	array( 'en' => 'low to medium volume production run', 'cs' => 'malé až středně velké výrobní série', 'not' => array( 'výrobní série s nízkým až středním objemem', 'nízko- až středněobjemové série' ) ),
@@ -802,4 +802,9 @@ return array(
 	array( 'en' => 'collision prevention', 'cs' => 'předcházení kolizím', 'not' => array( 'prevence srážek', 'prevence kolizí' ) ),
 	array( 'en' => 'road safety', 'cs' => 'bezpečnost silničního provozu', 'not' => array( 'bezpečnost na silnicích', 'silniční bezpečnost' ) ),
 	array( 'en' => 'EMEA Powertrain', 'cs' => 'v oblasti pohonných ústrojí pro region EMEA', 'not' => array( 'na pohonném ústrojí pro EMEA', 'pohonné ústrojí EMEA' ) ),
+	array( 'en' => 'Test system for fluid power rotary motion', 'cs' => 'Zkušební systém Titan pro', 'not' => array( 'Titan Zkušební systém', 'Titan zkušební systém pro' ) ),
+	array( 'en' => 'High-Speed Core Balancing Machine', 'cs' => 'vysokootáčkový vyvažovací stroj pro jádra', 'not' => array( 'pro vysokootáčkové vyvažování jader', 'vysokorychlostní vyvažovací stroj' ) ),
+	array( 'en' => 'Low-Speed Core Balancing Machine', 'cs' => 'nízkootáčkový vyvažovací stroj pro jádra', 'not' => array( 'pro nízkootáčkové vyvažování jader', 'nízkorychlostní vyvažovací stroj' ) ),
+	array( 'en' => 'workport', 'cs' => 'pracovní přípojka', 'not' => array( 'pracovní port', 'pracovními porty', 'pracovních portů' ) ),
+	array( 'en' => 'collision avoidance system', 'cs' => 'systém ochrany proti kolizím', 'not' => array( 'systémy pro předcházení kolizím', 'systém pro předcházení kolizím', 'systém vyhýbání se kolizím' ) ),
 );
