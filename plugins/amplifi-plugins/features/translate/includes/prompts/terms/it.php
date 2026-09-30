@@ -960,4 +960,7 @@ return array(
 	array( 'en' => 'as required', 'it' => 'secondo necessità', 'not' => array( 'come richiesto', 'come richiesta' ) ),
 	array( 'en' => 'Machine Specifications', 'it' => 'Caratteristiche tecniche della macchina', 'not' => array( 'Dati tecnici della macchina', 'Specifiche della macchina' ) ),
 	array( 'en' => 'Titan Combine Transmission Assembly system', 'it' => 'Sistema Titan di assemblaggio per trasmissioni per mietitrebbie', 'not' => array( 'Titan Sistema di assemblaggio', 'Titan sistema di assemblaggio' ) ),
+	array( 'en' => 'customer service platform', 'it' => 'piattaforma di servizio clienti', 'not' => array( 'piattaforma di assistenza ai clienti', 'piattaforma di assistenza clienti' ) ),
+	array( 'en' => 'customer service', 'it' => 'servizio clienti', 'not' => array( 'assistenza ai clienti', 'servizio al cliente' ) ),
+	array( 'en' => 'indexer', 'it' => 'divisore', 'not' => array( 'indexer', 'indicizzatore' ) ),
 );
