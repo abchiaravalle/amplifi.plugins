@@ -479,7 +479,7 @@ return array(
 	array( 'en' => 'Automotive e-drive test system', 'fr' => 'Système d’essai de motorisations électriques pour l’automobile', 'not' => array( 'Système d’essai de transmission électrique pour l’automobile', 'Automotive e-drive test system', 'Système d’essai de chaîne de traction électrique pour l’automobile' ) ),
 	array( 'en' => 'toe set', 'fr' => 'réglage du parallélisme', 'not' => array( 'réglage du carrossage', 'réglage de la pince' ) ),
 	array( 'en' => 'aligner', 'fr' => 'banc de géométrie', 'not' => array( 'aligneur', 'appareil d’alignement', 'banc d’alignement' ) ),
-	array( 'en' => 'Material / parts', 'fr' => 'Matériel / pièces', 'not' => array( 'Matériaux / Pièces', 'Matière / pièces' ) ),
+	array( 'en' => 'Material / parts', 'fr' => 'Fournitures / pièces', 'not' => array( 'Matériel / pièces', 'Matériaux / Pièces', 'Matière / pièces' ) ),
 	array( 'en' => 'mission critical', 'fr' => 'd’importance critique', 'not' => array( 'critique', 'critiques', 'essentiel à la mission', 'critique pour la mission' ) ),
 	array( 'en' => 'gas ballast', 'fr' => 'lest d’air', 'not' => array( 'ballast de gaz', 'ballast à gaz', 'lest de gaz' ) ),
 	array( 'en' => 'refrigeration units', 'fr' => 'groupes frigorifiques', 'not' => array( 'unités de réfrigération', 'unités frigorifiques' ) ),
@@ -743,4 +743,8 @@ return array(
 	array( 'en' => 'training material', 'fr' => 'supports de formation', 'not' => array( 'documentation de formation', 'matériel de formation' ) ),
 	array( 'en' => 'throughput', 'fr' => 'cadence', 'not' => array( 'débit', 'flux de production' ) ),
 	array( 'en' => 'website', 'fr' => 'site web', 'not' => array( 'website' ) ),
+	array( 'en' => 'HST', 'fr' => 'HST', 'not' => array( 'la HST', 'de la HST', 'petites HST' ) ),
+	array( 'en' => 'PM', 'fr' => 'maintenance préventive', 'not' => array( 'visite PM', 'la PM', 'de PM' ) ),
+	array( 'en' => 'Tool Center Point', 'fr' => 'point piloté de l’outil', 'not' => array( 'point central de l’outil', 'centre de l’outil' ) ),
+	array( 'en' => 'safety', 'fr' => 'sécurité', 'not' => array( 'sûreté' ) ),
 );
