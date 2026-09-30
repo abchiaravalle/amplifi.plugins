@@ -516,7 +516,7 @@ return array(
 	array( 'en' => 'balance quality grade', 'de' => 'Wuchtgüte', 'not' => array( 'Auswuchtqualitätsgrad', 'Auswuchtgüteklasse' ) ),
 	array( 'en' => 'permissible residual unbalance', 'de' => 'zulässige Restunwucht', 'not' => array( 'erlaubte Restunwucht', 'zulässiges Restungleichgewicht' ) ),
 	array( 'en' => 'minimum achievable residual unbalance', 'de' => 'kleinste erreichbare Restunwucht', 'not' => array( 'Mindestrestunwucht', 'minimales erreichbares Restungleichgewicht' ) ),
-	array( 'en' => 'unbalance reduction ratio', 'de' => 'Unwuchtreduktionsverhältnis', 'not' => array( 'Unwuchtreduzierverhältnis', 'Untersetzungsverhältnis', 'Reduktionsverhältnis' ) ),
+	array( 'en' => 'unbalance reduction ratio', 'de' => 'Unwuchtreduzierverhältnis', 'not' => array( 'Unwuchtreduktionsverhältnis', 'Untersetzungsverhältnis', 'Reduktionsverhältnis' ) ),
 	array( 'en' => 'couple unbalance', 'de' => 'Momentenunwucht', 'not' => array( 'Paarunwucht', 'Kopplungsunwucht', 'Kräftepaar-Unwucht' ) ),
 	array( 'en' => 'flexible rotor', 'de' => 'wellenelastischer Rotor', 'not' => array( 'flexibler Rotor', 'biegsamer Rotor' ) ),
 	array( 'en' => 'overhung rotor', 'de' => 'fliegend gelagerter Rotor', 'not' => array( 'überhängender Rotor', 'auskragender Rotor' ) ),
@@ -856,4 +856,6 @@ return array(
 	array( 'en' => 'in business hours', 'de' => 'innerhalb der Geschäftszeiten', 'not' => array( 'in Geschäftszeiten', 'in Geschäftsstunden' ) ),
 	array( 'en' => 'rebranded', 'de' => 'neu benannt', 'not' => array( 'unter neuer Marke', 'umgebrandet', 'neu gebrandet' ) ),
 	array( 'en' => 'electric armature', 'de' => 'Anker elektrischer Maschinen', 'not' => array( 'Elektrische Anker', 'elektrischen Anker', 'Elektroanker' ) ),
+	array( 'en' => 'customer service platform', 'de' => 'Kundenservice-Plattform', 'not' => array( 'Kundenserviceplattform', 'Kundendienstplattform' ) ),
+	array( 'en' => 'CNC milling', 'de' => 'CNC-Fräsen', 'not' => array( 'CNC-Frässervice', 'CNC-Fräsdienst' ) ),
 );
