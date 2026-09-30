@@ -775,7 +775,7 @@ return array(
 	array( 'en' => 'discounted rate', 'de' => 'ermäßigter Preis', 'not' => array( 'ermäßigter Tarif', 'Rabattsatz' ) ),
 	array( 'en' => 'preferred rate', 'de' => 'Vorzugspreis', 'not' => array( 'Vorzugstarif', 'bevorzugter Tarif' ) ),
 	array( 'en' => 'standard rate', 'de' => 'Standardpreis', 'not' => array( 'Standardtarif', 'Normaltarif' ) ),
-	array( 'en' => 'higher rate', 'de' => 'höherer Preis', 'not' => array( 'höherer Tarif', 'erhöhter Tarif' ) ),
+	array( 'en' => 'on request at a higher rate', 'de' => 'auf Anfrage zu einem höheren Preis', 'not' => array( 'höheren Tarif', 'erhöhten Tarif' ) ),
 	array( 'en' => 'Self-service training material', 'de' => 'Schulungsmaterial zum Selbststudium', 'not' => array( 'Self-Service-Schulungsmaterial', 'Selbstbedienungs-Schulungsmaterial' ) ),
 	array( 'en' => 'Linear Motion', 'de' => 'Linearbewegung', 'not' => array( 'Lineartechnik' ) ),
 	array( 'en' => 'industrial unit', 'de' => 'Einheit für den Industrieeinsatz', 'not' => array( 'Industrieeinheit' ) ),
