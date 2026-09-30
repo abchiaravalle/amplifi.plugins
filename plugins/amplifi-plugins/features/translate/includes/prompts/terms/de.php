@@ -821,4 +821,12 @@ return array(
 	array( 'en' => 'Aerospace & Industrials in the Americas', 'de' => 'Aerospace & Industrials für Nord- und Südamerika', 'not' => array( 'Aerospace & Industrials in Nord- und Südamerika' ) ),
 	array( 'en' => 'Erin Dillard as Chief Commercial Officer', 'de' => 'Erin Dillard zur Chief Commercial Officer', 'not' => array( 'Erin Dillard zum Chief Commercial Officer' ) ),
 	array( 'en' => 'Ascential Care logo', 'de' => 'Ascential-Care-Logo', 'not' => array( 'Ascential Care-Logo', 'Ascential Care Logo' ) ),
+	array( 'en' => 'responsiveness', 'de' => 'Reaktionsfähigkeit', 'not' => array( 'Reaktionsschnelligkeit', 'Reaktionsvermögen' ) ),
+	array( 'en' => 'local response', 'de' => 'lokale Reaktionsfähigkeit', 'not' => array( 'lokalem Reaktionsvermögen', 'lokales Reaktionsvermögen', 'lokaler Reaktionsschnelligkeit' ) ),
+	array( 'en' => 'equipment maintenance problem', 'de' => 'Problem mit der Anlagenwartung', 'not' => array( 'Problem mit der Wartung Ihrer Anlagen', 'Problem mit der Wartung Ihrer Anlage' ) ),
+	array( 'en' => 'We\'ll help you through it', 'de' => 'Wir helfen Ihnen weiter', 'not' => array( 'Wir helfen Ihnen dabei.', 'Wir begleiten Sie dabei' ) ),
+	array( 'en' => 'water meter component', 'de' => 'Wasserzählerkomponente', 'not' => array( 'Wasserzählerbauteil', 'Bauteile von Wasserzählern', 'Wasserzählerteile' ) ),
+	array( 'en' => 'Specialty Industrial Division', 'de' => 'Unternehmensbereich Specialty Industrial', 'not' => array( 'Spezialindustrie', 'Industriespezialitäten', 'Spezial-Industrie' ) ),
+	array( 'en' => 'CMM', 'de' => 'KMG', 'not' => array( 'CMM-Qualität', 'CMM-Messung', 'CMM-Genauigkeit' ) ),
+	array( 'en' => 'efficiency under high power', 'de' => 'Wirkungsgrad bei hoher Leistung', 'not' => array( 'Effizienz bei hoher Leistung', 'Effizienz unter hoher Leistung' ) ),
 );
