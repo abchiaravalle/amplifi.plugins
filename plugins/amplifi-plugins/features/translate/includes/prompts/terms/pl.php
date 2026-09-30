@@ -1239,7 +1239,7 @@ return array(
 	array( 'en' => 'at discounted rate', 'pl' => 'po stawce z rabatem', 'not' => array(  ) ),
 	array( 'en' => 'at preferred rate', 'pl' => 'po stawce preferencyjnej', 'not' => array(  ) ),
 	array( 'en' => 'megawatt scale', 'pl' => 'o mocy rzędu megawatów', 'not' => array( 'skala megawatów' ) ),
-	array( 'en' => 'hold tolerance', 'pl' => 'utrzymywać tolerancje', 'not' => array( 'zapewniać tolerancje', 'tolerancje sięgające' ) ),
+	array( 'en' => 'hold tolerance', 'pl' => 'zapewniać dokładność w tolerancji', 'not' => array( 'utrzymywać tolerancje', 'utrzymywać tolerancję', 'zapewniać tolerancje' ) ),
 	array( 'en' => 'keep your equipment running', 'pl' => 'aby Państwa urządzenia działały nieprzerwanie', 'not' => array( 'pozostawały w ruchu' ) ),
 	array( 'en' => 'keep your test and assembly equipment running', 'pl' => 'aby Państwa urządzenia testowe i montażowe działały nieprzerwanie', 'not' => array( 'pozostawały w ruchu' ) ),
 	array( 'en' => 'Three Rivers Location', 'pl' => 'zakład w Three Rivers', 'not' => array( 'zakładu Three Rivers' ) ),
