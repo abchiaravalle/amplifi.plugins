@@ -717,6 +717,8 @@ return array(
 	array( 'en' => 'Test & Measurement', 'es' => 'Test & Measurement', 'not' => array( 'Ensayo y medición', 'Ensayo y medida', 'Pruebas y mediciones' ) ),
 	array( 'en' => 'Mich.', 'es' => 'Míchigan', 'not' => array( 'Michigan' ) ),
 	array( 'en' => 'Elevating support, Enhancing value', 'es' => 'Mejor asistencia, mayor valor', 'not' => array( 'Más soporte', 'Más asistencia' ) ),
+	array( 'en' => 'facility', 'es' => 'centro', 'not' => array( 'Instalación de Ascential', 'en 18 instalaciones' ) ),
+	array( 'en' => 'Unsubscribe', 'es' => 'Cancelar suscripción', 'not' => array( 'Darse de baja' ) ),
 	array( 'en' => 'global locations', 'es' => 'centros en todo el mundo', 'not' => array( 'ubicaciones en todo el mundo', 'ubicaciones globales' ) ),
 	array( 'en' => 'service locations', 'es' => 'puntos de servicio', 'not' => array( 'ubicaciones de servicio' ) ),
 	array( 'en' => 'megawatt scale', 'es' => 'del orden de los megavatios', 'not' => array( 'a escala de megavatios', 'en la escala de los megavatios', 'escala de megavatios' ) ),
