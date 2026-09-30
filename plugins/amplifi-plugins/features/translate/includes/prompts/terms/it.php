@@ -971,4 +971,9 @@ return array(
 	array( 'en' => 'Hydrostatic Transmission (HST) Test', 'it' => 'Prova di trasmissioni idrostatiche (HST)', 'not' => array( 'Prova di trasmissione idrostatica (HST)', 'Test della trasmissione idrostatica (HST)' ) ),
 	array( 'en' => 'plan level', 'it' => 'livello di servizio', 'not' => array( 'livello di piano', 'livelli di piano' ) ),
 	array( 'en' => 'rattling', 'it' => 'rumorosità', 'not' => array( 'sferragliamento', 'sferragliamenti', 'sferragliare' ) ),
+	array( 'en' => 'electrical feedback', 'it' => 'retroazione elettrica', 'not' => array( 'feedback elettrico', 'ritorno elettrico' ) ),
+	array( 'en' => 'under slung', 'it' => 'a rotore sospeso', 'not' => array( 'sospesa sotto', 'sospeso sotto' ) ),
+	array( 'en' => 'underslung', 'it' => 'a rotore sospeso', 'not' => array( 'sospeso sotto', 'sottosospeso' ) ),
+	array( 'en' => 'High-Performance Specifications', 'it' => 'Caratteristiche ad alte prestazioni', 'not' => array( 'Dati tecnici ad alte prestazioni', 'Specifiche ad alte prestazioni' ) ),
+	array( 'en' => 'Marketing Manager', 'it' => 'responsabile marketing', 'not' => array( 'direttore marketing', 'manager marketing' ) ),
 );
