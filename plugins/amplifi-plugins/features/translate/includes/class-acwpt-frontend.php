@@ -3719,6 +3719,22 @@ class ACWPT_Frontend {
 
 		$show_suggestion = isset( $settings['show_suggestion'] ) ? (bool) $settings['show_suggestion'] : true;
 
+		// One-time country redirect (assets/js/geo.js). Loaded in <head> so the country lookup starts early.
+		// Replaces the suggestion banner: a visitor gets one redirect per visit, never both.
+		if ( ! empty( $settings['geo_redirect'] ) && ! is_admin() ) {
+			$show_suggestion = false;
+			wp_enqueue_script( 'acwpt-geo', ACWPT_PLUGIN_URL . 'assets/js/geo.js', array(), acwpt_asset_version( 'assets/js/geo.js' ), false );
+			wp_add_inline_script(
+				'acwpt-geo',
+				'var acwptGeo=' . wp_json_encode( array(
+					'source'  => ACWPT_Languages::get_source(),
+					'current' => $this->current_language ? $this->current_language : ACWPT_Languages::get_source(),
+					'enabled' => array_values( ACWPT_Languages::get_enabled_codes() ),
+				) ) . ';',
+				'before'
+			);
+		}
+
 		if ( $show_suggestion && ! $this->current_language ) {
 			wp_enqueue_script( 'acwpt-detect', ACWPT_PLUGIN_URL . 'assets/js/detect.js', array(), acwpt_asset_version( 'assets/js/detect.js' ), true );
 
