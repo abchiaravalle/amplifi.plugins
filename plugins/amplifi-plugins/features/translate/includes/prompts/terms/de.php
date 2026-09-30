@@ -154,7 +154,7 @@ return array(
 	array( 'en' => 'expert insights', 'de' => 'Experteneinschätzungen', 'not' => array( 'Experteneinblicke', 'fachliche Einblicke' ) ),
 	array( 'en' => 'instrument cluster', 'de' => 'Kombiinstrument', 'not' => array( 'Instrumentencluster', 'Armaturenbrett' ) ),
 	array( 'en' => 'keg', 'de' => 'Keg', 'not' => array( 'Fass', 'Fässern', 'Fassindustrie' ) ),
-	array( 'en' => 'keg finger holes', 'de' => 'Grifflöcher', 'not' => array( 'Fingerlöcher', 'Fasslöcher' ) ),
+	array( 'en' => 'finger hole', 'de' => 'Griffloch', 'not' => array( 'Fingerloch', 'Fingerlöcher', 'Fasslöcher' ) ),
 	array( 'en' => 'kinetostatics', 'de' => 'Kinetostatik', 'not' => array( 'Kinematik' ) ),
 	array( 'en' => 'Labour & Travel', 'de' => 'Arbeitszeit und Reisekosten', 'not' => array( 'Arbeitszeit und Anreise', 'Lohn und Fahrt' ) ),
 	array( 'en' => 'landed cost model', 'de' => 'Landed-Cost-Modell', 'not' => array( 'Modell der gelandeten Kosten', 'Anlieferkostenmodell' ) ),
@@ -750,7 +750,7 @@ return array(
 	array( 'en' => 'ISO 2953 reduction ratio', 'de' => 'Unwuchtreduzierverhältnis nach ISO 2953', 'not' => array( 'Reduktionsverhältnis nach ISO 2953' ) ),
 	array( 'en' => 'embedded vibration insulator', 'de' => 'integrierter Schwingungsisolator', 'not' => array( 'eingebetteter Schwingungsisolator' ) ),
 	array( 'en' => 'permanent and rotor-specific calibration', 'de' => 'permanente und rotorspezifische Kalibrierung', 'not' => array( 'dauerhafte und rotorspezifische Kalibrierung' ) ),
-	array( 'en' => 'safety standards compliant with', 'de' => 'Sicherheitsnormen nach', 'not' => array( 'Sicherheitsstandards in Übereinstimmung mit', 'Sicherheitsstandards gemäß' ) ),
+	array( 'en' => 'safety standards compliant with', 'de' => 'die Konformität mit der Sicherheitsnorm', 'not' => array( 'Sicherheitsnormen nach', 'Sicherheitsstandards in Übereinstimmung mit', 'Sicherheitsstandards gemäß' ) ),
 	array( 'en' => 'Precision Testing for Electric Motors', 'de' => 'Präzisionsprüfung für Elektromotoren', 'not' => array( 'Präzise Prüfung von Elektromotoren', 'Präzise Prüfung für Elektromotoren' ) ),
 	array( 'en' => 'and counting', 'de' => 'Tendenz steigend', 'not' => array( 'und es werden mehr', 'und es werden immer mehr' ) ),
 	array( 'en' => 'a leading global provider of automated diagnostic, inspection, assembly and test systems and services', 'de' => 'einer der weltweit führenden Anbieter automatisierter Systeme und Dienstleistungen für Diagnose, Inspektion, Montage und Prüfung', 'not' => array( 'Anbieter von automatisierten Diagnose-, Inspektions-, Montage- und Prüfsystemen' ) ),
@@ -758,7 +758,7 @@ return array(
 	array( 'en' => 'EMEA Powertrain', 'de' => 'Bereich Antriebsstrang in EMEA', 'not' => array( 'Antriebsstrang in EMEA' ) ),
 	array( 'en' => 'gauging', 'de' => 'Messen', 'not' => array( 'Lehrenprüfen', 'Lehrenprüfung' ) ),
 	array( 'en' => 'Max Envelope', 'de' => 'Max. Arbeitsbereich', 'not' => array( 'Max. Arbeitsraum', 'Maximaler Arbeitsraum' ) ),
-	array( 'en' => 'Preferred (&lt;20%)', 'de' => 'Vorzugspreis', 'not' => array( 'Bevorzugt' ) ),
+	array( 'en' => 'Preferred (&lt;20%)', 'de' => 'Vorzugspreis (&lt;20 %)', 'not' => array( 'Bevorzugt' ) ),
 	array( 'en' => 'thermal performance', 'de' => 'thermisches Verhalten', 'not' => array( 'thermische Leistung' ) ),
 	array( 'en' => 'road safety', 'de' => 'Verkehrssicherheit', 'not' => array( 'Straßenverkehrssicherheit' ) ),
 	array( 'en' => 'travel and parts', 'de' => 'Reisekosten und Teile', 'not' => array( 'Anreise und Teile', 'Anfahrt und Teile' ) ),
@@ -815,4 +815,10 @@ return array(
 	array( 'en' => 'air handling unit', 'de' => 'RLT-Gerät', 'not' => array( 'HLK-Lüftungsgerät', 'Luftbehandlungseinheit', 'Lüftungsgerät' ) ),
 	array( 'en' => 'data subject', 'de' => 'betroffene Person', 'not' => array( 'Datensubjekt', 'betroffene Subjekt' ) ),
 	array( 'en' => 'data controller', 'de' => 'Verantwortlicher', 'not' => array( 'Datenkontrolleur', 'Datencontroller' ) ),
+
+	// round 4 fix (de)
+	array( 'en' => 'Aerospace & Industrials Business Unit', 'de' => 'Geschäftsbereich Aerospace & Industrials', 'not' => array( 'Geschäftsbereich Luft- und Raumfahrt sowie Industrie', 'Luft- und Raumfahrt sowie Industrie' ) ),
+	array( 'en' => 'Aerospace & Industrials in the Americas', 'de' => 'Aerospace & Industrials für Nord- und Südamerika', 'not' => array( 'Aerospace & Industrials in Nord- und Südamerika' ) ),
+	array( 'en' => 'Erin Dillard as Chief Commercial Officer', 'de' => 'Erin Dillard zur Chief Commercial Officer', 'not' => array( 'Erin Dillard zum Chief Commercial Officer' ) ),
+	array( 'en' => 'Ascential Care logo', 'de' => 'Ascential-Care-Logo', 'not' => array( 'Ascential Care-Logo', 'Ascential Care Logo' ) ),
 );
