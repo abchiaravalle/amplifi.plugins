@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
  * and never stored. Source: 100-page blind review, 2026-09-25.
  */
 return array(
-	array( 'en' => '*', 'pl' => 'Button and link labels use the bare imperative, which is standard Polish UI ("Pobierz", "Przeglądaj katalog", "Zamów prezentację", "Więcej informacji"). In running sentences never address the reader with ty or wy forms: use Państwo ("Czy potrzebują Państwo…?", "dostosowane do Państwa potrzeb"), and render an English imperative in prose as "Zachęcamy do…", never "Mogą Państwo" + infinitive.', 'not' => array( 'Porozmawiaj z nami', 'Skontaktuj się z nami', 'Dowiedz się więcej o', 'Twój', 'Twoja', 'Twoje', 'Twoich', 'Twoim', 'Twojej', 'Twojego', 'Twoją', 'Wasz', 'Wasza', 'Wasze', 'Waszych', 'Waszego', 'Waszej', 'możesz', 'możecie', 'chcesz', 'chcecie', 'potrzebujesz', 'potrzebujecie', 'masz', 'macie', 'jesteś', 'jesteście' ) ),
+	array( 'en' => '*', 'pl' => 'Button and link labels use the bare imperative, which is standard Polish UI ("Pobierz", "Przeglądaj katalog", "Zamów prezentację", "Więcej informacji"). In running sentences never address the reader with ty or wy forms: use Państwo ("Czy potrzebują Państwo…?", "dostosowane do Państwa potrzeb"), and render an English imperative CTA in prose as a short bare imperative ("Poznaj nasze rozwiązania"), never "Zachęcamy do…" or "Mogą Państwo" + infinitive. A chat widget and placeholders use bare imperatives with a noun object ("Opisz swoje potrzeby"), never Państwo and never a ty verb.', 'not' => array( 'Porozmawiaj z nami', 'Skontaktuj się z nami', 'Dowiedz się więcej o', 'Twój', 'Twoja', 'Twoje', 'Twoich', 'Twoim', 'Twojej', 'Twojego', 'Twoją', 'Wasz', 'Wasza', 'Wasze', 'Waszych', 'Waszego', 'Waszej', 'możesz', 'możecie', 'chcesz', 'chcecie', 'potrzebujesz', 'potrzebujecie', 'masz', 'macie', 'jesteś', 'jesteście' ) ),
 	array( 'en' => '20-high / six-high mill', 'pl' => 'walcarka 20-walcowa / 6-walcowa', 'not' => array( 'walcarka dwudziestościowa', 'walcarka sześciościowa' ) ),
 	array( 'en' => '3-jaw chuck', 'pl' => 'uchwyt trójszczękowy', 'not' => array( 'uchwyt trzyczęściowy' ) ),
 	array( 'en' => 'A DESIGN / B LOGO', 'pl' => 'A DESIGN / B LOGO', 'not' => array( 'PROJEKT A', 'LOGO B' ) ),
@@ -1284,7 +1284,7 @@ return array(
 	array( 'en' => 'driven by purpose', 'pl' => 'kieruje nami poczucie celu', 'not' => array( 'jasny cel', 'jasnym celem', 'wyraźny cel' ) ),
 	array( 'en' => 'what your data is telling you', 'pl' => 'co wynika z Państwa danych', 'not' => array( 'co mówią Państwa dane', 'co mówią dane' ) ),
 	array( 'en' => 'service experience', 'pl' => 'obsługa serwisowa', 'not' => array( 'doświadczenia związane z usługami', 'doświadczenia serwisowe', 'doświadczenie serwisowe' ) ),
-	array( 'en' => 'improve processing time', 'pl' => 'skracać czas realizacji', 'not' => array( 'poprawiająca czas', 'poprawia czas', 'poprawić czas', 'poprawiać czas' ) ),
+	array( 'en' => 'improve processing time', 'pl' => 'skracać czas realizacji zamówień', 'not' => array( 'poprawiająca czas', 'poprawia czas', 'poprawić czas', 'czasu realizacji dla', 'czas realizacji dla' ) ),
 	array( 'en' => 'offered in plan levels', 'pl' => 'dostępny na różnych poziomach planu', 'not' => array( 'w różnych poziomach planu', 'oferowany w poziomach planu', 'w poziomach planu' ) ),
 	array( 'en' => 'reliable, repeatable results', 'pl' => 'wiarygodne i powtarzalne wyniki', 'not' => array( 'niezawodne, powtarzalne wyniki', 'niezawodne i powtarzalne wyniki' ) ),
 	array( 'en' => 'match coverage', 'pl' => 'dopasować zakres usług', 'not' => array( 'zakres ochrony do', 'dopasować ochronę' ) ),
@@ -1304,7 +1304,8 @@ return array(
 	array( 'en' => 'Turbo Balancing Machine', 'pl' => 'Wyważarka do turbosprężarek', 'not' => array( 'Wyważarka turbo', 'wyważarka turbo' ) ),
 	array( 'en' => 'fluid power test system', 'pl' => 'stanowisko testowe z zakresu napędów hydraulicznych i pneumatycznych', 'not' => array(  ) ),
 	array( 'en' => 'cable windings', 'pl' => 'uzwojenia kablowe', 'not' => array( 'uzwojenia z kabli', 'uzwojeń z kabli' ) ),
-	array( 'en' => 'over belt drive', 'pl' => 'górny napęd pasowy', 'not' => array( 'napęd pasowy nadległy', 'napędem pasowym nadległym', 'nadległy napęd pasowy' ) ),
+	array( 'en' => 'over belt drive', 'pl' => 'nad napędem pasowym', 'not' => array( 'górnym napędem pasowym', 'górny napęd pasowy', 'napędem pasowym nadległym', 'nadległy napęd pasowy' ) ),
+	array( 'en' => 'under slung', 'pl' => 'pas prowadzony od dołu', 'not' => array( 'napęd dolny', 'podwieszany' ) ),
 	array( 'en' => 'multi-axis', 'pl' => 'wieloosiowy', 'not' => array( 'wielosiowy', 'wielosiowa', 'wielosiowej' ) ),
 	array( 'en' => 'low to medium volume production', 'pl' => 'produkcja małoseryjna i średnioseryjna', 'not' => array( 'serii produkcyjnych od małych do średnich', 'serii produkcyjnych o wolumenie od małego do średniego' ) ),
 	array( 'en' => 'powertrain transmission applications', 'pl' => 'zastosowania w skrzyniach biegów układów napędowych', 'not' => array( 'skrzyniach biegów układu napędowego' ) ),
@@ -1316,4 +1317,6 @@ return array(
 	array( 'en' => 'equipment maintenance', 'pl' => 'konserwacja urządzeń', 'not' => array( 'konserwacja sprzętu', 'konserwacją sprzętu', 'konserwacji sprzętu' ) ),
 	array( 'en' => 'Relocatable driveline', 'pl' => 'Przestawny układ napędowy', 'not' => array( 'Przemieszczalny układ napędowy', 'przemieszczalny układ napędowy' ) ),
 	array( 'en' => 'within the framework of', 'pl' => 'w ramach', 'not' => array( 'Dzięki', 'dzięki' ) ),
+	array( 'en' => 'strip mill', 'pl' => 'walcownia taśm', 'not' => array( 'walcarka taśmowa', 'walcarek taśmowych', 'walcarki taśmowe' ) ),
+	array( 'en' => 'Speeds up to 30,000 rpm', 'pl' => 'prędkością obrotową do 30 000 rpm', 'not' => array( 'Prędkość obrotowa do 30 000 rpm', 'prędkość obrotowa do 30 000 rpm', 'Prędkości do 30 000 rpm' ) ),
 );
