@@ -96,7 +96,7 @@ return array(
 	array( 'en' => 'leak detector', 'tr' => 'kaçak dedektörü', 'not' => array( 'sızıntı dedektörü', 'kaçak bulucu' ) ),
 	array( 'en' => 'gross leak test', 'tr' => 'kaba kaçak testi', 'not' => array( 'brüt sızıntı testi', 'büyük kaçak testi' ) ),
 	array( 'en' => 'fine leak', 'tr' => 'ince kaçak', 'not' => array( 'hassas sızıntı', 'narin kaçak' ) ),
-	array( 'en' => 'tracer gas', 'tr' => 'iz gazı', 'not' => array( 'izleyici gaz', 'takip gazı' ) ),
+	array( 'en' => 'tracer gas', 'tr' => 'izleyici gaz', 'not' => array( 'iz gazı', 'takip gazı' ) ),
 	array( 'en' => 'sniffing pliers / sniffer', 'tr' => 'koklama probu', 'not' => array( 'koklama pensesi', 'koklayıcı kerpeten', 'burun probu' ) ),
 	array( 'en' => 'helium', 'tr' => 'helyum', 'not' => array( 'Helium' ) ),
 	array( 'en' => 'helium leak detection', 'tr' => 'helyum kaçak tespiti', 'not' => array( 'helyum sızıntı tespiti', 'helyum sızıntı algılaması' ) ),
@@ -806,7 +806,7 @@ return array(
 	array( 'en' => 'capabilities', 'tr' => 'yetkinlikler', 'not' => array( 'yetenekler' ) ),
 	array( 'en' => 'product line', 'tr' => 'ürün yelpazesi', 'not' => array( 'ürün hattı' ) ),
 	array( 'en' => 'wheel sets', 'tr' => 'tekerlek takımları', 'not' => array( 'tekerlek setleri' ) ),
-	array( 'en' => 'tracer gases', 'tr' => 'iz gazları', 'not' => array( 'izleyici gazlar', 'takip gazları' ) ),
+	array( 'en' => 'tracer gases', 'tr' => 'izleyici gazlar', 'not' => array( 'iz gazları', 'takip gazları' ) ),
 	array( 'en' => 'finger hole', 'tr' => 'tutma deliği', 'not' => array( 'parmak deliği' ) ),
 	array( 'en' => 'Machinery Directive 2006/42/EC', 'tr' => 'Makine Emniyeti Yönetmeliği (2006/42/AT)', 'not' => array( '2006/42/EC Makine Emniyeti Yönetmeliği', 'Makine Emniyeti Yönetmeliği 2006/42/EC', 'Makine Direktifi' ) ),
 	array( 'en' => 'tooling', 'tr' => 'takım ve aparat imalatı', 'not' => array( 'takımlama' ) ),
@@ -887,4 +887,5 @@ return array(
 	array( 'en' => 'navigated by', 'tr' => 'programlanır', 'not' => array( 'yönlendirilir', 'yönlendirilmektedir' ) ),
 	array( 'en' => 'included', 'tr' => 'dahil', 'not' => array( 'dâhil', 'dâhildir' ) ),
 	array( 'en' => 'configuration', 'tr' => 'konfigürasyon', 'not' => array( 'yapılandırma', 'yapılandırmaları' ) ),
+	array( 'en' => 'across a wide', 'tr' => 'çok çeşitli', 'not' => array( 'geniş bir', 'geniş bir yelpazede' ) ),
 );
