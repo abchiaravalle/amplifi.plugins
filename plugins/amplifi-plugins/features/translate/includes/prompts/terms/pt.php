@@ -432,7 +432,7 @@ return array(
 	array( 'en' => 'Profile Grinder Control', 'pt' => 'Controlo de retificadoras de perfis', 'not' => array( 'Controle de retífica de perfil' ) ),
 	array( 'en' => 'Roll Grinding Machines', 'pt' => 'Retificadoras de cilindros', 'not' => array( 'Máquinas de moagem de rolos' ) ),
 	array( 'en' => 'Brushing and Polishing Machines', 'pt' => 'Máquinas de escovagem e polimento', 'not' => array( 'Máquinas de escovação e lustragem' ) ),
-	array( 'en' => 'Retrofit and modernization', 'pt' => 'Retrofit e modernização', 'not' => array( 'Reequipamento e modernização' ) ),
+	array( 'en' => 'Retrofit and modernization', 'pt' => 'Modernização e atualização tecnológica', 'not' => array( 'Retrofit e modernização', 'Reequipamento e modernização' ) ),
 	array( 'en' => 'Robot Application', 'pt' => 'Aplicações robotizadas', 'not' => array( 'Aplicação de robôs' ) ),
 	array( 'en' => 'spare part', 'pt' => 'peça de substituição', 'not' => array( 'peças sobressalentes', 'peça sobressalente', 'peças de reposição' ) ),
 	array( 'en' => 'Machine Tools and Special Machines', 'pt' => 'Máquinas-ferramenta e máquinas especiais', 'not' => array( 'Ferramentas de máquina e máquinas especiais' ) ),
@@ -944,7 +944,7 @@ return array(
 	array( 'en' => 'on request', 'pt' => 'mediante pedido', 'not' => array( 'sob pedido' ) ),
 	array( 'en' => 'service location', 'pt' => 'local de assistência', 'not' => array( 'localização de assistência', 'localizações de assistência' ) ),
 	array( 'en' => 'customer service platform', 'pt' => 'plataforma de serviço ao cliente', 'not' => array( 'plataforma de assistência ao cliente', 'plataforma de atendimento ao cliente' ) ),
-	array( 'en' => 'retrofit', 'pt' => 'retrofit', 'not' => array( 'readaptar', 'readaptação' ) ),
+	array( 'en' => 'retrofit', 'pt' => 'modernização', 'not' => array( 'o retrofit', 'fazer o retrofit', 'readaptar', 'readaptação' ) ),
 	array( 'en' => 'first alert monitoring', 'pt' => 'monitorização de alerta antecipado', 'not' => array( 'monitorização de primeiro alerta' ) ),
 	array( 'en' => 'scheduling optimization', 'pt' => 'otimização da calendarização', 'not' => array( 'otimização do planeamento', 'otimização da programação' ) ),
 	array( 'en' => 'subcategories under', 'pt' => 'subcategorias de', 'not' => array( 'subcategorias em', 'subcategorias na', 'subcategorias no' ) ),
@@ -1022,4 +1022,10 @@ return array(
 	array( 'en' => 'Newly Rebranded Company Division', 'pt' => 'a sua divisão com nova designação', 'not' => array( 'com designação recentemente alterada', 'divisão da empresa recentemente renomeada' ) ),
 	array( 'en' => 'Divisional CEO', 'pt' => 'CEO', 'not' => array( 'CEO divisional', 'CEO de divisão' ) ),
 	array( 'en' => 'Ascential facility', 'pt' => 'unidade da Ascential', 'not' => array( 'instalação da Ascential' ) ),
+	// Round 4 blind review (pt-PT native): consistency of repeated terms.
+	array( 'en' => 'refurbishment', 'pt' => 'recondicionamento', 'not' => array( 'renovação', 'remodelação' ) ),
+	array( 'en' => 'touch panel', 'pt' => 'ecrã tátil', 'not' => array( 'painel tátil', 'painel táctil', 'painel de toque' ) ),
+	array( 'en' => 'megawatt scale', 'pt' => 'escala de megawatts', 'not' => array( 'escala do megawatt', 'escala megawatt' ) ),
+	array( 'en' => 'specialty production run', 'pt' => 'série de produção especializada', 'not' => array( 'séries de produção especiais', 'produções especiais' ) ),
+	array( 'en' => 'expert people', 'pt' => 'especialistas', 'not' => array( 'pessoas especialistas', 'pessoas peritas' ) ),
 );
