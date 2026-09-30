@@ -861,4 +861,5 @@ return array(
 	array( 'en' => 'Newly Rebranded', 'ro' => 'care a primit recent o nouă identitate de brand', 'not' => array( 'recent cu o nouă identitate de brand', 'nou rebranduită' ) ),
 	array( 'en' => 'reduce downtime risks and costs for MRO', 'ro' => 'reducerea riscurilor de nefuncționare și a costurilor de MRO', 'not' => array( 'reducerea riscurilor și a costurilor pentru MRO legate de timpii de nefuncționare' ) ),
 	array( 'en' => 'old ISO 7475 and DIN 45690', 'ro' => 'fostele ISO 7475 și DIN 45690', 'not' => array( 'vechile ISO 7475 și DIN 45690' ) ),
+	array( 'en' => 'Toggle light/dark', 'ro' => 'Comutați modul luminos/întunecat', 'not' => array( 'Comutați luminos/întunecat', 'Comutare luminos/întunecat' ) ),
 );
