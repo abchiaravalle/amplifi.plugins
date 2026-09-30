@@ -711,4 +711,9 @@ return array(
 	array( 'en' => 'engine oil', 'zh' => '滑油', 'not' => array( '机油' ) ),
 	array( 'en' => 'aircraft wheel', 'zh' => '机轮', 'not' => array( '车轮' ) ),
 	array( 'en' => 'preservation stand', 'zh' => '封存台', 'not' => array(   ) ),
+	array( 'en' => 'only with cloud version', 'zh' => '仅适用于云版本', 'not' => array( '仅限云版本', '仅云版本' ) ),
+	array( 'en' => 'low to medium volume', 'zh' => '小批量至中批量', 'not' => array( '小到中等批量', '小至中等批量' ) ),
+	array( 'en' => 'minimal lead time', 'zh' => '尽可能短的交付周期', 'not' => array( '极短的交付周期', '最短的交付周期' ) ),
+	array( 'en' => 'ultimate flexibility', 'zh' => '极致的灵活性', 'not' => array( '极高的灵活性', '最大的灵活性' ) ),
+	array( 'en' => 'Visit hub', 'zh' => '进入资源中心', 'not' => array( '访问中心' ) ),
 );

@@ -768,4 +768,7 @@ return array(
 	array( 'en' => 'Ascential Technologies Poland', 'es' => 'Ascential Technologies Poland', 'not' => array( 'Ascential Technologies Polonia', 'Ascential Technologies de Polonia' ) ),
 	array( 'en' => 'over belt drive', 'es' => 'accionamiento por correa superior', 'not' => array( 'transmisión por correa por encima', 'correa por encima', 'por encima (por debajo)' ) ),
 	array( 'en' => 'under slung', 'es' => 'inferior', 'not' => array( '(por debajo)', 'suspendido por debajo' ) ),
+	array( 'en' => 'plan level', 'es' => 'nivel de plan', 'not' => array( 'nivel del plan', 'niveles del plan' ) ),
+	array( 'en' => 'Assembly & Test System', 'es' => 'Sistema de montaje y ensayo', 'not' => array( 'Montaje y sistemas de ensayo', 'Sistemas de ensamblaje y prueba' ) ),
+	array( 'en' => 'overspeed test', 'es' => 'ensayo de sobrevelocidad', 'not' => array( 'eficiencia en sobrevelocidad', 'prueba de sobrevelocidad' ) ),
 );
