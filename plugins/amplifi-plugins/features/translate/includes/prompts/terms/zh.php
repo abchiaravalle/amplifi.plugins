@@ -696,5 +696,8 @@ return array(
 	array( 'en' => 'Three Rivers', 'zh' => '三河城（Three Rivers）', 'not' => array( 'Three Rivers 基地' ) ),
 	array( 'en' => 'Test & Measurement Systems', 'zh' => '测试与测量系统事业部', 'not' => array( 'Test & Measurement Systems', 'Test &amp; Measurement Systems' ) ),
 	array( 'en' => 'Test &amp; Measurement Systems', 'zh' => '测试与测量系统事业部', 'not' => array( 'Test & Measurement Systems', 'Test &amp; Measurement Systems' ) ),
+	array( 'en' => 'supercharger', 'zh' => '机械增压器', 'not' => array(  ) ),
+	array( 'en' => 'Automated Balancers for Rotors of Supercharger', 'zh' => '机械增压器转子自动化动平衡机', 'not' => array(  ) ),
+	array( 'en' => 'standing on the shoulders of', 'zh' => '依托', 'not' => array( '的肩膀上' ) ),
 	array( 'en' => 'propshaft driveshaft', 'zh' => '传动轴/驱动轴', 'not' => array( '传动轴动平衡', '汽车传动轴宣传册' ) ),
 );
