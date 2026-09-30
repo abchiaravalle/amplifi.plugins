@@ -698,6 +698,7 @@ return array(
 	array( 'en' => 'list price', 'es' => 'precio de catálogo', 'not' => array( 'precio de lista' ) ),
 	array( 'en' => 'first alert monitoring', 'es' => 'monitorización de alerta temprana', 'not' => array( 'monitorización First Alert', 'monitorización de primeras alertas', 'monitorización de primera alerta' ) ),
 	array( 'en' => 'update & refresh', 'es' => 'actualización y repaso', 'not' => array( 'actualización y renovación', 'actualización y puesta al día' ) ),
+	array( 'en' => 'Next', 'es' => 'Siguiente', 'not' => array( 'Siguiente envío' ) ),
 	array( 'en' => 'Next day', 'es' => 'Al día siguiente', 'not' => array( 'Día siguiente' ) ),
 	array( 'en' => 'On request', 'es' => 'A petición', 'not' => array( 'Bajo petición', 'Bajo solicitud' ) ),
 	array( 'en' => 'troubleshooting', 'es' => 'resolución de problemas', 'not' => array( 'diagnóstico de averías' ) ),
