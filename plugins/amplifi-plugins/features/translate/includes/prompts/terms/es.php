@@ -786,4 +786,5 @@ return array(
 	array( 'en' => 'Performance Analysis', 'es' => 'Análisis del rendimiento', 'not' => array( 'Análisis de rendimiento', 'Análisis de desempeño' ) ),
 	array( 'en' => 'global reach', 'es' => 'alcance global', 'not' => array( 'alcance mundial', 'presencia mundial' ) ),
 	array( 'en' => 'Horizontal Manual - Compact', 'es' => 'Horizontal manual: compacta', 'not' => array( 'Horizontal manual: compactas', 'Horizontal manual - compacta' ) ),
+	array( 'en' => 'we’re in this together', 'es' => 'lo afrontamos juntos', 'not' => array( 'estamos juntos en esto', 'estamos en esto juntos' ) ),
 );

@@ -1239,7 +1239,7 @@ return array(
 	array( 'en' => 'at discounted rate', 'pl' => 'po stawce z rabatem', 'not' => array(  ) ),
 	array( 'en' => 'at preferred rate', 'pl' => 'po stawce preferencyjnej', 'not' => array(  ) ),
 	array( 'en' => 'megawatt scale', 'pl' => 'o mocy rzędu megawatów', 'not' => array( 'skala megawatów' ) ),
-	array( 'en' => 'hold tolerance', 'pl' => 'zapewniać tolerancje', 'not' => array( 'utrzymywać tolerancje' ) ),
+	array( 'en' => 'hold tolerance', 'pl' => 'utrzymywać tolerancje', 'not' => array( 'zapewniać tolerancje', 'tolerancje sięgające' ) ),
 	array( 'en' => 'keep your equipment running', 'pl' => 'aby Państwa urządzenia działały nieprzerwanie', 'not' => array( 'pozostawały w ruchu' ) ),
 	array( 'en' => 'keep your test and assembly equipment running', 'pl' => 'aby Państwa urządzenia testowe i montażowe działały nieprzerwanie', 'not' => array( 'pozostawały w ruchu' ) ),
 	array( 'en' => 'Three Rivers Location', 'pl' => 'zakład w Three Rivers', 'not' => array( 'zakładu Three Rivers' ) ),
@@ -1302,4 +1302,5 @@ return array(
 	array( 'en' => 'quick-change fixturing', 'pl' => 'szybka wymiana przyrządów mocujących', 'not' => array( 'szybkiej wymiany uchwytów mocujących', 'szybką wymianę uchwytów mocujących', 'szybka wymiana uchwytów mocujących' ) ),
 	array( 'en' => 'cloud version', 'pl' => 'wersja chmurowa', 'not' => array( 'wersja w chmurze', 'wersji w chmurze' ) ),
 	array( 'en' => 'Chief Commercial Officer', 'pl' => 'dyrektor handlowy', 'not' => array( 'dyrektor ds. handlowych', 'dyrektora ds. handlowych' ) ),
+	array( 'en' => 'Turbo Balancing Machine', 'pl' => 'Wyważarka do turbosprężarek', 'not' => array( 'Wyważarka turbo', 'wyważarka turbo' ) ),
 );
