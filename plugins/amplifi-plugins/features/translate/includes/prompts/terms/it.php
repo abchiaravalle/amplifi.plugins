@@ -920,7 +920,7 @@ return array(
 	array( 'en' => 'newest', 'it' => 'di ultima generazione', 'not' => array( 'più recente', 'nuovissima', 'nuovissimo' ) ),
 	array( 'en' => 'driven by purpose', 'it' => 'mossi da uno scopo', 'not' => array( 'guidati dallo scopo', 'guidati da uno scopo' ) ),
 	array( 'en' => 'Company Division', 'it' => 'la propria divisione', 'not' => array( 'divisione dell’Azienda', 'divisione dell’azienda', 'divisione aziendale' ) ),
-	array( 'en' => 'field balancer', 'it' => 'equilibratore portatile', 'not' => array( 'equilibratrice portatile', 'equilibratrici portatili' ) ),
+	array( 'en' => 'field balancer', 'it' => 'equilibratore portatile', 'not' => array(  ) ),
 	array( 'en' => 'Tool Center Point', 'it' => 'punta dell’utensile', 'not' => array( 'punto centrale dell’utensile', 'punto centrale utensile' ) ),
 	array( 'en' => 'Ascential Technologies Poland', 'it' => 'Ascential Technologies Poland', 'not' => array( 'Ascential Technologies Polonia' ) ),
 	array( 'en' => 'Director of Operations', 'it' => 'direttore operativo', 'not' => array( 'direttore delle attività' ) ),

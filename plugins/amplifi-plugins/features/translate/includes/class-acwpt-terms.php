@@ -214,7 +214,10 @@ class ACWPT_Terms {
 				}
 				continue;
 			}
-			if ( ! self::contains_word( $src, mb_strtolower( $e['en'] ) ) ) {
+			// Same plural-aware match as relevant(): a row selected for a plural
+			// source ('E-Motor Test Stands') must also be ENFORCED on it; the exact
+			// whole-word check never fired on plurals (seen in es/ro/cs loop rounds).
+			if ( ! preg_match( self::en_key_regex( mb_strtolower( $e['en'] ) ), $src ) ) {
 				continue;
 			}
 			foreach ( $e['not'] as $n ) {

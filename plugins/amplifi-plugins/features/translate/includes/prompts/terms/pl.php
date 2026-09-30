@@ -84,7 +84,7 @@ return array(
 	array( 'en' => 'draper header', 'pl' => 'heder taśmowy', 'not' => array( 'głowica żniwna prasy zbioru', 'rozrzutnik' ) ),
 	array( 'en' => 'drift', 'pl' => 'opadanie tłoka', 'not' => array( 'dryfowanie' ) ),
 	array( 'en' => 'drivability', 'pl' => 'właściwości jezdne', 'not' => array( 'prowadzenie' ) ),
-	array( 'en' => 'dual mass flywheel', 'pl' => 'dwumasowe koło zamachowe', 'not' => array( 'dwumasowe sprzęgło bezwładności', 'sprzęgło dwumasowe', 'dwumasy' ) ),
+	array( 'en' => 'dual mass flywheel', 'pl' => 'dwumasowe koło zamachowe', 'not' => array( 'dwumasowe sprzęgło bezwładności', 'sprzęgło dwumasowe' ) ),
 	array( 'en' => 'dynamometer', 'pl' => 'hamownia', 'not' => array( 'dynamometr', 'dynamometr podwozia pojazdu', 'Dynamometr, systemy testowe', 'Dynamometr', 'dynamometry', 'Dynamometry' ) ),
 	array( 'en' => 'eddy current technology', 'pl' => 'technologia prądów wirowych', 'not' => array(  ) ),
 	array( 'en' => 'electrical discharge texturing', 'pl' => 'maszyny do elektroerozji (EDT)', 'not' => array( 'maszyny do elektroerozyji' ) ),
