@@ -841,5 +841,6 @@ return array(
 	array( 'en' => 'workport flow is integral to', 'cs' => 'průtok pracovními přípojkami probíhá uvnitř', 'not' => array( 'je nedílnou součástí' ) ),
 	array( 'en' => 'Tap or click here', 'cs' => 'Klepněte nebo klikněte zde', 'not' => array( 'Klikněte zde' ) ),
 	array( 'en' => 'eliminates the need for foundations', 'cs' => 'díky tomu nejsou potřeba základy', 'not' => array( 'odstraňuje potřebu základů', 'eliminuje potřebu základů' ) ),
+	array( 'en' => 'promise', 'cs' => 'slib', 'not' => array( 'příslib', 'Příslib' ) ),
 	array( 'en' => 'Whitepaper Highlighting', 'cs' => 'bílou knihu, která upozorňuje na', 'not' => array( 'zdůrazňuje', 'zdůrazňující' ) ),
 );
