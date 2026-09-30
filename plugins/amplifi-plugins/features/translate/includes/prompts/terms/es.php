@@ -217,7 +217,7 @@ return array(
 	array( 'en' => 'machine tools', 'es' => 'máquinas herramienta', 'not' => array( 'herramientas de máquina', 'máquinas tecnológicas' ) ),
 	array( 'en' => 'Machine Tools and Special Machines', 'es' => 'Máquinas herramienta y máquinas especiales', 'not' => array(  ) ),
 	array( 'en' => 'machining cell', 'es' => 'célula de mecanizado', 'not' => array( 'celda de mecanizado', 'gabinete de mecanizado' ) ),
-	array( 'en' => 'machinist', 'es' => 'operario de máquina herramienta', 'not' => array( 'maquinista', 'mecánico de máquinas' ) ),
+	array( 'en' => 'machinist', 'es' => 'mecanizador', 'not' => array( 'maquinista', 'operario de máquina herramienta', 'operarios de máquina herramienta' ) ),
 	array( 'en' => 'boring', 'es' => 'mandrinado', 'not' => array(  ) ),
 	array( 'en' => 'horizontal boring machine', 'es' => 'mandrinadora horizontal', 'not' => array( 'taladradora horizontal' ) ),
 	array( 'en' => 'deep hole drilling', 'es' => 'taladrado profundo', 'not' => array( 'perforación de agujeros profundos' ) ),
@@ -737,4 +737,10 @@ return array(
 	array( 'en' => 'DC idle voltage', 'es' => 'tensión continua en vacío', 'not' => array( 'tensión en reposo de CC', 'voltaje en reposo de CC' ) ),
 	array( 'en' => 'Divisional CEO', 'es' => 'consejero delegado de división', 'not' => array( 'CEO divisional', 'CEO de división', 'director ejecutivo divisional' ) ),
 	array( 'en' => 'website', 'es' => 'sitio web', 'not' => array( 'el website', 'su website', 'nuestro website', 'nuestra website' ) ),
+
+	// --- r4 blind review ---
+	array( 'en' => 'touch panel', 'es' => 'pantalla táctil', 'not' => array( 'panel táctil', 'panel de contacto' ) ),
+	array( 'en' => 'Subscription-Based, ADAS Calibration Business Model', 'es' => 'modelo de negocio por suscripción para la calibración de ADAS', 'not' => array( 'modelo de negocio de calibración de ADAS por suscripción' ) ),
+	array( 'en' => 'globally responsive, locally attentive', 'es' => 'con capacidad de respuesta global y atención local', 'not' => array( 'de respuesta rápida a escala mundial', 'atentas a lo local' ) ),
+	array( 'en' => 'MU 60 runs', 'es' => 'MU 60 ciclos de medición', 'not' => array( 'MU 60 ejecuciones', 'MU 60 carreras' ) ),
 );
