@@ -274,6 +274,13 @@ class ACWPT_Translator {
 		$translated = ACWPT_Glossary::extract_first_json_object( (string) $text );
 		if ( ! is_array( $translated ) || count( $translated ) !== count( $originals ) ) {
 			$pos = ACWPT_Glossary::parse_positional( (string) $text, count( $originals ) );
+			// Positional recovery is accepted only if EVERY value is plausible for
+			// its source; one implausible pair means the order cannot be trusted.
+			if ( is_array( $pos ) ) {
+				foreach ( array_values( $originals ) as $i => $o ) {
+					if ( ! self::plausible_pair( $o, $pos[ (string) $i ] ?? '', $language ) ) { $pos = null; break; }
+				}
+			}
 			if ( is_array( $pos ) ) {
 				$translated = $pos;
 			}
@@ -293,6 +300,10 @@ class ACWPT_Translator {
 			$val = self::typography_text_only( array( __CLASS__, 'localize_quotes' ), $val, $language );
 			$val = self::typography_text_only( function ( $t, $l ) use ( $original ) { return self::localize_numbers( $t, $original, $l ); }, $val, $language );
 			if ( self::structure_signature( $val ) !== self::structure_signature( $original ) ) {
+				$retry[] = $original;
+				continue;
+			}
+			if ( ! self::plausible_pair( $original, $val, $language ) ) {
 				$retry[] = $original;
 				continue;
 			}
@@ -410,6 +421,50 @@ class ACWPT_Translator {
 			}
 		}
 		return $out;
+	}
+
+	/**
+	 * ALIGNMENT PLAUSIBILITY. A batch can come back with values attached to the
+	 * wrong source (seen in a local loop round: four adjacent catalog captions
+	 * rotated, "Balancers for electric armatures" stored as the long turbine
+	 * description). Cheap per-item checks catch a mis-pairing: every multi-digit
+	 * number in the source must appear in the translation, and the visible
+	 * length ratio must be plausible for the target script.
+	 */
+	public static function plausible_pair( $original, $translation, $language ) {
+		$src = html_entity_decode( wp_strip_all_tags( (string) $original ), ENT_QUOTES, 'UTF-8' );
+		$tr  = html_entity_decode( wp_strip_all_tags( (string) $translation ), ENT_QUOTES, 'UTF-8' );
+		// Numbers that identify an item: 3+ digits, not a year. A thousands
+		// separator is ONE character followed by exactly three digits, so a date
+		// ("22, 2026") is two numbers, not "222026".
+		$nums = function ( $t ) {
+			preg_match_all( '/\d{1,3}(?:[.,\x{00A0}\x{202F} ]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?/u', $t, $m );
+			$out = array();
+			foreach ( $m[0] as $g ) {
+				$d = preg_replace( '/\D/u', '', $g );
+				if ( strlen( $d ) >= 3 && ! preg_match( '/^(19|20)\d\d$/', $d ) ) { $out[] = $d; }
+			}
+			return $out;
+		};
+		$sn = $nums( $src );
+		$tn = $nums( $tr );
+		// The source's identifying numbers must survive (dates and small counts
+		// are reformatted legitimately; metric equivalents may be added).
+		foreach ( $sn as $d ) {
+			if ( ! in_array( $d, $tn, true ) ) { return false; }
+		}
+		// A number-free source (a caption) must not come back carrying a spec.
+		$src_has_digit = (bool) preg_match( '/\d/', $src );
+		if ( ! $src_has_digit && $tn ) { return false; }
+		// A much shorter source paired with a much longer translation, or reverse.
+		$ls = mb_strlen( trim( $src ) );
+		$lt = mb_strlen( trim( $tr ) );
+		if ( $ls >= 24 && $lt > 0 ) {
+			$r = $lt / $ls;
+			list( $lo, $hi ) = in_array( $language, array( 'zh', 'ja', 'ko' ), true ) ? array( 0.12, 1.6 ) : array( 0.35, 3.2 );
+			if ( $r < $lo || $r > $hi ) { return false; }
+		}
+		return true;
 	}
 
 	/** Guard against recursion while a terminology retry runs. */
