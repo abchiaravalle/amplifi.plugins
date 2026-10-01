@@ -874,5 +874,9 @@ return array(
 	array( 'en' => 'CTO', 'ro' => 'director de tehnologie', 'not' => array( 'director tehnic executiv', 'director tehnologic' ) ),
 	array( 'en' => 'CFO', 'ro' => 'director financiar', 'not' => array( 'director financiar executiv', 'director de finanțe' ) ),
 	array( 'en' => 'SVP Manufacturing Operations', 'ro' => 'Vicepreședinte senior pentru operațiuni de producție', 'not' => array( 'SVP operațiuni de producție', 'Vicepreședinte senior operațiuni de fabricație' ) ),
-	array( 'en' => 'Automatic Control', 'ro' => 'Sistem de control automat', 'not' => array( 'Comandă automată', 'Control automat' ) ),
+	array( 'en' => 'Automatic Control', 'ro' => 'Sistem de comandă automată', 'not' => array( 'Sistem de control automat', 'Comandă automată', 'Control automat' ) ),
+	array( 'en' => 'Automatic Grinder Control', 'ro' => 'Sistem de comandă automată pentru mașini de rectificat', 'not' => array( 'Comandă pentru mașini de rectificat automate', 'Sistem de comandă pentru mașini de rectificat automate', 'Comandă automată pentru rectificator' ) ),
+	array( 'en' => 'Profile Grinder Control', 'ro' => 'Sistem de comandă pentru mașini de rectificat profile', 'not' => array( 'Comandă pentru mașini de rectificat profile', 'Comandă pentru rectificator de profil' ) ),
+	array( 'en' => 'service agent', 'ro' => 'tehnician de service', 'not' => array( 'agent de service', 'agent de servicii' ) ),
+	array( 'en' => 'Agents', 'ro' => 'Tehnicieni', 'not' => array( 'Agenți', 'Reprezentanți' ) ),
 );
