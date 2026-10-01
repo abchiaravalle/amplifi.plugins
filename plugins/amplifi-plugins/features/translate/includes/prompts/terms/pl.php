@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
  * and never stored. Source: 100-page blind review, 2026-09-25.
  */
 return array(
-	array( 'en' => '*', 'pl' => 'Button and link labels use the bare imperative, which is standard Polish UI ("Pobierz", "Przeglądaj katalog", "Zamów prezentację", "Więcej informacji"). In running sentences never address the reader with ty or wy forms: use Państwo ("Czy potrzebują Państwo…?", "dostosowane do Państwa potrzeb"), and render an English imperative CTA in prose as a short bare imperative ("Poznaj nasze rozwiązania"), never "Zachęcamy do…" or "Mogą Państwo" + infinitive. A chat widget and placeholders use bare imperatives with a noun object ("Opisz swoje potrzeby"), never Państwo and never a ty verb.', 'not' => array( 'Porozmawiaj z nami', 'Skontaktuj się z nami', 'Dowiedz się więcej o', 'Twój', 'Twoja', 'Twoje', 'Twoich', 'Twoim', 'Twojej', 'Twojego', 'Twoją', 'Wasz', 'Wasza', 'Wasze', 'Waszych', 'Waszego', 'Waszej', 'możesz', 'możecie', 'chcesz', 'chcecie', 'potrzebujesz', 'potrzebujecie', 'masz', 'macie', 'jesteś', 'jesteście' ) ),
+	array( 'en' => '*', 'pl' => 'Button and link labels use the bare imperative, which is standard Polish UI ("Pobierz", "Przeglądaj katalog", "Zamów prezentację", "Więcej informacji"). In running sentences never address the reader with ty or wy forms: use Państwo ("Czy potrzebują Państwo…?", "dostosowane do Państwa potrzeb"), and render an English imperative CTA in prose as a short bare imperative ("Poznaj nasze rozwiązania"), never "Zachęcamy do…" or "Mogą Państwo" + infinitive. A chat widget and placeholders address the user as ty, never Państwo, never impersonal ("Nie wiesz, od czego zacząć?", "Opisz swoje potrzeby", "Opisz, czego szukasz…"); never narrow "what you are looking for" to "produkt".', 'not' => array( 'Nie wiadomo, od czego', 'Opisz poszukiwany produkt', 'Porozmawiaj z nami', 'Skontaktuj się z nami', 'Dowiedz się więcej o', 'Twój', 'Twoja', 'Twoje', 'Twoich', 'Twoim', 'Twojej', 'Twojego', 'Twoją', 'Wasz', 'Wasza', 'Wasze', 'Waszych', 'Waszego', 'Waszej', 'możesz', 'możecie', 'chcesz', 'chcecie', 'potrzebujesz', 'potrzebujecie', 'masz', 'macie', 'jesteś', 'jesteście' ) ),
 	array( 'en' => '20-high / six-high mill', 'pl' => 'walcarka 20-walcowa / 6-walcowa', 'not' => array( 'walcarka dwudziestościowa', 'walcarka sześciościowa' ) ),
 	array( 'en' => '3-jaw chuck', 'pl' => 'uchwyt trójszczękowy', 'not' => array( 'uchwyt trzyczęściowy' ) ),
 	array( 'en' => 'A DESIGN / B LOGO', 'pl' => 'A DESIGN / B LOGO', 'not' => array( 'PROJEKT A', 'LOGO B' ) ),
@@ -1234,7 +1234,7 @@ return array(
 	array( 'en' => 'global provider', 'pl' => 'światowy dostawca', 'not' => array( 'globalny dostawca' ) ),
 	array( 'en' => 'for the Americas', 'pl' => 'w obu Amerykach', 'not' => array( 'na obie Ameryki', 'dla obu Ameryk' ) ),
 	array( 'en' => 'Service Manager, Americas', 'pl' => 'kierownik serwisu w obu Amerykach', 'not' => array( 'kierownik serwisu na obie Ameryki' ) ),
-	array( 'en' => 'or for Ascential Care field support at', 'pl' => 'lub w sprawie serwisu terenowego Ascential Care pod numer', 'not' => array( 'pod adresem' ) ),
+	array( 'en' => 'or for Ascential Care field support at', 'pl' => 'lub w sprawie serwisu terenowego Ascential Care pod numerem', 'not' => array( 'pod adresem' ) ),
 	array( 'en' => 'at standard rate', 'pl' => 'po stawce standardowej', 'not' => array(  ) ),
 	array( 'en' => 'at discounted rate', 'pl' => 'po stawce z rabatem', 'not' => array(  ) ),
 	array( 'en' => 'at preferred rate', 'pl' => 'po stawce preferencyjnej', 'not' => array(  ) ),
@@ -1321,4 +1321,7 @@ return array(
 	array( 'en' => 'gear balancing machine', 'pl' => 'wyważarka kół zębatych (a single gear is „koło zębate”; „przekładnia” is a gearbox)', 'not' => array( 'kół kolejowych i przekładni', 'wyważarka przekładni', 'wyważarki przekładni' ) ),
 	array( 'en' => 'additional testing capabilities', 'pl' => 'dodatkowe funkcje badawcze (integrated with → „można je rozbudować o dodatkowe funkcje badawcze”)', 'not' => array( 'dodatkowymi możliwościami badawczymi', 'dodatkowe możliwości badawcze', 'zintegrować z dodatkowymi' ) ),
 	array( 'en' => 'Speeds up to 30,000 rpm', 'pl' => 'prędkością obrotową do 30 000 rpm', 'not' => array( 'Prędkość obrotowa do 30 000 rpm', 'prędkość obrotowa do 30 000 rpm', 'Prędkości do 30 000 rpm' ) ),
+	array( 'en' => 'CNC milling center', 'pl' => 'centrum frezarskie CNC', 'not' => array( 'centrów frezarskich,', 'centrów frezarskich aby' ) ),
+	array( 'en' => 'Advanced Driver Assistance System Calibration', 'pl' => 'kalibracja zaawansowanych systemów wspomagania kierowcy', 'not' => array( 'zaawansowanej kalibracji systemów', 'zaawansowana kalibracja systemów', 'zaawansowaną kalibrację systemów' ) ),
+	array( 'en' => 'silica sand vibration dampening', 'pl' => 'tłumienie drgań za pomocą piasku kwarcowego', 'not' => array( 'tłumienie drgań na piasku', 'tłumienia drgań na piasku', 'tłumieniem drgań na piasku' ) ),
 );
