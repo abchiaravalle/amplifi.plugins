@@ -1318,5 +1318,7 @@ return array(
 	array( 'en' => 'Relocatable driveline', 'pl' => 'Przestawny układ napędowy', 'not' => array( 'Przemieszczalny układ napędowy', 'przemieszczalny układ napędowy' ) ),
 	array( 'en' => 'within the framework of', 'pl' => 'w ramach', 'not' => array( 'Dzięki', 'dzięki' ) ),
 	array( 'en' => 'strip mill', 'pl' => 'walcownia taśm', 'not' => array( 'walcarka taśmowa', 'walcarek taśmowych', 'walcarki taśmowe' ) ),
+	array( 'en' => 'gear balancing machine', 'pl' => 'wyważarka kół zębatych (a single gear is „koło zębate”; „przekładnia” is a gearbox)', 'not' => array( 'kół kolejowych i przekładni', 'wyważarka przekładni', 'wyważarki przekładni' ) ),
+	array( 'en' => 'additional testing capabilities', 'pl' => 'dodatkowe funkcje badawcze (integrated with → „można je rozbudować o dodatkowe funkcje badawcze”)', 'not' => array( 'dodatkowymi możliwościami badawczymi', 'dodatkowe możliwości badawcze', 'zintegrować z dodatkowymi' ) ),
 	array( 'en' => 'Speeds up to 30,000 rpm', 'pl' => 'prędkością obrotową do 30 000 rpm', 'not' => array( 'Prędkość obrotowa do 30 000 rpm', 'prędkość obrotowa do 30 000 rpm', 'Prędkości do 30 000 rpm' ) ),
 );
