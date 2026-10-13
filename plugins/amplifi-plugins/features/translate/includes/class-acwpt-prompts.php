@@ -120,7 +120,7 @@ class ACWPT_Prompts {
         if ( ! empty( $pack['register'] ) ) {
             $lines[] = 'REGISTER: ' . $pack['register'];
         }
-        $marks = array( 'de' => '„…“', 'cs' => '„…“', 'pl' => '„…”', 'ro' => '„…”', 'fr' => '« … » (no-break spaces)', 'es' => '«…»', 'it' => '«…»', 'pt' => '«…»', 'zh' => '“…” (full-width)', 'tr' => '"…"' );
+        $marks = array( 'de' => '„…“', 'cs' => '„…“', 'pl' => '„…”', 'ro' => '„…”', 'fr' => '« … » (no-break spaces)', 'es' => '«…»', 'it' => '«…»', 'pt' => '«…»', 'zh' => '“…” (full-width)', 'tr' => '"…"', 'nl' => '“…”' );
         if ( isset( $marks[ $lang_code ] ) ) {
             $lines[] = 'QUOTATION MARKS: ' . $marks[ $lang_code ];
         }

@@ -633,6 +633,7 @@ class ACWPT_Translator {
 			'cs' => array( '„', '“', false ),
 			'pl' => array( '„', '”', false ),
 			'ro' => array( '„', '”', false ),
+			'nl' => array( '“', '”', false ),
 			'hu' => array( '„', '”', false ),
 			'fr' => array( '«', '»', true ),
 			'es' => array( '«', '»', false ),
@@ -776,7 +777,7 @@ class ACWPT_Translator {
 	 */
 	public static function localize_numbers( $text, $source, $code ) {
 		$sep = array(
-			'de' => '.', 'es' => '.', 'it' => '.', 'pt' => '.', 'ro' => '.', 'tr' => '.',
+			'de' => '.', 'es' => '.', 'it' => '.', 'pt' => '.', 'ro' => '.', 'tr' => '.', 'nl' => '.',
 			'fr' => "\u{202F}", 'pl' => "\u{00A0}", 'cs' => "\u{00A0}",
 		);
 		if ( ! isset( $sep[ $code ] ) || '' === (string) $text ) {
@@ -843,7 +844,7 @@ class ACWPT_Translator {
 	 */
 	public static function localize_thousands( $text, $code ) {
 		$sep = array(
-			'de' => '.', 'es' => '.', 'it' => '.', 'pt' => '.', 'ro' => '.', 'tr' => '.',
+			'de' => '.', 'es' => '.', 'it' => '.', 'pt' => '.', 'ro' => '.', 'tr' => '.', 'nl' => '.',
 			'fr' => "\u{202F}", 'pl' => "\u{00A0}", 'cs' => "\u{00A0}",
 		);
 		if ( ! isset( $sep[ $code ] ) ) {

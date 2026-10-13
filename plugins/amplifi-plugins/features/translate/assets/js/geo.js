@@ -68,10 +68,10 @@
 	// Country -> language. Only countries whose national language matches the site's variant.
 	var MAP = {
 		PL: 'pl', DE: 'de', AT: 'de', LI: 'de', FR: 'fr', MC: 'fr', IT: 'it', SM: 'it', VA: 'it',
-		ES: 'es', AD: 'es', PT: 'pt', CZ: 'cs', RO: 'ro', MD: 'ro', TR: 'tr', CN: 'zh'
+		ES: 'es', AD: 'es', PT: 'pt', CZ: 'cs', RO: 'ro', MD: 'ro', TR: 'tr', CN: 'zh', NL: 'nl'
 	};
 	// Multilingual countries: use the browser's own language to choose; if none of these, no redirect.
-	var MULTI = { CH: ['de', 'fr', 'it'], BE: ['fr'], LU: ['fr', 'de'] };
+	var MULTI = { CH: ['de', 'fr', 'it'], BE: ['nl', 'fr'], LU: ['fr', 'de'] };
 
 	function pick(cc) {
 		if (!cc) { return null; }
