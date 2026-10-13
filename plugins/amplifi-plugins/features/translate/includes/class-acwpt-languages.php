@@ -12,6 +12,7 @@ class ACWPT_Languages {
 		return array(
 			'en' => array( 'name' => 'English',              'native' => 'English',            'flag' => "\xF0\x9F\x87\xBA\xF0\x9F\x87\xB8" ),
 			'es' => array( 'name' => 'Spanish',              'native' => "Espa\xC3\xB1ol",     'flag' => "\xF0\x9F\x87\xAA\xF0\x9F\x87\xB8" ),
+			'mx' => array( 'name' => 'Spanish (Latin America)', 'native' => "Espa\xC3\xB1ol (Latinoam\xC3\xA9rica)", 'flag' => "\xF0\x9F\x87\xB2\xF0\x9F\x87\xBD", 'bcp47' => 'es-419' ),
 			'fr' => array( 'name' => 'French',               'native' => "Fran\xC3\xA7ais",    'flag' => "\xF0\x9F\x87\xAB\xF0\x9F\x87\xB7" ),
 			'de' => array( 'name' => 'German',               'native' => 'Deutsch',            'flag' => "\xF0\x9F\x87\xA9\xF0\x9F\x87\xAA" ),
 			'it' => array( 'name' => 'Italian',              'native' => 'Italiano',           'flag' => "\xF0\x9F\x87\xAE\xF0\x9F\x87\xB9" ),
@@ -68,6 +69,7 @@ class ACWPT_Languages {
 			'it' => 'it_IT',
 			'fr' => 'fr_FR',
 			'es' => 'es_ES',
+			'mx' => 'es_MX',
 			'pt' => 'pt_PT',
 			'cs' => 'cs_CZ',
 			'ja' => 'ja_JP',

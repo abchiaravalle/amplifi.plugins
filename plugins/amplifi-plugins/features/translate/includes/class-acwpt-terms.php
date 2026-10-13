@@ -245,7 +245,7 @@ class ACWPT_Terms {
 		$p = ' ' . mb_strtolower( trim( html_entity_decode( wp_strip_all_tags( (string) $text ), ENT_QUOTES, 'UTF-8' ) ) ) . ' ';
 		$letters = array(
 			'pl' => '/[ąćęłńśźż]/u', 'cs' => '/[čďěňřšťůž]/u', 'de' => '/[äöüß]/u', 'tr' => '/[çğışı]/u',
-			'ro' => '/[ăâîșşțţ]/u', 'fr' => '/[àâçèéêëîïôœùûÿ]/u', 'es' => '/[áéíñóúü¿¡]/u', 'pt' => '/[ãõçáâéêíóôú]/u',
+			'ro' => '/[ăâîșşțţ]/u', 'fr' => '/[àâçèéêëîïôœùûÿ]/u', 'es' => '/[áéíñóúü¿¡]/u', 'mx' => '/[áéíñóúü¿¡]/u', 'pt' => '/[ãõçáâéêíóôú]/u',
 			'it' => '/[àèéìòù]/u', 'zh' => '/\p{Han}/u',
 		);
 		if ( empty( $letters[ $lang ] ) || ! preg_match( $letters[ $lang ], $p ) ) {

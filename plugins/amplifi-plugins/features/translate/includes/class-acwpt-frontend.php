@@ -876,7 +876,7 @@ class ACWPT_Frontend {
 	private function resort_translated_selects( $html ) {
 		$lang   = $this->current_language;
 		$locale = array( 'de' => 'de_DE', 'pl' => 'pl_PL', 'ro' => 'ro_RO', 'tr' => 'tr_TR', 'zh' => 'zh_CN',
-			'it' => 'it_IT', 'fr' => 'fr_FR', 'es' => 'es_ES', 'pt' => 'pt_PT', 'cs' => 'cs_CZ', 'nl' => 'nl_BE' );
+			'it' => 'it_IT', 'fr' => 'fr_FR', 'es' => 'es_ES', 'pt' => 'pt_PT', 'cs' => 'cs_CZ', 'nl' => 'nl_BE', 'mx' => 'es_MX' );
 		$coll   = class_exists( 'Collator' ) ? new Collator( $locale[ $lang ] ?? $lang ) : null;
 
 		return preg_replace_callback(
@@ -3104,7 +3104,7 @@ class ACWPT_Frontend {
 					// stayed English on every product gallery in every language. Translate
 					// the title through the store and the word "Image" from a fixed table.
 					if ( ! $translated && preg_match( '/^(.+?)\s+-\s+Image\s+(\d+)$/u', preg_replace( '/<!--\/?acwpt:done-->/', '', $text ), $im ) ) {
-						$img = array( 'pl' => 'Zdjęcie', 'de' => 'Bild', 'es' => 'Imagen', 'fr' => 'Image', 'it' => 'Immagine', 'pt' => 'Imagem', 'cs' => 'Obrázek', 'ro' => 'Imagine', 'tr' => 'Görsel', 'zh' => '图', 'nl' => 'Afbeelding' );
+						$img = array( 'pl' => 'Zdjęcie', 'de' => 'Bild', 'es' => 'Imagen', 'fr' => 'Image', 'it' => 'Immagine', 'pt' => 'Imagem', 'cs' => 'Obrázek', 'ro' => 'Imagine', 'tr' => 'Görsel', 'zh' => '图', 'nl' => 'Afbeelding', 'mx' => 'Imagen' );
 						$lang = $this->current_language;
 						$t_title = $this->get_string_translation( $im[1] );
 						if ( ! $t_title && function_exists( 'tm_sentence_case' ) ) {
@@ -3730,6 +3730,7 @@ class ACWPT_Frontend {
 					'source'  => ACWPT_Languages::get_source(),
 					'current' => $this->current_language ? $this->current_language : ACWPT_Languages::get_source(),
 					'enabled' => array_values( ACWPT_Languages::get_enabled_codes() ),
+					'tags'    => array_combine( ACWPT_Languages::get_enabled_codes(), array_map( array( 'ACWPT_Languages', 'bcp47' ), ACWPT_Languages::get_enabled_codes() ) ),
 				) ) . ';',
 				'before'
 			);

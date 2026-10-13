@@ -637,6 +637,7 @@ class ACWPT_Translator {
 			'hu' => array( '„', '”', false ),
 			'fr' => array( '«', '»', true ),
 			'es' => array( '«', '»', false ),
+			'mx' => array( '“', '”', false ),
 			'it' => array( '«', '»', false ),
 			'pt' => array( '«', '»', false ),
 			'ru' => array( '«', '»', false ),

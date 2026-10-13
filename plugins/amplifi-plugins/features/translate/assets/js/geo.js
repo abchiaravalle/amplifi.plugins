@@ -34,6 +34,8 @@
 	var enabled = C.enabled || [], source = C.source || 'en', cur = C.current || source;
 
 	function langOfLink(a) {
+		var d = a.getAttribute('data-acwpt-lang');
+		if (d && (d === source || enabled.indexOf(d) !== -1)) { return d; }
 		var h = (a.getAttribute('hreflang') || '').slice(0, 2).toLowerCase();
 		if (h && (h === source || enabled.indexOf(h) !== -1)) { return h; }
 		try {
@@ -68,7 +70,9 @@
 	// Country -> language. Only countries whose national language matches the site's variant.
 	var MAP = {
 		PL: 'pl', DE: 'de', AT: 'de', LI: 'de', FR: 'fr', MC: 'fr', IT: 'it', SM: 'it', VA: 'it',
-		ES: 'es', AD: 'es', PT: 'pt', CZ: 'cs', RO: 'ro', MD: 'ro', TR: 'tr', CN: 'zh', NL: 'nl'
+		ES: 'es', AD: 'es', PT: 'pt', CZ: 'cs', RO: 'ro', MD: 'ro', TR: 'tr', CN: 'zh', NL: 'nl',
+		MX: 'mx', GT: 'mx', HN: 'mx', SV: 'mx', NI: 'mx', CR: 'mx', PA: 'mx', CU: 'mx', DO: 'mx', PR: 'mx',
+		CO: 'mx', VE: 'mx', EC: 'mx', PE: 'mx', BO: 'mx', CL: 'mx', AR: 'mx', UY: 'mx', PY: 'mx'
 	};
 	// Multilingual countries: use the browser's own language to choose; if none of these, no redirect.
 	var MULTI = { CH: ['de', 'fr', 'it'], BE: ['nl', 'fr'], LU: ['fr', 'de'] };
@@ -98,7 +102,8 @@
 
 	function go(lang) {
 		if (document.body && document.body.classList.contains('logged-in')) { return; }
-		var alt = document.querySelector('link[rel="alternate"][hreflang="' + lang + '"]');
+		var tag = (C.tags && C.tags[lang]) || lang;
+		var alt = document.querySelector('link[rel="alternate"][hreflang="' + tag + '"]');
 		if (!alt || !alt.href) { return; }
 		var search = location.search.replace(/([?&])acwpt_geo=[^&]*&?/, '$1').replace(/[?&]$/, '');
 		location.replace(alt.href + search + location.hash);
