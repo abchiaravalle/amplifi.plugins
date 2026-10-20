@@ -76,10 +76,17 @@
 	};
 	// Multilingual countries: use the browser's own language to choose; if none of these, no redirect.
 	var MULTI = { CH: ['de', 'fr', 'it'], BE: ['nl', 'fr'], LU: ['fr', 'de'] };
+	// Countries where only the browser's MAIN language decides (first entry of navigator.languages): a US visitor
+	// whose browser is set to Spanish gets Latin American Spanish; every other US visitor stays on the page they opened.
+	var BY_BROWSER = { US: { es: 'mx' } };
 
 	function pick(cc) {
 		if (!cc) { return null; }
 		if (MAP[cc]) { return MAP[cc]; }
+		if (BY_BROWSER[cc]) {
+			var main = String((navigator.languages && navigator.languages[0]) || navigator.language || '').slice(0, 2).toLowerCase();
+			return BY_BROWSER[cc][main] || null;
+		}
 		var opts = MULTI[cc];
 		if (!opts) { return null; }
 		var bl = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ''];
