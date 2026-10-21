@@ -227,6 +227,7 @@ if ( ! defined( 'AMPLIFI_FRAMEWORK_LOADED' ) ) {
 			'alt'       => [ 'name' => 'Alt',       'desc' => 'AI alt text for WordPress images.', 'icon' => 'dashicons-format-image' ],
 			'optimize'  => [ 'name' => 'Optimize',  'desc' => 'AI SEO triage — scan, propose fixes, approve.', 'icon' => 'dashicons-chart-line' ],
 			'consent'   => [ 'name' => 'Consent',   'desc' => 'Hard-withholding GDPR/CCPA cookie consent — trackers do not fire until the visitor accepts.', 'icon' => 'dashicons-privacy' ],
+			'aos'       => [ 'name' => 'AOS',       'desc' => 'Subtle staggered reveal animations as content scrolls into view.', 'icon' => 'dashicons-visibility' ],
 		];
 
 		$enabled = get_option( 'amplifi_plugins_enabled_features', [] );

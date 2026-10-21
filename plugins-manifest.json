@@ -56,6 +56,11 @@
       "name": "Consent",
       "description": "Cookie consent that withholds your tracking scripts until consent, keeps a best-effort server-side record, honors GPC, and can auto-block unmanaged trackers.",
       "icon": "dashicons-privacy"
+    },
+    "aos": {
+      "name": "AOS",
+      "description": "Subtle staggered reveal animations as content scrolls into view.",
+      "icon": "dashicons-visibility"
     }
   }
 }

@@ -3,7 +3,7 @@
  * Plugin Name:       amplifi.plugins
  * Plugin URI:        https://amplifi.studio/
  * Description:       The complete amplifi.studio WordPress suite. Schema, SEO optimization, security, translation, sync, magic links, podcasts, static cache, and more.
- * Version:           3.3.7
+ * Version:           3.4.0-dev.1
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Amplifi Studio
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'AMPLIFI_PLUGINS_VERSION', '3.3.7' );
+define( 'AMPLIFI_PLUGINS_VERSION', '3.4.0-dev.1' );
 define( 'AMPLIFI_PLUGINS_FILE', __FILE__ );
 define( 'AMPLIFI_PLUGINS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'AMPLIFI_PLUGINS_URL', plugin_dir_url( __FILE__ ) );
@@ -57,6 +57,7 @@ $amplifi_all_features = [
 	'alt'       => [ 'file' => 'features/alt/ac-alt-text.php',             'name' => 'Alt',       'desc' => 'AI alt text for WordPress images.' ],
 	'optimize'  => [ 'file' => 'features/optimize/amplifi-optimize.php',   'name' => 'Optimize',  'desc' => 'AI SEO triage — scan, propose fixes, approve.' ],
 	'consent'   => [ 'file' => 'features/consent/ac-consent.php',          'name' => 'Consent',   'desc' => 'Hard-withholding GDPR/CCPA cookie consent — trackers do not fire until the visitor accepts.' ],
+	'aos'       => [ 'file' => 'features/aos/ac-aos.php',                  'name' => 'AOS',       'desc' => 'Subtle staggered reveal animations as content scrolls into view.' ],
 ];
 
 // Load only enabled features. Default: none enabled.
