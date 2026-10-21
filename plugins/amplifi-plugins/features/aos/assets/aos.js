@@ -2,8 +2,10 @@
 (function (w, d) {
 	'use strict';
 
+	// Loaded twice (duplicate enqueue, optimizer)? Keep the first instance and bail.
+	if (w.__amplifiAos) { w.amplifiAos = w.__amplifiAos; return; }
 	var cfg = w.amplifiAos || {};
-	var api = w.amplifiAos = cfg;
+	var api = w.amplifiAos = w.__amplifiAos = cfg;
 	api.ready = false;
 
 	if (!('IntersectionObserver' in w) || !w.requestAnimationFrame || !d.querySelectorAll) { return; }
@@ -164,10 +166,12 @@
 	// sitting in view that can never reach the threshold (very end of the page).
 	function onScrollSettle() {
 		var vh = w.innerHeight;
+		var de = d.documentElement;
+		var atEnd = (w.pageYOffset || de.scrollTop) + vh >= de.scrollHeight - 2;
 		items.forEach(function (it) {
 			if (it.state !== 1) { return; }
 			var r = it.el.getBoundingClientRect();
-			if (r.bottom <= 0) { reveal(it, 0, true); } else if (r.top < vh * 0.92) { enqueue(it); }
+			if (r.bottom <= 0) { reveal(it, 0, true); } else if (r.top < vh * (atEnd ? 1 : 0.92)) { enqueue(it); }
 		});
 	}
 	function onScroll() {
@@ -189,6 +193,7 @@
 	function init() {
 		if (api.ready) { return; }
 		api.ready = true;
+		api.initY = Math.round(w.pageYOffset || 0);
 		var vh = w.innerHeight || d.documentElement.clientHeight;
 		var found = collect();
 		var hide = [];
@@ -231,16 +236,16 @@
 	}
 
 	api.state = function () {
-		var s = { targets: api.targets || 0, managed: items.length, hidden: 0, animating: 0, done: 0 };
+		var s = { targets: api.targets || 0, managed: items.length, hidden: 0, animating: 0, done: 0, initY: api.initY };
 		items.forEach(function (it) { if (it.state === 1) { s.hidden++; } else if (it.state === 2) { s.animating++; } else { s.done++; } });
 		return s;
 	};
 	api.revealAll = revealAll;
 
-	// Back/forward navigation and #anchor links restore the scroll position after load; start
-	// after that so content at the restored position is never hidden.
+	// Back/forward, reload and #anchor links restore or jump the scroll position during/after
+	// load; start after that so content at the restored position is never hidden.
 	var nav = (w.performance && w.performance.getEntriesByType) ? w.performance.getEntriesByType('navigation')[0] : null;
-	var late = (nav && nav.type === 'back_forward') || (w.location.hash && w.location.hash.length > 1);
+	var late = (nav && (nav.type === 'back_forward' || nav.type === 'reload')) || (w.location.hash && w.location.hash.length > 1);
 	if (late && d.readyState !== 'complete') {
 		w.addEventListener('load', function () { w.requestAnimationFrame(function () { setTimeout(init, 0); }); });
 	} else if (d.readyState === 'loading') {
