@@ -14,7 +14,9 @@
  *     acwpt_lang = the 2-letter language code the visitor explicitly chose in a language switcher. Set ONLY
  *                  by a click on a switcher link. Nothing else is stored in it, and it is never sent to any
  *                  third party (the server receives it with page requests and does not read it).
- *     acwpt_geo  = "1": this browser session's first page has been handled.
+ *     acwpt_geo  = this browser session's first page has been handled. Value "1", or the 2-letter code of the
+ *                  language that first page ended in (the country redirect's target, or the translated URL the
+ *                  visit started on), so a new tab can continue in that language.
  *   Purpose: remember a user-interface choice (language) for the session = a strictly necessary,
  *   consent-exempt "user interface customisation" cookie. It does not identify the visitor, track across
  *   sites, or carry analytics/advertising data.
@@ -26,6 +28,8 @@
  * - Picking a language in any switcher is remembered for the browser session (all tabs) and stops any
  *   further country redirect. If the visitor later opens an English page in a new tab, they are taken to
  *   that page in the language they chose. Choosing English means "never redirect" for the session.
+ * - With no switcher choice, a new tab continues in the language the visit started in (the country redirect's
+ *   target, or the translated page the visitor landed on), the same result a fresh country lookup gave before.
  * - Never redirects crawlers, headless browsers or logged-in editors.
  * - Test/escape hatch: ?acwpt_geo=PL simulates a country; ?acwpt_geo=0 turns it off for the visit.
  */
@@ -90,16 +94,19 @@
 
 	// 3. Once per visit: the first page decides. A new tab of the same browser session has empty
 	//    sessionStorage, so it is recognised by the session cookies instead.
-	if (SS.getItem(K_PREF) || SS.getItem(K_DONE)) { setCookie(CK_DONE, '1'); return; }
+	var doneCk = getCookie(CK_DONE);
+	if (SS.getItem(K_PREF) || SS.getItem(K_DONE)) { if (!doneCk) { setCookie(CK_DONE, '1'); } return; }
 	var chosen = getCookie(CK_LANG);
 	if (!isLang(chosen)) { chosen = null; }
-	var handled = getCookie(CK_DONE) === '1';
+	var handled = !!doneCk;
+	// Language this session's first page ended in (set below / by go()); "1" = handled, no language.
+	var sessLang = (doneCk && doneCk !== '1' && doneCk !== source && enabled.indexOf(doneCk) !== -1) ? doneCk : null;
 	SS.setItem(K_DONE, '1');
 	if (chosen) { try { SS.setItem(K_PREF, chosen); } catch (e) {} }
-	setCookie(CK_DONE, '1');
+	if (!handled) { setCookie(CK_DONE, cur !== source && enabled.indexOf(cur) !== -1 ? cur : '1'); }
 	if (cur !== source) { return; }
 	if (chosen === source) { return; } // chose English: never redirect this session
-	if (handled && !chosen) { return; } // this session already had its one country redirect decision
+	if (handled && !chosen && !sessLang) { return; } // this session already had its one country redirect decision
 
 	var ua = navigator.userAgent || '';
 	if (navigator.webdriver && !q) { return; }
@@ -151,6 +158,7 @@
 		var alt = document.querySelector('link[rel="alternate"][hreflang="' + tag + '"]');
 		if (!alt || !alt.href) { return; }
 		var search = location.search.replace(/([?&])acwpt_geo=[^&]*&?/, '$1').replace(/[?&]$/, '');
+		if (!chosen) { setCookie(CK_DONE, lang); } // new tabs continue in this language
 		location.replace(alt.href + search + location.hash);
 	}
 
@@ -163,8 +171,10 @@
 		}
 	}
 
-	// A language the visitor chose earlier in this browser session wins over the country.
+	// A language the visitor chose earlier in this browser session wins over the country,
+	// then the language this session started in.
 	if (chosen) { when(chosen); return; }
+	if (sessLang) { when(sessLang); return; }
 
 	country().then(function (cc) { when(pick(cc)); });
 })();
