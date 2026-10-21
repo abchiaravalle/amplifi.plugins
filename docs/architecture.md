@@ -44,7 +44,8 @@ plugins/amplifi-plugins/          <-- the ONLY thing that ships
     ├── schema/       ac-schema.php
     ├── security/     amplifi-security.php
     ├── sync/         ac-sync.php
-    └── translate/    ac-wp-translator.php
+    ├── translate/    ac-wp-translator.php
+    └── aos/          ac-aos.php
 ```
 
 ## Boot sequence
@@ -83,6 +84,7 @@ $amplifi_all_features = [
     'alt'       => [ 'file' => 'features/alt/ac-alt-text.php',            'name' => 'Alt',       ... ],
     'optimize'  => [ 'file' => 'features/optimize/amplifi-optimize.php',  'name' => 'Optimize',  ... ],
     'consent'   => [ 'file' => 'features/consent/ac-consent.php',         'name' => 'Consent',   ... ],
+    'aos'       => [ 'file' => 'features/aos/ac-aos.php',                 'name' => 'AOS',       ... ],
 ];
 ```
 
@@ -132,6 +134,7 @@ script:
 | security | `AMPLIFI_SECURITY_VERSION` |
 | sync | `ACSYNC_VERSION` |
 | translate | `ACWPT_VERSION` |
+| aos | `ACAOS_VERSION` |
 
 Two features (`schema`, `security`) deliberately omit `declare(strict_types=1)`
 from their entry file so the file still parses on PHP below 8.1 and can render a
@@ -210,6 +213,7 @@ slug**, so the page slug does not match the feature slug:
 | `security` | `amplifi-security` | `amplifi-security` | `amplifi-studio_page_amplifi-security` |
 | `sync` | `ac-sync` | `amplifi-ac-sync` | `amplifi-studio_page_amplifi-ac-sync` |
 | `translate` | `ac-wp-translator` | `amplifi-ac-wp-translator` | `amplifi-studio_page_amplifi-ac-wp-translator` |
+| `aos` | `ac-aos` | `amplifi-ac-aos` | `amplifi-studio_page_amplifi-ac-aos` |
 
 Guessing `amplifi-<feature-slug>` gives you an `admin_enqueue_scripts` comparison
 that silently never fires, which is a genuinely annoying bug to chase. **Nine of

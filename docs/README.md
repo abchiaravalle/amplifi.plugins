@@ -29,6 +29,7 @@ in the UI.
 | [LockCache](features/cache.md) | `cache` | Static HTML cache for password-protected posts |
 | [Pods](features/pods.md) | `pods` | Podcast carousel and floating player |
 | [Sync](features/sync.md) | `sync` | REST API sync between WordPress environments |
+| [AOS](features/aos.md) | `aos` | Subtle staggered reveal animations as content scrolls into view |
 
 ## Two things worth knowing up front
 

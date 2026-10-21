@@ -376,6 +376,19 @@ Same as amplifi.security: scope key to Messages API only, set spend caps in the 
 ### Relationship to amplifi.meta
 This plugin supersedes amplifi.meta's JSON-LD subsystem. When `AMPLIFI_SCHEMA_ACTIVE` is defined (always true when this plugin is loaded), amplifi.meta's `output_jsonld()` early-returns and its JSON-LD admin page shows a deprecation banner linking here. Existing data is imported via the one-time admin notice on activation. amplifi.meta's other features (SEO meta editor, FAQ generator) are unaffected.
 
+## Feature: AOS (`plugins/amplifi-plugins/features/aos/`)
+Subtle staggered reveal animations as content scrolls into view. Lives only inside the mega plugin (no legacy standalone dir). Full reference: `docs/features/aos.md`.
+
+### Feature registry
+
+| Slug | Name | Entry file | Version constant | AI provider |
+|---|---|---|---|---|
+| `aos` | AOS | `features/aos/ac-aos.php` | `ACAOS_VERSION` | none |
+
+- Registers as `ac-aos` → page `amplifi-ac-aos`, hook suffix `amplifi-studio_page_amplifi-ac-aos`.
+- Settings: one option `amplifi_aos_settings` (`scope`, `page_ids`, `rules`, `distance`, `distance_mobile`, `duration`, `stagger`, `easing`, `animate_on_load`). No tables.
+- Front end: `assets/aos.js` (vanilla, IntersectionObserver, CSS transitions only, never keyframes). Targets = `[data-aos]` + selector rules. Only hides targets below the viewport at load; respects `prefers-reduced-motion`.
+
 ## Go TUI: amplifi.sync (`tools/sync-tui/`)
 Terminal UI orchestrator for syncing between WordPress environments.
 
