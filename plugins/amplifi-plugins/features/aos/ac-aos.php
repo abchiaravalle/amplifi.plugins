@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( defined( 'ACAOS_VERSION' ) ) {
 	return;
 }
-define( 'ACAOS_VERSION', '3.4.0-dev.1' );
+define( 'ACAOS_VERSION', '3.4.0-dev.2' );
 define( 'ACAOS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ACAOS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'ACAOS_PLUGIN_FILE', __FILE__ );
@@ -58,6 +58,7 @@ class Amplifi_AOS {
 	/** Easing presets. All are ease-out curves with y in [0,1]: no overshoot, no bounce. */
 	public static function easings() {
 		return array(
+			'spring'   => array( 'label' => 'Spring (damped)', 'css' => 'linear(0, 0.0464, 0.1494, 0.2724, 0.3953, 0.5079, 0.6059, 0.6883, 0.756, 0.8106, 0.854, 0.8881, 0.9147, 0.9353, 0.9511, 0.9632, 0.9723, 0.9793, 0.9845, 0.9885, 0.9914, 0.9936, 0.9953, 0.9965, 0.9974, 0.9981, 0.9986, 1)' ),
 			'expo'     => array( 'label' => 'Expo out',     'css' => 'cubic-bezier(0.16, 1, 0.3, 1)' ),
 			'quart'    => array( 'label' => 'Quart out',    'css' => 'cubic-bezier(0.25, 1, 0.5, 1)' ),
 			'cubic'    => array( 'label' => 'Cubic out',    'css' => 'cubic-bezier(0.33, 1, 0.68, 1)' ),
@@ -77,6 +78,7 @@ class Amplifi_AOS {
 			'stagger'         => 90,
 			'easing'          => 'expo',
 			'animate_on_load' => false,
+			'blur'            => 0,
 		);
 	}
 
@@ -135,6 +137,7 @@ class Amplifi_AOS {
 		$out['distance_mobile'] = self::clamp_int( $in['distance_mobile'] ?? null, 0, 60, $d['distance_mobile'] );
 		$out['duration']        = self::clamp_int( $in['duration'] ?? null, 150, 1500, $d['duration'] );
 		$out['stagger']         = self::clamp_int( $in['stagger'] ?? null, 0, 300, $d['stagger'] );
+		$out['blur']            = self::clamp_int( $in['blur'] ?? null, 0, 20, $d['blur'] );
 
 		$easing        = isset( $in['easing'] ) ? (string) $in['easing'] : $d['easing'];
 		$out['easing'] = array_key_exists( $easing, self::easings() ) ? $easing : $d['easing'];
@@ -207,6 +210,7 @@ class Amplifi_AOS {
 			'stagger'        => $s['stagger'],
 			'maxDelay'       => self::MAX_DELAY,
 			'easing'         => $easings[ $s['easing'] ]['css'],
+			'blur'           => $s['blur'],
 			'animateOnLoad'  => (bool) $s['animate_on_load'],
 		);
 		$config = apply_filters( 'amplifi_aos_config', $config, $s );
@@ -238,6 +242,7 @@ class Amplifi_AOS {
 			'distance_mobile' => $post['distance_mobile'] ?? null,
 			'duration'        => $post['duration'] ?? null,
 			'stagger'         => $post['stagger'] ?? null,
+			'blur'            => $post['blur'] ?? null,
 			'easing'          => isset( $post['easing'] ) ? sanitize_key( $post['easing'] ) : '',
 			'animate_on_load' => ! empty( $post['animate_on_load'] ),
 		);
@@ -295,6 +300,10 @@ class Amplifi_AOS {
 					<tr>
 						<th scope="row"><label for="acaos-stagger">Stagger (ms)</label></th>
 						<td><input type="number" id="acaos-stagger" name="stagger" min="0" max="300" step="5" class="small-text" value="<?php echo esc_attr( $s['stagger'] ); ?>"></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="acaos-blur">Text blur (px)</label></th>
+						<td><input type="number" id="acaos-blur" name="blur" min="0" max="20" step="1" class="small-text" value="<?php echo esc_attr( $s['blur'] ); ?>"></td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="acaos-easing">Easing</label></th>

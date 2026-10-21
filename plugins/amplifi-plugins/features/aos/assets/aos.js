@@ -18,7 +18,13 @@
 	var DUR = num(cfg.duration, 800);
 	var STAG = num(cfg.stagger, 90);
 	var MAXD = num(cfg.maxDelay, 450);
-	var EASE = (typeof cfg.easing === 'string' && /^[a-z0-9.,()\s-]+$/i.test(cfg.easing)) ? cfg.easing : 'cubic-bezier(0.16, 1, 0.3, 1)';
+	var EXPO = 'cubic-bezier(0.16, 1, 0.3, 1)';
+	var EASE = (typeof cfg.easing === 'string' && /^[a-z0-9.,()\s-]+$/i.test(cfg.easing)) ? cfg.easing : EXPO;
+	// linear() (spring preset) needs a current browser; fall back to expo where it is not supported
+	if (/^linear\(/.test(EASE) && !(w.CSS && w.CSS.supports && w.CSS.supports('transition-timing-function', 'linear(0, 1)'))) { EASE = EXPO; }
+	var BLUR = Math.max(0, Math.min(20, num(cfg.blur, 0)));
+	// opacity lands first (55% of the time, gentle ease-out) while the movement keeps settling: reads damped, never floaty
+	var FADE = 'cubic-bezier(0.25, 0.1, 0.25, 1)';
 	var RATIO = 0.12;
 
 	var items = [], queue = [], raf = 0, nextSlot = 0, io = null, scrollTimer = 0;
@@ -70,7 +76,9 @@
 		});
 	}
 
-	var PROPS = ['opacity', 'transform', 'transition'];
+	var PROPS = ['opacity', 'transform', 'transition', 'filter'];
+	// soft blur only on text-only targets (blurring photos/video is expensive and looks smeared)
+	function blurs(el) { return BLUR > 0 && !el.querySelector('img,picture,video,iframe,svg,canvas'); }
 	function saveStyle(el) {
 		var s = {};
 		PROPS.forEach(function (p) { s[p] = [el.style.getPropertyValue(p), el.style.getPropertyPriority(p)]; });
@@ -89,6 +97,7 @@
 			// transition is still "none": restore the end state, commit it, then hand transitions back.
 			restoreProp(it, 'opacity');
 			restoreProp(it, 'transform');
+			restoreProp(it, 'filter');
 			void el.offsetWidth;
 			restoreProp(it, 'transition');
 			it.state = 3;
@@ -96,12 +105,15 @@
 		}
 		it.state = 2;
 		var tr = DUR + 'ms ' + EASE + ' ' + delay + 'ms';
-		el.style.setProperty('transition', 'opacity ' + tr + ', transform ' + tr, 'important');
+		var fo = Math.round(DUR * 0.55) + 'ms ' + FADE + ' ' + delay + 'ms';
+		var fl = it.blur ? ', filter ' + Math.round(DUR * 0.7) + 'ms ' + FADE + ' ' + delay + 'ms' : '';
+		el.style.setProperty('transition', 'opacity ' + fo + ', transform ' + tr + fl, 'important');
 		restoreProp(it, 'opacity');
 		restoreProp(it, 'transform');
+		restoreProp(it, 'filter');
 		var timer = 0;
 		function done(e) {
-			if (e && (e.target !== el || e.propertyName !== 'opacity')) { return; }
+			if (e && (e.target !== el || e.propertyName !== 'transform')) { return; }
 			if (it.state !== 2) { return; }
 			el.removeEventListener('transitionend', done);
 			clearTimeout(timer);
@@ -216,6 +228,8 @@
 			el.style.setProperty('opacity', '0', 'important');
 			var t = hiddenTransform(it.v, it.base);
 			if (t) { el.style.setProperty('transform', t, 'important'); }
+			it.blur = blurs(el);
+			if (it.blur) { el.style.setProperty('filter', 'blur(' + BLUR + 'px)', 'important'); }
 			it.state = 1;
 			el._amplifiAos = it;
 			items.push(it);
