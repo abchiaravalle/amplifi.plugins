@@ -526,7 +526,10 @@ Two supporting mechanisms:
   infrastructure is ever allowlisted — never an arbitrary third party. When
   `googletagmanager.com` is present, the GA collect endpoints are added unconditionally,
   because GTM injects GA4 which pings hosts that do not literally appear in the container
-  loader snippet.
+  loader snippet. When a CM-flagged script carries a Google Ads tag (`AW-` id),
+  `googleadservices.com` is added too: that is where the Ads tag sends its conversion
+  pings, so without it a visitor who has not accepted marketing sends cookieless page-view
+  pings but never a cookieless conversion ping, and Google has no conversions to model.
 
 **The CM allowlist yields to opt-out.** In the shim's `blocked()`, `saleBlocked(url) ||
 spiBlocked(url)` is checked *before* the CM allowlist, so a GPC / Do-Not-Sell / Limit-SPI

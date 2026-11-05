@@ -890,6 +890,15 @@ gtag('consent','default',{
 					$hosts[] = $h;
 				}
 			}
+			// A Google Ads tag (gtag.js?id=AW-...) sends its conversion pings through
+			// googleadservices.com. Without it here, a visitor who has not accepted
+			// marketing still gets the cookieless page_view pings but never the
+			// cookieless conversion ping, so Google sees visits and no conversions to
+			// model from. Only Google's own Consent-Mode-aware conversion endpoint is
+			// added, and only when a CM-flagged script actually carries an AW- tag.
+			if ( preg_match( '/\baw-\d{6,}/', $code ) || false !== strpos( $code, 'googleadservices.com' ) ) {
+				$hosts[] = 'googleadservices.com';
+			}
 		}
 		// Always include the GA collect endpoints when GTM is present — GTM
 		// injects GA4, which pings *.google-analytics.com even though that host
